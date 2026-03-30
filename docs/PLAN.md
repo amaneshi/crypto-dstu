@@ -324,22 +324,18 @@ crypto-dstu/
 - [x] HTTP client (POST application/timestamp-query, mock-testable)
 - [x] Tests: 18 tests covering request build/marshal, response parse, TSTInfo extraction, verify valid/wrong-hash/nonce-mismatch/invalid-DER, HTTP client mock/error/bad-URL
 
-### Phase 12 — High-Level API `[ua]`
-> **Reference:** agent CLI workflows
+### Phase 12 — High-Level API `[ua]` ✅ Complete
+> **Reference:** agent CLI workflows, RFC 5652
 
-- [ ] `Box` — stateful context holding loaded keys, certificates, CA list
-- [ ] `SignDocument(key, certs, data, opts) → signedContainer`
-  - Signing order: accountant → director → seal → branch seal → XML
-  - Options: detached, no-tax, TSP level
-- [ ] `UnsignDocument(container, caList) → (data, signerInfo, error)`
-  - Verify all signatures, check timestamps, return original data
-- [ ] `EncryptDocument(recipientCert, senderKey, data) → encrypted`
-  - ECDH key agreement → GOST/Kalyna symmetric encryption
-- [ ] `DecryptDocument(key, encrypted) → plaintext`
-- [ ] `GetCertInfo(certDER) → CertInfo`
-- [ ] `VerifyCert(cert, rootCert) → error`
-- [ ] `VerifyCertPKMatch(cert, privateKey) → error`
-- [ ] Tests: full sign→encrypt→decrypt→unsign roundtrip
+- [x] `Box` — stateful context: keys, CA certs, TSP clients; `LoadKey`, `AddCert`, `AddTSP`, `KeyByRole`
+- [x] `SignDocument` — raw CMS (NoTax) or transport container; detached support
+- [x] `UnsignDocument` — transport container or raw CMS; cert injection fallback via `cms.ResolveCertificates`
+- [x] `EncryptDocument` / `DecryptDocument` — ECDH+GOST28147 roundtrip
+- [x] `SignAndEncrypt` — sign then encrypt, returns transport container or raw CMS
+- [x] `GetCertInfo` / `certInfoFromCert` — wraps `cert.ExtractCertInfo`
+- [x] `VerifyCert`, `VerifyCertPKMatch`, `VerifyCertPKMatchDirect`
+- [x] `cms.ResolveCertificates` added to cms package for post-hoc SID matching
+- [x] Tests: 21 tests covering Box lifecycle, sign/unsign roundtrip, encrypt/decrypt, SignAndEncrypt, certinfo, verify
 
 ### Phase 13 — CZO Test Examples `[testdata/czo]`
 > **Reference:** https://czo.gov.ua/testexamples
@@ -366,7 +362,7 @@ crypto-dstu/
 | 9 | `transport` | ✅ Complete | Section encode/decode; TRANSPORTABLE header; CRC32; Container Encode/Decode; 26 tests |
 | 10 | `cms` | ✅ Complete | Depends on Phase 5, 8 |
 | 11 | `tsp` | ✅ Complete | Depends on Phase 3, 10 |
-| 12 | `ua` | 🔲 Not started | Depends on all above |
+| 12 | `ua` | ✅ Complete | Depends on all above |
 | 13 | `testdata/czo` | 🔲 Not started | Depends on Phase 10-12 |
 
 ### Dependency Graph

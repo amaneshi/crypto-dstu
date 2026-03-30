@@ -192,7 +192,8 @@ type parsedSignedData struct {
 }
 
 // marshalSignedData manually encodes a SignedData SEQUENCE.
-func marshalSignedData(version int, digestAlgOID asn1.ObjectIdentifier, eci EncapsulatedContentInfo, signerInfos []SignerInfo) ([]byte, error) {
+// certDERs contains raw DER of certificates to embed in [0] IMPLICIT.
+func marshalSignedData(version int, digestAlgOID asn1.ObjectIdentifier, eci EncapsulatedContentInfo, signerInfos []SignerInfo, certDERs ...[]byte) ([]byte, error) {
 	versionDER, err := asn1.Marshal(version)
 	if err != nil {
 		return nil, err
@@ -226,6 +227,16 @@ func marshalSignedData(version int, digestAlgOID asn1.ObjectIdentifier, eci Enca
 	inner := versionDER
 	inner = append(inner, digestAlgSetDER...)
 	inner = append(inner, eciDER...)
+
+	// Optional [0] IMPLICIT SEQUENCE OF Certificate
+	if len(certDERs) > 0 {
+		var certBytes []byte
+		for _, der := range certDERs {
+			certBytes = append(certBytes, der...)
+		}
+		inner = append(inner, tlv(0xa0, certBytes)...)
+	}
+
 	inner = append(inner, signerInfosSetDER...)
 	return marshalSEQ(inner), nil
 }
@@ -374,6 +385,7 @@ type SignerResult struct {
 	SigningTime time.Time
 	Valid       bool
 	Error       error
+	sid         IssuerAndSerialNumber // unexported; used by ResolveCertificates
 }
 
 // Sign creates a CMS SignedData for content using the given private key and certificate.
@@ -434,7 +446,7 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 		eci.EContent = content
 	}
 
-	sdDER, err := marshalSignedData(1, digestAlgOID, eci, []SignerInfo{si})
+	sdDER, err := marshalSignedData(1, digestAlgOID, eci, []SignerInfo{si}, signerCert.Raw)
 	if err != nil {
 		return nil, errors.New("cms: marshal SignedData: " + err.Error())
 	}
@@ -479,7 +491,7 @@ func ParseSigned(der []byte) (*SignedMessage, error) {
 	}
 
 	for _, si := range sd.SignerInfos {
-		sr := SignerResult{}
+		sr := SignerResult{sid: si.SID}
 		for _, c := range msg.Certificates {
 			if matchesSID(c, si.SID) {
 				sr.Certificate = c
@@ -491,6 +503,23 @@ func ParseSigned(der []byte) (*SignedMessage, error) {
 	}
 
 	return msg, nil
+}
+
+// ResolveCertificates re-runs SID matching for any signer whose Certificate is still nil.
+// Call this after adding extra certificates to msg.Certificates.
+func ResolveCertificates(msg *SignedMessage) {
+	for i := range msg.Signers {
+		if msg.Signers[i].Certificate != nil {
+			continue
+		}
+		sid := msg.Signers[i].sid
+		for _, c := range msg.Certificates {
+			if matchesSID(c, sid) {
+				msg.Signers[i].Certificate = c
+				break
+			}
+		}
+	}
 }
 
 // VerifySigned verifies signatures in a parsed SignedMessage.
