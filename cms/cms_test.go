@@ -167,11 +167,8 @@ func TestSignVerifyTamperedContent(t *testing.T) {
 	require.NoError(t, err)
 
 	tampered := []byte("Tampered content!")
-	msg, err := VerifySignedRaw(der, tampered, []*cert.Certificate{c})
-	require.NoError(t, err)
-	require.Len(t, msg.Signers, 1)
-	require.False(t, msg.Signers[0].Valid)
-	require.Error(t, msg.Signers[0].Error)
+	_, err = VerifySignedRaw(der, tampered, []*cert.Certificate{c})
+	require.Error(t, err)
 }
 
 func TestParseSigned(t *testing.T) {

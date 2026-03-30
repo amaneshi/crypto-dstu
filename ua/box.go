@@ -105,6 +105,27 @@ func (b *Box) AddCertFile(path string) error {
 	return b.AddCert(data)
 }
 
+// LoadCABundle parses a DER or PEM certificate bundle (concatenated certs or PKCS#7 certs-only)
+// and adds all found certificates to the CACerts pool.
+func (b *Box) LoadCABundle(data []byte) error {
+	data = keystore.MaybePEM(data)
+	certs, err := cert.ParseCertificates(data)
+	if err != nil {
+		return errors.New("ua: LoadCABundle: " + err.Error())
+	}
+	b.CACerts = append(b.CACerts, certs...)
+	return nil
+}
+
+// LoadCABundleFile reads a certificate bundle file from disk and calls LoadCABundle.
+func (b *Box) LoadCABundleFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return errors.New("ua: LoadCABundleFile: " + err.Error())
+	}
+	return b.LoadCABundle(data)
+}
+
 // AddTSP registers a TSP server URL.
 func (b *Box) AddTSP(url string) {
 	b.TSPClients = append(b.TSPClients, tsp.NewClient(url))

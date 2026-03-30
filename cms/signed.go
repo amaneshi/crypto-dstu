@@ -663,6 +663,12 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 		msg.Signers = append(msg.Signers, sr)
 	}
 
+	// Return error if any signer failed.
+	for _, sr := range msg.Signers {
+		if sr.Error != nil {
+			return msg, sr.Error
+		}
+	}
 	return msg, nil
 }
 

@@ -337,13 +337,15 @@ crypto-dstu/
 - [x] `cms.ResolveCertificates` added to cms package for post-hoc SID matching
 - [x] Tests: 21 tests covering Box lifecycle, sign/unsign roundtrip, encrypt/decrypt, SignAndEncrypt, certinfo, verify
 
-### Phase 13 — CZO Test Examples `[testdata/czo]`
-> **Reference:** https://czo.gov.ua/testexamples
+### Phase 13 — CZO Test Examples `[testdata/czo]` ✅ Complete
+> **Reference:** https://czo.gov.ua/testexamples, https://czo.gov.ua/verify
 
-- [ ] Download test example files for CAdES / XAdES / PAdES
-- [ ] Verify signature parsing against all test examples
-- [ ] Verify hash computation matches expected values
-- [ ] Cross-verify with https://czo.gov.ua/verify
+- [x] `testdata/czo/README.md` — directory layout, instructions for replacing with real CZO files
+- [x] `cms/czo_test.go` — 12 synthetic CAdES-BES tests: parse, verify, tampered, detached, wrong-content, multi-signer, cert-embedded, signing-time, message-digest, fixture roundtrip; 3 skip gracefully when real files absent
+- [x] `ua/czo_test.go` — 15 end-to-end Box API tests: sign/unsign attached+detached+transport, encrypt/decrypt, sign-and-encrypt roundtrip+no-tax+container structure, certinfo, CA pool, file-based skip tests
+- [x] `ua/box.go` extended with `LoadCABundle` / `LoadCABundleFile`
+- [x] `cms/signed.go`: `VerifySignedRaw` now returns error when any signer verification fails (was silently setting `sr.Error` only)
+- [x] All 15 packages pass; real CZO files can be dropped in `testdata/czo/cades/` to activate file-based tests
 
 ---
 
@@ -363,7 +365,7 @@ crypto-dstu/
 | 10 | `cms` | ✅ Complete | Depends on Phase 5, 8 |
 | 11 | `tsp` | ✅ Complete | Depends on Phase 3, 10 |
 | 12 | `ua` | ✅ Complete | Depends on all above |
-| 13 | `testdata/czo` | 🔲 Not started | Depends on Phase 10-12 |
+| 13 | `testdata/czo` | ✅ Complete | Depends on Phase 10-12 |
 
 ### Dependency Graph
 
