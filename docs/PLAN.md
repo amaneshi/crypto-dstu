@@ -314,13 +314,15 @@ crypto-dstu/
 - [x] Manual ASN.1 encode/decode for SignerInfo, SignedData, KeyAgreeRecipientInfo (fixes Go asn1 RawValue+big.Int bug)
 - [x] Tests: 26 tests covering sign/verify roundtrip, detached, tampered content, custom content type, encrypt/decrypt roundtrip, wrong key, invalid DER, error cases
 
-### Phase 11 — Timestamp Protocol `[tsp]`
-> **Reference:** jkurwa `lib/util/tsp.js`, RFC 3161
+### Phase 11 — Timestamp Protocol `[tsp]` ✅ Complete
+> **Reference:** RFC 3161, RFC 5816
 
-- [ ] TSP request building (hash algorithm OID + message imprint)
-- [ ] TSP response parsing
-- [ ] Timestamp token verification
-- [ ] Tests: mock TSP roundtrip
+- [x] TSP request building (hash algorithm OID + message imprint, random nonce, CertReq)
+- [x] TSP response parsing (PKIStatusInfo, TimeStampToken extraction)
+- [x] TSTInfo parsing from CMS SignedData eContent
+- [x] Timestamp token verification (CMS sig + hash imprint + nonce)
+- [x] HTTP client (POST application/timestamp-query, mock-testable)
+- [x] Tests: 18 tests covering request build/marshal, response parse, TSTInfo extraction, verify valid/wrong-hash/nonce-mismatch/invalid-DER, HTTP client mock/error/bad-URL
 
 ### Phase 12 — High-Level API `[ua]`
 > **Reference:** agent CLI workflows
@@ -363,7 +365,7 @@ crypto-dstu/
 | 8 | `cert`, `oid` | ✅ Complete | OID registry; X.509v3 parse; CertInfo; chain verify; role detection; PKMatch |
 | 9 | `transport` | ✅ Complete | Section encode/decode; TRANSPORTABLE header; CRC32; Container Encode/Decode; 26 tests |
 | 10 | `cms` | ✅ Complete | Depends on Phase 5, 8 |
-| 11 | `tsp` | 🔲 Not started | Depends on Phase 3, 10 |
+| 11 | `tsp` | ✅ Complete | Depends on Phase 3, 10 |
 | 12 | `ua` | 🔲 Not started | Depends on all above |
 | 13 | `testdata/czo` | 🔲 Not started | Depends on Phase 10-12 |
 
