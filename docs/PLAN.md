@@ -374,15 +374,16 @@ crypto-dstu/
 - [x] `keystore.MarshalPrivateKeyDER` / `MarshalPrivateKeyPEM` added
 - [x] All 14 packages pass; binary smoke-tested with real CZO cert
 
-### Phase 15 — Root README ⬜ Pending
+### Phase 15 — Root README ✅ Complete
 > **Reference:** dstucrypt/agent README style
 
-- [ ] Installation section (`go install` for CLI, `go get` for library)
-- [ ] Complete CLI reference with copy-pastable examples for all subcommands
-- [ ] Library usage snippets: sign, verify, encrypt, decrypt, certinfo, raw primitives
-- [ ] Supported key format table (Key-6.dat, JKS, PKCS#12, raw DER, PEM)
-- [ ] Package reference table
-- [ ] Compatibility notes (cryptonite-aligned, tested against CZO)
+- [x] Installation section (build from source + future `go install` once published)
+- [x] Complete CLI reference with copy-pastable examples for all subcommands
+- [x] Library usage snippets: sign, verify, encrypt, decrypt, certinfo, raw primitives
+- [x] Supported key format table (Key-6.dat, JKS, PKCS#12, raw DER, PEM)
+- [x] Package reference table
+- [x] Compatibility notes (cryptonite-aligned, tested against CZO)
+- [x] Reviewed and corrected against implementation: `gost28147.NewCipher`, `dstu4145.UnmarshalSignature(der, words)`, `priv.Public()`, `keystore.Parse`, nil guard on `CertInfo`, honest notes on `-tsp-level`/`-include-chain`
 
 ---
 
@@ -404,7 +405,7 @@ crypto-dstu/
 | 12 | `ua` | ✅ Complete | Depends on all above |
 | 13 | `testdata/czo` | ✅ Complete | Depends on Phase 10-12 |
 | 14 | `cmd/dstu` | ✅ Complete | CLI tool; depends on Phase 12, 7 |
-| 15 | `README.md` | ⬜ Pending | Root docs; depends on Phase 14 |
+| 15 | `README.md` | ✅ Complete | Root docs; depends on Phase 14 |
 
 ### Dependency Graph
 

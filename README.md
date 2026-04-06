@@ -26,15 +26,27 @@ Aligned with the [cryptonite](https://github.com/privat-it/cryptonite) reference
 
 ### CLI tool
 
+Clone the repository and build:
+
 ```bash
-go install crypto-dstu/cmd/dstu@latest
+git clone https://github.com/your-org/crypto-dstu
+cd crypto-dstu
+go build -o dstu ./cmd/dstu
+```
+
+Once the module is published to a Go proxy:
+
+```bash
+go install github.com/your-org/crypto-dstu/cmd/dstu@latest
 ```
 
 ### Library
 
 ```bash
-go get crypto-dstu
+go get github.com/your-org/crypto-dstu
 ```
+
+> **Note:** The module is currently named `crypto-dstu` (local). Replace `github.com/your-org/crypto-dstu` with the actual published module path.
 
 Requires Go 1.21 or later.
 
@@ -102,6 +114,8 @@ dstu sign \
   -input text.pdf \
   -output text.pdf.p7s
 ```
+
+> **Note:** `-tsp-level` and `-include-chain` flags are accepted by the CLI but TSP stamping and CAdES-C/X chain embedding are not yet wired into the output — they are reserved for a future release.
 
 #### `dstu sign` flags
 
@@ -290,7 +304,11 @@ if err != nil {
 
 fmt.Println(string(result.Content))
 for _, s := range result.Signers {
-    fmt.Printf("signer: %s valid=%v\n", s.CertInfo.CommonName, s.Valid)
+    name := "<unknown>"
+    if s.CertInfo != nil {
+        name = s.CertInfo.CommonName
+    }
+    fmt.Printf("signer: %s valid=%v\n", name, s.Valid)
 }
 ```
 
@@ -349,15 +367,24 @@ import (
     "crypto/rand"
     "crypto-dstu/dstu4145"
     "crypto-dstu/ec"
+    "crypto-dstu/kupyna"
 )
 
 priv, err := dstu4145.GenerateKey(rand.Reader, ec.DSTU_PB_257)
-pub := priv.Public()
+pub := priv.Public() // *dstu4145.PublicKey
 
-hash := make([]byte, 32) // Kupyna-256 digest
-sig, err := priv.Sign(rand.Reader, hash, nil)
+// Hash the message with Kupyna-256
+h := kupyna.New256()
+h.Write([]byte("hello"))
+digest := h.Sum(nil)
 
-ok := dstu4145.Verify(pub, hash, sig)
+// Sign returns ASN.1-encoded (r, s) via crypto.Signer interface
+sigBytes, err := priv.Sign(rand.Reader, digest, nil)
+
+// Unmarshal to *dstu4145.Signature for low-level Verify
+sig, err := dstu4145.UnmarshalSignature(sigBytes, priv.Curve.Words)
+
+ok := dstu4145.Verify(pub, digest, sig)
 ```
 
 **Kupyna hash:**
@@ -375,17 +402,22 @@ digest := h.Sum(nil) // 32 bytes
 ```go
 import "crypto-dstu/gost28147"
 
-block, err := gost28147.New(key) // 32-byte key
-// Use with cipher.NewCFBEncrypter / cipher.NewCBCEncrypter etc.
+block, err := gost28147.NewCipher(key) // 32-byte key, returns cipher.Block
+// Use with gost28147.NewCFBEncrypter / gost28147.NewCFBDecrypter
 ```
 
 **Load a key from any container format:**
 
 ```go
-import "crypto-dstu/keystore"
+import (
+    "os"
+    "crypto-dstu/keystore"
+)
 
-priv, err := keystore.ParseFile("Key-6.dat", "password")
-// Returns *dstu4145.PrivateKey, format auto-detected
+data, err := os.ReadFile("Key-6.dat")
+result, err := keystore.Parse(data, "password")
+// result.Keys[0] is *dstu4145.PrivateKey, format auto-detected
+// result.Format is keystore.FormatKey6 / FormatJKS / FormatPKCS12 / etc.
 ```
 
 ---
