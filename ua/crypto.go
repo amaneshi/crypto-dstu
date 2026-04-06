@@ -5,6 +5,7 @@ import (
 
 	"crypto-dstu/cert"
 	"crypto-dstu/cms"
+	"crypto-dstu/keystore"
 	"crypto-dstu/transport"
 )
 
@@ -42,6 +43,26 @@ func (b *Box) DecryptDocument(data []byte) ([]byte, error) {
 		return nil, errors.New("ua: DecryptDocument: parse: " + err.Error())
 	}
 	return cms.DecryptEnveloped(msg, entry.PrivateKey, entry.CryptCert)
+}
+
+// EncryptForRecipientDER is like EncryptDocument but accepts raw DER/PEM cert bytes.
+func (b *Box) EncryptForRecipientDER(content []byte, recipientDER []byte) ([]byte, error) {
+	recipientDER = keystore.MaybePEM(recipientDER)
+	rc, err := cert.ParseCertificate(recipientDER)
+	if err != nil {
+		return nil, errors.New("ua: EncryptForRecipientDER: parse cert: " + err.Error())
+	}
+	return b.EncryptDocument(content, rc)
+}
+
+// SignAndEncryptDER is like SignAndEncrypt but accepts raw DER/PEM cert bytes for the recipient.
+func (b *Box) SignAndEncryptDER(content []byte, recipientDER []byte, opts SignOptions) ([]byte, error) {
+	recipientDER = keystore.MaybePEM(recipientDER)
+	rc, err := cert.ParseCertificate(recipientDER)
+	if err != nil {
+		return nil, errors.New("ua: SignAndEncryptDER: parse cert: " + err.Error())
+	}
+	return b.SignAndEncrypt(content, rc, opts)
 }
 
 // SignAndEncrypt signs content then encrypts the signed CMS for a recipient.

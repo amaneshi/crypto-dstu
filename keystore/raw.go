@@ -119,6 +119,22 @@ func MarshalRawKey(priv *dstu4145.PrivateKey) ([]byte, error) {
 	return asn1.Marshal(ki)
 }
 
+// MarshalPrivateKeyDER encodes a DSTU 4145 private key as unencrypted PKCS#8 DER.
+// Alias for MarshalRawKey.
+func MarshalPrivateKeyDER(priv *dstu4145.PrivateKey) ([]byte, error) {
+	return MarshalRawKey(priv)
+}
+
+// MarshalPrivateKeyPEM encodes a DSTU 4145 private key as a PEM-wrapped
+// unencrypted PKCS#8 "PRIVATE KEY" block.
+func MarshalPrivateKeyPEM(priv *dstu4145.PrivateKey) ([]byte, error) {
+	der, err := MarshalRawKey(priv)
+	if err != nil {
+		return nil, err
+	}
+	return EncodePEM(der, "PRIVATE KEY"), nil
+}
+
 // paramsByPtr returns the DomainParams whose Curve matches by value (M + N bytes).
 // ec.DSTUxxx() creates a new *Curve on each call so pointer equality is unreliable.
 func paramsByPtr(curve *ec.Curve) *dstu4145.DomainParams {

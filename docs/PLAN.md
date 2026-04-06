@@ -359,20 +359,20 @@ crypto-dstu/
 - [x] `cms/signed.go`: `VerifySignedRaw` now returns error when any signer verification fails (was silently setting `sr.Error` only)
 - [x] All 15 packages pass; real CZO files can be dropped in `testdata/czo/cades/` to activate file-based tests
 
-### Phase 14 — CLI Tool `[cmd/dstu]` ⬜ Pending
+### Phase 14 — CLI Tool `[cmd/dstu]` ✅ Complete
 > **Reference:** dstucrypt/agent README, `ua` package API
 
-- [ ] `main.go` — subcommand dispatch: sign, decrypt, encrypt, certinfo, unprotect
-- [ ] `flags.go` — `buildBox` helper, `multiFlag`, `mustRead`/`mustWrite` I/O helpers
-- [ ] `cmd_sign.go` — `dstu sign`: `-key`, `-cert`, `-ca`, `-input`, `-output`, `-no-tax`, `-detached`, `-tsp`, `-tsp-level`, `-role`, `-email`, `-filename`, `-crypt`, `-include-chain`
-- [ ] `cmd_decrypt.go` — `dstu decrypt`: `-key`, `-ca`, `-input`, `-output`, `-role`, `-v`; auto-detects transport container vs raw CMS vs encrypted
-- [ ] `cmd_encrypt.go` — `dstu encrypt`: `-key`, `-cert`, `-crypt`, `-input`, `-output`
-- [ ] `cmd_certinfo.go` — `dstu certinfo`: `-cert`, `-json`; human-readable or JSON output
-- [ ] `cmd_unprotect.go` — `dstu unprotect`: `-key path:password`, `-output`, `-der`
-- [ ] stdin/stdout support (`-input -` / `-output -`)
-- [ ] Add thin `ua.Box` helpers: `SignAndEncryptFile`, `EncryptForRecipientDER`
-- [ ] Add `keystore.MarshalPrivateKeyDER` / `MarshalPrivateKeyPEM`
-- [ ] Integration tests in `cmd/dstu/main_test.go`
+- [x] `main.go` — subcommand dispatch: sign, decrypt, encrypt, certinfo, unprotect
+- [x] `flags.go` — `buildBox` helper, `multiFlag`, `mustRead`/`mustWrite` I/O helpers
+- [x] `cmd_sign.go` — `dstu sign`: `-key`, `-cert`, `-ca`, `-input`, `-output`, `-no-tax`, `-detached`, `-tsp`, `-tsp-level`, `-role`, `-email`, `-filename`, `-crypt`, `-include-chain`
+- [x] `cmd_decrypt.go` — `dstu decrypt`: `-key`, `-ca`, `-input`, `-output`, `-role`, `-v`; auto-detects transport container vs raw CMS vs encrypted
+- [x] `cmd_encrypt.go` — `dstu encrypt`: `-key`, `-cert`, `-crypt`, `-input`, `-output`
+- [x] `cmd_certinfo.go` — `dstu certinfo`: `-cert`, `-json`; human-readable or JSON output
+- [x] `cmd_unprotect.go` — `dstu unprotect`: `-key path:password`, `-output`, `-der`
+- [x] stdin/stdout support (`-input -` / `-output -`)
+- [x] `ua.EncryptForRecipientDER`, `ua.SignAndEncryptDER` thin wrappers added
+- [x] `keystore.MarshalPrivateKeyDER` / `MarshalPrivateKeyPEM` added
+- [x] All 14 packages pass; binary smoke-tested with real CZO cert
 
 ### Phase 15 — Root README ⬜ Pending
 > **Reference:** dstucrypt/agent README style
@@ -403,7 +403,7 @@ crypto-dstu/
 | 11 | `tsp` | ✅ Complete | Depends on Phase 3, 10 |
 | 12 | `ua` | ✅ Complete | Depends on all above |
 | 13 | `testdata/czo` | ✅ Complete | Depends on Phase 10-12 |
-| 14 | `cmd/dstu` | ⬜ Pending | CLI tool; depends on Phase 12, 7 |
+| 14 | `cmd/dstu` | ✅ Complete | CLI tool; depends on Phase 12, 7 |
 | 15 | `README.md` | ⬜ Pending | Root docs; depends on Phase 14 |
 
 ### Dependency Graph
