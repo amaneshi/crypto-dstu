@@ -244,18 +244,25 @@ func extractString(rv asn1.RawValue) string {
 }
 
 // parsePublicKey extracts and parses the DSTU 4145 public key from SubjectPublicKeyInfo.
-// Per cryptonite pkix_utils.c (dstu4145_public_key_to_spki):
-//   - algorithm.algorithm = curve OID
-//   - publicKey BIT STRING = compressed point bytes (LE, ceil(m/8) bytes)
+//
+// Three encoding styles are supported:
+//  1. algorithm.OID = curve OID directly (synthetic test certs).
+//  2. algorithm.OID = sig-alg OID, Parameters = curve OID (older encoding).
+//  3. algorithm.OID = sig-alg OID, Parameters = SEQUENCE { DSTU domain params }
+//     and BIT STRING = OCTET STRING { LE compressed point } (real CZO certs).
 func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 	algOID := spki.Algorithm.Algorithm
 	params := dstu4145.ParamsByOID(algOID)
 	if params == nil {
-		// Some certs encode: algorithm = sig-alg OID, parameters = curve OID
+		// Try parameters as bare curve OID
 		var curveOID asn1.ObjectIdentifier
 		if _, err := asn1.Unmarshal(spki.Algorithm.Parameters.FullBytes, &curveOID); err == nil {
 			params = dstu4145.ParamsByOID(curveOID)
 		}
+	}
+	if params == nil {
+		// Try parameters as DSTU domain-params SEQUENCE: extract field size m to find curve.
+		params = paramsFromDSTUDomainParams(spki.Algorithm.Parameters.FullBytes)
 	}
 	if params == nil {
 		// Not a DSTU key — store nil PublicKey (non-fatal)
@@ -266,12 +273,69 @@ func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 	if len(keyBytes) == 0 {
 		return errors.New("cert: empty public key bytes")
 	}
+	// Real CZO certs wrap the key as OCTET STRING inside the BIT STRING.
+	if keyBytes[0] == 0x04 && len(keyBytes) >= 2 {
+		inner := keyBytes[1:]
+		expectedLen := (params.Curve.M + 7) / 8
+		if len(inner) >= 1 && int(inner[0]) == expectedLen {
+			// Looks like OCTET STRING { LE key }
+			keyBytes = inner[1:]
+		}
+	}
 
 	pub, err := expandPublicKey(params.Curve, keyBytes)
 	if err != nil {
 		return errors.New("cert: public key expansion: " + err.Error())
 	}
 	c.PublicKey = pub
+	return nil
+}
+
+// paramsFromDSTUDomainParams extracts the DSTU curve parameters from a DSTU
+// domain-parameters SEQUENCE by reading the field size m (first INTEGER in the
+// inner EC_PARAMS SEQUENCE) and looking up the matching named curve.
+//
+// DSTU domain params DER layout (abbreviated):
+//
+//	SEQUENCE {          ← outer wrapper (may be present)
+//	  SEQUENCE {        ← EC_PARAMS
+//	    INTEGER m       ← GF(2^m) field degree, e.g. 257
+//	    INTEGER ks      ← reduction polynomial
+//	    ...
+//	  }
+//	  ...
+//	}
+func paramsFromDSTUDomainParams(b []byte) *dstu4145.DomainParams {
+	if len(b) < 4 {
+		return nil
+	}
+	// DSTU domain params have nested SEQUENCE wrappers. Unwrap SEQUENCE layers
+	// until we find the first INTEGER (field degree m).
+	// Typical layout: SEQUENCE { SEQUENCE { SEQUENCE { INTEGER m, ... }, ... }, ... }
+	rest := b
+	for len(rest) >= 2 {
+		switch rest[0] {
+		case 0x30: // SEQUENCE — unwrap and descend
+			var seq asn1.RawValue
+			if _, err := asn1.Unmarshal(rest, &seq); err != nil {
+				return nil
+			}
+			rest = seq.Bytes
+		case 0x02: // INTEGER — this is m
+			var m int
+			if _, err := asn1.Unmarshal(rest, &m); err != nil {
+				return nil
+			}
+			for _, p := range dstu4145.AllParams() {
+				if p.Curve.M == m {
+					return &p
+				}
+			}
+			return nil
+		default:
+			return nil
+		}
+	}
 	return nil
 }
 

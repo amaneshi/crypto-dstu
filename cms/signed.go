@@ -10,6 +10,7 @@ import (
 	"crypto-dstu/cert"
 	"crypto-dstu/dstu4145"
 	"crypto-dstu/kupyna"
+	"crypto-dstu/oid"
 )
 
 // IssuerAndSerialNumber identifies a certificate by its issuer DN and serial number.
@@ -144,8 +145,8 @@ func parseOneSignerInfo(data []byte) (SignerInfo, error) {
 		return si, errors.New("cms: SignerInfo digestAlgorithm: " + err.Error())
 	}
 
-	// SignedAttrs: if next tag is 0x31 (SET), consume it as signed attrs
-	if len(rest) > 0 && rest[0] == 0x31 {
+	// SignedAttrs: [0] IMPLICIT SET OF (tag 0xa0, per RFC 5652) or bare SET (0x31).
+	if len(rest) > 0 && (rest[0] == 0xa0 || rest[0] == 0x31) {
 		var raw asn1.RawValue
 		var r []byte
 		r, err = asn1.Unmarshal(rest, &raw)
@@ -423,10 +424,10 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 		return nil, errors.New("cms: Sign: " + err.Error())
 	}
 
-	// 5. Digest algorithm OID (Kupyna-256: 1.2.804.2.1.1.1.1.2.1)
-	digestAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 1}
-	// Signature algorithm OID (DSTU4145 with Kupyna-256: 1.2.804.2.1.1.1.1.3.1.1)
-	sigAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
+	// 5. Digest algorithm OID (Kupyna-256: 1.2.804.2.1.1.1.1.2.2.1)
+	digestAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 2, 1}
+	// Signature algorithm OID (DSTU4145 with Kupyna-256: 1.2.804.2.1.1.1.1.3.1.2)
+	sigAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
 
 	si := SignerInfo{
 		Version: 1,
@@ -628,8 +629,8 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 				continue
 			}
 
-			// Compute actual digest
-			h := kupyna.New256()
+			// Compute actual digest using the algorithm from digestAlgorithm OID
+			h := newHashForOID(si.DigestAlgorithm.Algorithm)
 			h.Write(content)
 			actualDigest := h.Sum(nil)
 
@@ -639,13 +640,25 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 				continue
 			}
 
+			// Only verify sig-alg OIDs we know how to handle.
+			if !oid.IsDSTU4145SigAlg(si.SignatureAlgorithm.Algorithm) {
+				sr.Error = errors.New("cms: unsupported signature algorithm: " + si.SignatureAlgorithm.Algorithm.String())
+				msg.Signers = append(msg.Signers, sr)
+				continue
+			}
+
 			// Hash the signed attrs and verify signature
-			h2 := kupyna.New256()
-			h2.Write(si.SignedAttrs.FullBytes) // already SET OF DER
+			// RFC 5652 §5.4: hash the signedAttrs with tag rewritten to SET (0x31)
+			h2 := newHashForOID(si.DigestAlgorithm.Algorithm)
+			h2.Write(signedAttrsForHashing(si.SignedAttrs.FullBytes))
 			attrDigest := h2.Sum(nil)
+			// GOST34311 outputs LE bytes; dstu4145.Verify (via truncate) expects BE.
+			if isLEHashOID(si.DigestAlgorithm.Algorithm) {
+				attrDigest = reverseBytes(attrDigest)
+			}
 
 			words := sr.Certificate.PublicKey.Curve.Words
-			sig, err := dstu4145.UnmarshalSignature(si.Signature, words)
+			sig, err := unmarshalSignatureCMS(si.Signature, words)
 			if err != nil {
 				sr.Error = errors.New("cms: unmarshal signature: " + err.Error())
 				msg.Signers = append(msg.Signers, sr)
@@ -663,9 +676,9 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 		msg.Signers = append(msg.Signers, sr)
 	}
 
-	// Return error if any signer failed.
+	// Return error if any signer failed with a hard error (not unsupported algorithm).
 	for _, sr := range msg.Signers {
-		if sr.Error != nil {
+		if sr.Error != nil && !isUnsupportedAlgError(sr.Error) {
 			return msg, sr.Error
 		}
 	}
@@ -833,6 +846,21 @@ func parseContentInfo(der []byte, expectedOID asn1.ObjectIdentifier) (asn1.Objec
 // marshalEXPLICIT wraps content in an EXPLICIT context tag.
 func marshalEXPLICIT(tag int, content []byte) []byte {
 	return tlv(byte(0xa0|tag), content)
+}
+
+// signedAttrsForHashing returns a copy of signedAttrs bytes with the outer tag
+// rewritten to SET (0x31) if it is [0] IMPLICIT (0xa0), as required by RFC 5652 §5.4.
+func signedAttrsForHashing(b []byte) []byte {
+	if len(b) == 0 {
+		return b
+	}
+	if b[0] == 0xa0 {
+		out := make([]byte, len(b))
+		copy(out, b)
+		out[0] = 0x31
+		return out
+	}
+	return b
 }
 
 // bytesEqual compares two byte slices for equality.

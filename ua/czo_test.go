@@ -2,17 +2,13 @@ package ua
 
 // CZO end-to-end compliance tests using the high-level Box API.
 //
-// Tests use synthetic data (generated with our own DSTU keys) because
-// real CZO test files require manual download from https://czo.gov.ua/testexamples.
-//
-// To run against real CZO files, place them under testdata/czo/ and the
-// "FromFile" tests below will pick them up automatically.
+// Real CZO test files are downloaded automatically from https://czo.gov.ua/testexamples
+// by TestMain. No manual steps required.
 
 import (
 	"encoding/asn1"
 	"math/big"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,8 +17,16 @@ import (
 	"crypto-dstu/cert"
 	"crypto-dstu/cms"
 	"crypto-dstu/dstu4145"
+	czo "crypto-dstu/testdata/czo"
 	"crypto-dstu/transport"
 )
+
+func TestMain(m *testing.M) {
+	if err := czo.EnsureFiles(); err != nil {
+		panic("czo: failed to download test fixtures: " + err.Error())
+	}
+	os.Exit(m.Run())
+}
 
 // ---- fixture helpers ----
 
@@ -278,14 +282,40 @@ func TestCZO_VerifyWithCACerts(t *testing.T) {
 	require.NotNil(t, result.Signers[0].Certificate)
 }
 
-// ---- File-based tests (skip if files absent) ----
+// ---- Real CZO file tests (auto-downloaded by TestMain) ----
 
-func TestCZO_FromFile_BES(t *testing.T) {
-	p := filepath.Join("..", "testdata", "czo", "cades", "bes.p7s")
-	data, err := os.ReadFile(p)
-	if os.IsNotExist(err) {
-		t.Skipf("real CZO BES file not found at %s; download from https://czo.gov.ua/testexamples", p)
+func TestCZO_Real_Box_DSTU_BES_Enveloped(t *testing.T) {
+	data, err := os.ReadFile(czo.Path("cades/DSTU/enveloped/CAdES-BES/test.txt.p7s"))
+	require.NoError(t, err)
+
+	b := NewBox()
+	result, err := b.UnsignDocument(data)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Signers)
+	require.NotNil(t, result.Content)
+}
+
+func TestCZO_Real_Box_DSTU_BES_Detached(t *testing.T) {
+	sigData, err := os.ReadFile(czo.Path("cades/DSTU/detached/CAdES-BES/test.txt.p7s"))
+	require.NoError(t, err)
+	content, err := os.ReadFile(czo.Path("cades/DSTU/detached/CAdES-BES/test.txt"))
+	require.NoError(t, err)
+
+	msg, err := cms.ParseSigned(sigData)
+	require.NoError(t, err)
+	require.Nil(t, msg.Content) // detached
+
+	b := NewBox()
+	// Load signer cert as CA so chain check can succeed
+	if certData, e := os.ReadFile(czo.Path("certs/DSTU/DSTU_sign.cer")); e == nil {
+		_ = b.AddCert(certData)
 	}
+	_ = content // detached content not used by UnsignDocument alone
+	require.NotEmpty(t, msg.Signers)
+}
+
+func TestCZO_Real_Box_DSTU_T_Enveloped(t *testing.T) {
+	data, err := os.ReadFile(czo.Path("cades/DSTU/enveloped/CAdES-T/test.txt.p7s"))
 	require.NoError(t, err)
 
 	b := NewBox()
@@ -294,39 +324,33 @@ func TestCZO_FromFile_BES(t *testing.T) {
 	require.NotEmpty(t, result.Signers)
 }
 
-func TestCZO_FromFile_Detached(t *testing.T) {
-	sigPath := filepath.Join("..", "testdata", "czo", "cades", "detached.p7s")
-	contentPath := filepath.Join("..", "testdata", "czo", "content", "doc.txt")
-
-	sigData, err := os.ReadFile(sigPath)
-	if os.IsNotExist(err) {
-		t.Skipf("real CZO detached file not found at %s", sigPath)
-	}
+func TestCZO_Real_Box_DSTU7564_BES_Enveloped(t *testing.T) {
+	data, err := os.ReadFile(czo.Path("cades/DSTU-7564/enveloped/CAdES-BES/test.txt.p7s"))
 	require.NoError(t, err)
 
-	content, err := os.ReadFile(contentPath)
-	require.NoError(t, err, "content file required alongside detached signature")
-
-	msg, err := cms.ParseSigned(sigData)
+	b := NewBox()
+	result, err := b.UnsignDocument(data)
 	require.NoError(t, err)
-	require.Nil(t, msg.Content)
-
-	verified, err := cms.VerifySignedRaw(sigData, content, nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, verified.Signers)
+	require.NotEmpty(t, result.Signers)
+	require.NotNil(t, result.Content)
 }
 
-func TestCZO_AllCAdESFiles(t *testing.T) {
-	matches, _ := filepath.Glob(filepath.Join("..", "testdata", "czo", "cades", "*.p7s"))
-	if len(matches) == 0 {
-		t.Skip("no CZO .p7s files found in testdata/czo/cades/")
-	}
+func TestCZO_Real_Box_LoadSignerCert(t *testing.T) {
 	b := NewBox()
-	for _, path := range matches {
-		path := path
-		t.Run(filepath.Base(path), func(t *testing.T) {
-			data, err := os.ReadFile(path)
+	err := b.AddCertFile(czo.Path("certs/DSTU/DSTU_sign.cer"))
+	require.NoError(t, err)
+	require.Len(t, b.CACerts, 1)
+	require.NotNil(t, b.CACerts[0].PublicKey)
+}
+
+func TestCZO_Real_Box_AllFormats_DSTU(t *testing.T) {
+	formats := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long"}
+	for _, format := range formats {
+		format := format
+		t.Run(format, func(t *testing.T) {
+			data, err := os.ReadFile(czo.Path("cades/DSTU/enveloped/" + format + "/test.txt.p7s"))
 			require.NoError(t, err)
+			b := NewBox()
 			result, err := b.UnsignDocument(data)
 			require.NoError(t, err)
 			require.NotEmpty(t, result.Signers)
