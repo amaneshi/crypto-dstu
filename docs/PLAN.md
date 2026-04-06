@@ -61,7 +61,9 @@ crypto-dstu/
 │   ├── phase-10-cms.md
 │   ├── phase-11-tsp.md
 │   ├── phase-12-ua.md
-│   └── phase-13-czo.md
+│   ├── phase-13-czo.md
+│   ├── phase-14-cli.md
+│   └── phase-15-readme.md
 │
 │  ══════════════════════════════════════════
 │  LAYER 0 — Field Arithmetic
@@ -182,6 +184,16 @@ crypto-dstu/
 │   ├── certinfo.go              #   GetCertInfo → CertInfo struct
 │   ├── box.go                   #   Box — stateful context (keys, certs, CA list)
 │   └── ua_test.go
+│
+├── cmd/
+│   └── dstu/                    # CLI tool
+│       ├── main.go              #   Entry point, subcommand dispatch
+│       ├── flags.go             #   Shared flag helpers, Box builder
+│       ├── cmd_sign.go          #   sign subcommand
+│       ├── cmd_decrypt.go       #   decrypt / unwrap subcommand
+│       ├── cmd_encrypt.go       #   encrypt subcommand
+│       ├── cmd_certinfo.go      #   certinfo subcommand
+│       └── cmd_unprotect.go     #   unprotect subcommand
 │
 └── testdata/                    # Test vectors & fixtures
     ├── kupyna/                  #   Hash test vectors from DSTU 7564
@@ -347,6 +359,31 @@ crypto-dstu/
 - [x] `cms/signed.go`: `VerifySignedRaw` now returns error when any signer verification fails (was silently setting `sr.Error` only)
 - [x] All 15 packages pass; real CZO files can be dropped in `testdata/czo/cades/` to activate file-based tests
 
+### Phase 14 — CLI Tool `[cmd/dstu]` ⬜ Pending
+> **Reference:** dstucrypt/agent README, `ua` package API
+
+- [ ] `main.go` — subcommand dispatch: sign, decrypt, encrypt, certinfo, unprotect
+- [ ] `flags.go` — `buildBox` helper, `multiFlag`, `mustRead`/`mustWrite` I/O helpers
+- [ ] `cmd_sign.go` — `dstu sign`: `-key`, `-cert`, `-ca`, `-input`, `-output`, `-no-tax`, `-detached`, `-tsp`, `-tsp-level`, `-role`, `-email`, `-filename`, `-crypt`, `-include-chain`
+- [ ] `cmd_decrypt.go` — `dstu decrypt`: `-key`, `-ca`, `-input`, `-output`, `-role`, `-v`; auto-detects transport container vs raw CMS vs encrypted
+- [ ] `cmd_encrypt.go` — `dstu encrypt`: `-key`, `-cert`, `-crypt`, `-input`, `-output`
+- [ ] `cmd_certinfo.go` — `dstu certinfo`: `-cert`, `-json`; human-readable or JSON output
+- [ ] `cmd_unprotect.go` — `dstu unprotect`: `-key path:password`, `-output`, `-der`
+- [ ] stdin/stdout support (`-input -` / `-output -`)
+- [ ] Add thin `ua.Box` helpers: `SignAndEncryptFile`, `EncryptForRecipientDER`
+- [ ] Add `keystore.MarshalPrivateKeyDER` / `MarshalPrivateKeyPEM`
+- [ ] Integration tests in `cmd/dstu/main_test.go`
+
+### Phase 15 — Root README ⬜ Pending
+> **Reference:** dstucrypt/agent README style
+
+- [ ] Installation section (`go install` for CLI, `go get` for library)
+- [ ] Complete CLI reference with copy-pastable examples for all subcommands
+- [ ] Library usage snippets: sign, verify, encrypt, decrypt, certinfo, raw primitives
+- [ ] Supported key format table (Key-6.dat, JKS, PKCS#12, raw DER, PEM)
+- [ ] Package reference table
+- [ ] Compatibility notes (cryptonite-aligned, tested against CZO)
+
 ---
 
 ## Progress Tracking
@@ -366,6 +403,8 @@ crypto-dstu/
 | 11 | `tsp` | ✅ Complete | Depends on Phase 3, 10 |
 | 12 | `ua` | ✅ Complete | Depends on all above |
 | 13 | `testdata/czo` | ✅ Complete | Depends on Phase 10-12 |
+| 14 | `cmd/dstu` | ⬜ Pending | CLI tool; depends on Phase 12, 7 |
+| 15 | `README.md` | ⬜ Pending | Root docs; depends on Phase 14 |
 
 ### Dependency Graph
 
@@ -376,6 +415,10 @@ Phase 3 (kupyna/gost hash) ──────                          Phase 10 
                                                           ↗                          ↘
 Phase 4 (kalyna/gost cipher) → Phase 7 (keystore)       Phase 9 (transport)     Phase 12 (ua)
                              → Phase 6 (key agreement) ──────────────────────────────↗
+                                                                                      ↓
+                                                                             Phase 14 (cmd/dstu)
+                                                                                      ↓
+                                                                             Phase 15 (README)
 ```
 
 ## Key Design Decisions
