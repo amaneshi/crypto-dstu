@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Curve represents an elliptic curve over GF(2^m) with equation y² + xy = x³ + ax² + b
+// Curve represents an elliptic curve over GF(2^m) with equation y² + xy = x³ + ax² + b.
 type Curve struct {
 	M        int          // field extension degree
 	ModBits  gf2m.ModBits // irreducible polynomial sparse form
@@ -44,7 +44,7 @@ func (c *Curve) BasePoint() *Point {
 }
 
 // Contains checks if a point lies on the curve.
-// Verifies: y² + xy = x³ + ax² + b
+// Verifies: y² + xy = x³ + ax² + b.
 func (c *Curve) Contains(p *Point) bool {
 	if p.Inf {
 		return true

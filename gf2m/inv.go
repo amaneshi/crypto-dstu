@@ -2,7 +2,7 @@ package gf2m
 
 // Inv computes the modular inverse of a modulo the irreducible polynomial.
 // Returns a^(-1) mod f(x) using the extended binary GCD algorithm.
-func Inv(a Element, modBits ModBits) Element {
+func Inv(a Element, modBits ModBits) Element { //nolint:funlen
 	if a.IsZero() {
 		panic("cannot invert zero element")
 	}
@@ -47,7 +47,7 @@ func Inv(a Element, modBits ModBits) Element {
 			b0 ^= p.words[0] & mask
 
 			// Shift u and b right by 1
-			for idx := 0; idx < len(u.words)-1; idx++ {
+			for idx := range len(u.words) - 1 {
 				u1 := u.words[idx+1]
 				u.words[idx] = (u0 >> 1) | (u1 << 31)
 				u0 = u1
@@ -88,11 +88,8 @@ func Inv(a Element, modBits ModBits) Element {
 		}
 
 		// u ^= v, b ^= c
-		maxLen := len(v.words)
-		if len(u.words) < maxLen {
-			maxLen = len(u.words)
-		}
-		for idx := 0; idx < maxLen; idx++ {
+		maxLen := min(len(u.words), len(v.words))
+		for idx := range maxLen {
 			u.words[idx] ^= v.words[idx]
 			b.words[idx] ^= c.words[idx]
 		}

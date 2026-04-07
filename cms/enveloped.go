@@ -5,6 +5,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"math/big"
+	"slices"
 
 	"crypto-dstu/cert"
 	"crypto-dstu/dstu15946"
@@ -87,7 +88,11 @@ type parsedRecipient struct {
 // Encrypt encrypts content for one or more recipients using ECDH + GOST28147 CFB.
 // senderKey is the sender's ephemeral or static private key.
 // Returns DER-encoded ContentInfo wrapping EnvelopedData.
-func Encrypt(content []byte, recipients []*cert.Certificate, senderKey *dstu4145.PrivateKey) ([]byte, error) {
+func Encrypt( //nolint:funlen
+	content []byte,
+	recipients []*cert.Certificate,
+	senderKey *dstu4145.PrivateKey,
+) ([]byte, error) {
 	if len(recipients) == 0 {
 		return nil, errors.New("cms: Encrypt: no recipients")
 	}
@@ -115,18 +120,25 @@ func Encrypt(content []byte, recipients []*cert.Certificate, senderKey *dstu4145
 
 	// 4. Generate random UKM (64 bytes)
 	ukm := make([]byte, 64)
-	if _, err := rand.Read(ukm); err != nil {
+	if _, err = rand.Read(ukm); err != nil {
 		return nil, errors.New("cms: generate UKM: " + err.Error())
 	}
 
 	// 5. For each recipient: ECDH → DeriveKey → WrapKey
 	var recipiInfosDER []byte
+	var wrappedCEK []byte
+	var ridDER []byte
+	var encKeyDER []byte
+	var ukmValDER []byte
+	var keyEncAlgDER []byte
+	var versionDER []byte
 	for _, rcpt := range recipients {
 		if rcpt.PublicKey == nil {
 			return nil, errors.New("cms: recipient has no public key")
 		}
 
-		kek, err := dstu15946.KeyAgreement(senderKey, rcpt.PublicKey, ukm, gost34311.New)
+		var kek []byte
+		kek, err = dstu15946.KeyAgreement(senderKey, rcpt.PublicKey, ukm, gost34311.New)
 		if err != nil {
 			return nil, errors.New("cms: KeyAgreement: " + err.Error())
 		}
@@ -136,22 +148,22 @@ func Encrypt(content []byte, recipients []*cert.Certificate, senderKey *dstu4145
 
 		// Random wrap IV (8 bytes)
 		wrapIV := make([]byte, 8)
-		if _, err := rand.Read(wrapIV); err != nil {
+		if _, err = rand.Read(wrapIV); err != nil {
 			return nil, errors.New("cms: generate wrapIV: " + err.Error())
 		}
 
-		wrappedCEK, err := gost28147.WrapKey(kek, cek, wrapIV)
+		wrappedCEK, err = gost28147.WrapKey(kek, cek, wrapIV)
 		if err != nil {
 			return nil, errors.New("cms: WrapKey: " + err.Error())
 		}
 
 		// Build RID (IssuerAndSerialNumber) manually to avoid asn1.RawValue length bug
-		ridDER, err := marshalIssuerAndSerial(rcpt.Issuer, rcpt.SerialNumber)
+		ridDER, err = marshalIssuerAndSerial(rcpt.Issuer, rcpt.SerialNumber)
 		if err != nil {
 			return nil, errors.New("cms: marshal RID: " + err.Error())
 		}
 		// RecipientEncryptedKey = SEQUENCE { RID, EncryptedKey }
-		encKeyDER, err := asn1.Marshal(wrappedCEK)
+		encKeyDER, err = asn1.Marshal(wrappedCEK)
 		if err != nil {
 			return nil, errors.New("cms: marshal encKey: " + err.Error())
 		}
@@ -163,20 +175,20 @@ func Encrypt(content []byte, recipients []*cert.Certificate, senderKey *dstu4145
 		originatorDER := marshalEXPLICIT(0, tlv(0xa1, senderPKBytes))
 
 		// UKM [1] EXPLICIT OCTET STRING
-		ukmValDER, err := asn1.Marshal(ukm)
+		ukmValDER, err = asn1.Marshal(ukm)
 		if err != nil {
 			return nil, errors.New("cms: marshal UKM: " + err.Error())
 		}
 		ukmDER := marshalEXPLICIT(1, ukmValDER)
 
 		// KeyEncryptionAlgorithm
-		keyEncAlgDER, err := asn1.Marshal(AlgorithmIdentifier{Algorithm: OIDGost28147Wrap})
+		keyEncAlgDER, err = asn1.Marshal(AlgorithmIdentifier{Algorithm: OIDGost28147Wrap})
 		if err != nil {
 			return nil, errors.New("cms: marshal keyEncAlg: " + err.Error())
 		}
 
 		// Version
-		versionDER, err := asn1.Marshal(3)
+		versionDER, err = asn1.Marshal(3)
 		if err != nil {
 			return nil, err
 		}
@@ -218,19 +230,19 @@ func Encrypt(content []byte, recipients []*cert.Certificate, senderKey *dstu4145
 	if err != nil {
 		return nil, err
 	}
-	inner := append(oidDER, marshalEXPLICIT(0, edDER)...)
-	return marshalSEQ(inner), nil
+	return marshalSEQ(slices.Concat(oidDER, marshalEXPLICIT(0, edDER))), nil
 }
 
 // ParseEnveloped parses a DER-encoded ContentInfo/EnvelopedData.
 func ParseEnveloped(der []byte) (*EncryptedMessage, error) {
-	_, edBytes, err := parseContentInfo(der, OIDEnvelopedData)
+	edBytes, err := parseContentInfo(der, OIDEnvelopedData)
 	if err != nil {
 		return nil, err
 	}
 
 	var ed rawEnvelopedData
-	if _, err := asn1.Unmarshal(edBytes, &ed); err != nil {
+	_, err = asn1.Unmarshal(edBytes, &ed)
+	if err != nil {
 		return nil, errors.New("cms: parse EnvelopedData: " + err.Error())
 	}
 
@@ -241,7 +253,7 @@ func ParseEnveloped(der []byte) (*EncryptedMessage, error) {
 	}
 
 	// Parse recipients from the SET
-	msg.Recipients, _ = parseRecipients(ed.RecipientInfos.Bytes)
+	msg.Recipients = parseRecipients(ed.RecipientInfos.Bytes)
 
 	return msg, nil
 }
@@ -307,11 +319,10 @@ func encodePublicKeyUncompressed(pub *dstu4145.PublicKey, byteLen int) []byte {
 	xBytes := pub.Q.X.Bytes()
 	yBytes := pub.Q.Y.Bytes()
 	// BE-pad to byteLen
-	x := make([]byte, byteLen)
-	y := make([]byte, byteLen)
-	copy(x[byteLen-len(xBytes):], xBytes)
-	copy(y[byteLen-len(yBytes):], yBytes)
-	return append(x, y...)
+	out := make([]byte, 2*byteLen)
+	copy(out[byteLen-len(xBytes):], xBytes)
+	copy(out[2*byteLen-len(yBytes):], yBytes)
+	return out
 }
 
 // rebuildPublicKey reconstructs a PublicKey on the same curve as key from raw BE X||Y bytes.
@@ -347,12 +358,11 @@ func marshalIssuerAndSerial(issuer asn1.RawValue, serial *big.Int) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	inner := append(issuerBytes, serialDER...)
-	return marshalSEQ(inner), nil
+	return marshalSEQ(slices.Concat(issuerBytes, serialDER)), nil
 }
 
 // parseRecipients parses the inner bytes of a SET OF RecipientInfo.
-func parseRecipients(data []byte) ([]parsedRecipient, error) {
+func parseRecipients(data []byte) []parsedRecipient {
 	var recipients []parsedRecipient
 	for len(data) > 0 {
 		var raw asn1.RawValue
@@ -364,18 +374,18 @@ func parseRecipients(data []byte) ([]parsedRecipient, error) {
 
 		// Each element should be context-tagged KeyAgreeRecipientInfo ([1])
 		if raw.Class == 2 && raw.Tag == 1 {
-			rcpts, err := parseKeyAgreeRecipientInfo(raw.Bytes)
-			if err != nil {
+			rcpts, rcptErr := parseKeyAgreeRecipientInfo(raw.Bytes)
+			if rcptErr != nil {
 				continue
 			}
 			recipients = append(recipients, rcpts...)
 		}
 	}
-	return recipients, nil
+	return recipients
 }
 
 // parseKeyAgreeRecipientInfo manually parses a KeyAgreeRecipientInfo from its inner bytes.
-func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) {
+func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) { //nolint:funlen
 	// Version
 	var version int
 	rest, err := asn1.Unmarshal(data, &version)
@@ -402,20 +412,20 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) {
 
 	// Optional UKM [1] EXPLICIT
 	var ukm []byte
+	var ukmRaw asn1.RawValue
 	if len(rest) > 0 && rest[0] == 0xa1 {
-		var ukmRaw asn1.RawValue
-		r, err := asn1.Unmarshal(rest, &ukmRaw)
+		rest, err = asn1.Unmarshal(rest, &ukmRaw)
 		if err != nil {
 			return nil, errors.New("cms: KARI UKM: " + err.Error())
 		}
 		// UKM is EXPLICIT [1] { OCTET STRING }
 		var ukmBytes []byte
-		if _, err := asn1.Unmarshal(ukmRaw.Bytes, &ukmBytes); err == nil {
+		_, err = asn1.Unmarshal(ukmRaw.Bytes, &ukmBytes)
+		if err == nil {
 			ukm = ukmBytes
 		} else {
 			ukm = ukmRaw.Bytes
 		}
-		rest = r
 	}
 
 	// KeyEncryptionAlgorithm AlgorithmIdentifier
@@ -434,38 +444,43 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) {
 
 	var recipients []parsedRecipient
 	tmp := rekSeq.Bytes
+	var rekSeqItem asn1.RawValue
+	var issuer asn1.RawValue
+	var serial *big.Int
+	var ridSeq asn1.RawValue
+	var issuerRaw asn1.RawValue
+	var encKey []byte
 	for len(tmp) > 0 {
-		var rekSeqItem asn1.RawValue
-		tmp2, err := asn1.Unmarshal(tmp, &rekSeqItem)
+		var tmp2 []byte
+		tmp2, err = asn1.Unmarshal(tmp, &rekSeqItem)
 		if err != nil {
 			break
 		}
 		tmp = tmp2
 
 		// Parse RID (IssuerAndSerialNumber) manually
-		var issuer asn1.RawValue
-		var serial *big.Int
 		rekInner := rekSeqItem.Bytes
 		// RID is a SEQUENCE { Issuer, SerialNumber }
-		var ridSeq asn1.RawValue
-		rekRest, err := asn1.Unmarshal(rekInner, &ridSeq)
+		var rekRest []byte
+		rekRest, err = asn1.Unmarshal(rekInner, &ridSeq)
 		if err != nil {
 			continue
 		}
 		// Parse issuer RawValue from ridSeq.Bytes
-		var issuerRaw asn1.RawValue
-		ridRest, err := asn1.Unmarshal(ridSeq.Bytes, &issuerRaw)
+		var ridRest []byte
+		ridRest, err = asn1.Unmarshal(ridSeq.Bytes, &issuerRaw)
 		if err != nil {
 			continue
 		}
 		issuer = asn1.RawValue{FullBytes: ridSeq.Bytes[:len(ridSeq.Bytes)-len(ridRest)]}
-		if _, err := asn1.Unmarshal(ridRest, &serial); err != nil {
+		_, err = asn1.Unmarshal(ridRest, &serial)
+		if err != nil {
 			continue
 		}
 
 		// EncryptedKey OCTET STRING
-		var encKey []byte
-		if _, err := asn1.Unmarshal(rekRest, &encKey); err != nil {
+		_, err = asn1.Unmarshal(rekRest, &encKey)
+		if err != nil {
 			continue
 		}
 
@@ -477,5 +492,5 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) {
 			WrappedCEK:   encKey,
 		})
 	}
-	return recipients, nil
+	return recipients, nil //nolint:nilerr // best-effort: return successfully parsed recipients even if last item was malformed
 }

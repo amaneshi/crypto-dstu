@@ -14,7 +14,7 @@ import (
 
 // Certificate holds a parsed Ukrainian X.509v3 certificate.
 // Go's crypto/x509 cannot parse DSTU certificates — custom ASN.1 parsing required.
-// Reference: cryptonite src/pkix/c/struct/pkix_utils.c, pkix_cert.c
+// Reference: cryptonite src/pkix/c/struct/pkix_utils.c, pkix_cert.c.
 type Certificate struct {
 	Raw    []byte // original DER
 	TBSRaw []byte // TBSCertificate DER (signed portion)
@@ -50,9 +50,9 @@ type Certificate struct {
 	Surname            string
 }
 
-// Extension mirrors crypto/x509/pkix.Extension without requiring that import.
+// Extension mirrors [crypto/x509/pkix.Extension] without requiring that import.
 type Extension struct {
-	Id       asn1.ObjectIdentifier
+	Id       asn1.ObjectIdentifier //nolint:revive,staticcheck // encoding/asn1 reflects on field name; renaming Id→ID would silently break DER parsing
 	Critical bool
 	Value    []byte
 }
@@ -87,9 +87,9 @@ type subjectPublicKeyInfo struct {
 }
 
 type rawExtension struct {
-	Id       asn1.ObjectIdentifier
-	Critical bool   `asn1:"optional"`
-	Value    []byte // OCTET STRING
+	Id       asn1.ObjectIdentifier //nolint:revive,staticcheck // encoding/asn1 reflects on field name; renaming Id→ID would silently break DER parsing
+	Critical bool                  `asn1:"optional"`
+	Value    []byte                // OCTET STRING
 }
 
 type outerCertificate struct {
@@ -111,7 +111,8 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	}
 
 	var tbs tbsCertificate
-	if _, err := asn1.Unmarshal(outer.TBSCertificate.FullBytes, &tbs); err != nil {
+	_, err = asn1.Unmarshal(outer.TBSCertificate.FullBytes, &tbs)
+	if err != nil {
 		return nil, errors.New("cert: ParseCertificate: TBS: " + err.Error())
 	}
 
@@ -132,11 +133,9 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 		c.Extensions = append(c.Extensions, Extension(ext))
 	}
 
-	if err := parseSubjectDN(c); err != nil {
-		return nil, err
-	}
+	parseSubjectDN(c)
 
-	if err := parsePublicKey(c, tbs.PublicKeyInfo); err != nil {
+	if err = parsePublicKey(c, tbs.PublicKeyInfo); err != nil {
 		return nil, err
 	}
 
@@ -159,8 +158,8 @@ func ParseCertificates(der []byte) ([]*Certificate, error) {
 
 // parseSubjectDN extracts standard and Ukrainian-specific attributes from Subject DN.
 // Subject RawValue.FullBytes is the outer SEQUENCE; its .Bytes is the content.
-// Structure: SEQUENCE { SET { SEQUENCE { OID, Value } } ... }
-func parseSubjectDN(c *Certificate) error {
+// Structure: SEQUENCE { SET { SEQUENCE { OID, Value } } ... }.
+func parseSubjectDN(c *Certificate) {
 	// Unmarshal the outer SEQUENCE content to get individual SET (RDN) elements.
 	// We use the inner Bytes (not FullBytes) to iterate over the SET elements.
 	rest := c.Subject.Bytes
@@ -182,7 +181,6 @@ func parseSubjectDN(c *Certificate) error {
 		atvRest := rdn.Bytes
 		for len(atvRest) > 0 {
 			var atav asn1.RawValue
-			var err error
 			atvRest, err = asn1.Unmarshal(atvRest, &atav)
 			if err != nil {
 				break
@@ -190,7 +188,6 @@ func parseSubjectDN(c *Certificate) error {
 			parseATAV(c, atav)
 		}
 	}
-	return nil
 }
 
 // parseATAV parses a single AttributeTypeAndValue into Certificate fields.

@@ -44,7 +44,7 @@ func makeCert(t *testing.T, key *dstu4145.PrivateKey) *cert.Certificate {
 	}
 }
 
-func makeBox(t *testing.T) (*Box, *dstu4145.PrivateKey, *cert.Certificate) {
+func makeBox(t *testing.T) (*Box, *cert.Certificate) {
 	t.Helper()
 	key := mustGenerateKey(t)
 	c := makeCert(t, key)
@@ -55,7 +55,7 @@ func makeBox(t *testing.T) (*Box, *dstu4145.PrivateKey, *cert.Certificate) {
 		CryptCert:  c,
 		Role:       cert.RolePersonal,
 	}}
-	return b, key, c
+	return b, c
 }
 
 // ---- Box tests ----
@@ -82,7 +82,7 @@ func TestBoxFirstKeyEmpty(t *testing.T) {
 }
 
 func TestBoxKeyByRole(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	e := b.KeyByRole(cert.RolePersonal)
 	require.NotNil(t, e)
 	require.Equal(t, cert.RolePersonal, e.Role)
@@ -103,7 +103,7 @@ func TestBoxAddCert(t *testing.T) {
 // ---- SignDocument / UnsignDocument ----
 
 func TestSignDocumentRawCMS(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	content := []byte("Hello, Ukraine!")
 
 	der, err := b.SignDocument(content, SignOptions{NoTax: true})
@@ -120,7 +120,7 @@ func TestSignDocumentRawCMS(t *testing.T) {
 }
 
 func TestSignDocumentTransportContainer(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	content := []byte("<xml>data</xml>")
 
 	der, err := b.SignDocument(content, SignOptions{
@@ -138,7 +138,7 @@ func TestSignDocumentTransportContainer(t *testing.T) {
 }
 
 func TestSignDocumentDetached(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	content := []byte("detached content")
 
 	der, err := b.SignDocument(content, SignOptions{NoTax: true, Detached: true})
@@ -158,7 +158,7 @@ func TestSignDocumentNoKey(t *testing.T) {
 }
 
 func TestUnsignDocumentRawCMS(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	content := []byte("test document")
 
 	signedDER, err := b.SignDocument(content, SignOptions{NoTax: true})
@@ -171,7 +171,7 @@ func TestUnsignDocumentRawCMS(t *testing.T) {
 }
 
 func TestUnsignDocumentInvalidDER(t *testing.T) {
-	b, _, _ := makeBox(t)
+	b, _ := makeBox(t)
 	_, err := b.UnsignDocument([]byte{0x00, 0x01, 0x02})
 	require.Error(t, err)
 }
@@ -179,7 +179,7 @@ func TestUnsignDocumentInvalidDER(t *testing.T) {
 // ---- EncryptDocument / DecryptDocument ----
 
 func TestEncryptDecryptRoundtrip(t *testing.T) {
-	b, _, c := makeBox(t)
+	b, c := makeBox(t)
 	content := []byte("secret message")
 
 	encDER, err := b.EncryptDocument(content, c)
@@ -206,7 +206,7 @@ func TestDecryptDocumentNoKey(t *testing.T) {
 // ---- SignAndEncrypt / DecryptDocument + UnsignDocument ----
 
 func TestSignAndEncryptRoundtrip(t *testing.T) {
-	b, _, c := makeBox(t)
+	b, c := makeBox(t)
 	content := []byte("sign and encrypt me")
 
 	container, err := b.SignAndEncrypt(content, c, SignOptions{Filename: "enc.xml"})
@@ -225,7 +225,7 @@ func TestSignAndEncryptRoundtrip(t *testing.T) {
 }
 
 func TestSignAndEncryptNoTax(t *testing.T) {
-	b, _, c := makeBox(t)
+	b, c := makeBox(t)
 	content := []byte("raw sign+encrypt")
 
 	der, err := b.SignAndEncrypt(content, c, SignOptions{NoTax: true})

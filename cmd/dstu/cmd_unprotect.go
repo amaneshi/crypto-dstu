@@ -28,7 +28,7 @@ Options:
 	output := fs.String("output", "-", "output file")
 	asDER := fs.Bool("der", false, "output DER instead of PEM")
 
-	fs.Parse(args)
+	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	if *keyFlag == "" {
 		fmt.Fprintln(os.Stderr, "dstu unprotect: -key path:password is required")

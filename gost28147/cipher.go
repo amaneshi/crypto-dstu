@@ -26,7 +26,7 @@ func NewCipherWithSbox(key []byte, sbox *Sbox) (cipher.Block, error) {
 		return nil, errors.New("gost28147: key must be 32 bytes")
 	}
 	c := &gostCipher{sbox: sbox}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		c.k[i] = binary.LittleEndian.Uint32(key[i*4:])
 	}
 	return c, nil
@@ -41,7 +41,7 @@ func (g *gostCipher) Encrypt(dst, src []byte) {
 
 	s := g.sbox
 	// 3 rounds forward: k0..k7
-	for round := 0; round < 3; round++ {
+	for range 3 {
 		n1 ^= s.pass(n0 + g.k[0])
 		n0 ^= s.pass(n1 + g.k[1])
 		n1 ^= s.pass(n0 + g.k[2])
@@ -83,7 +83,7 @@ func (g *gostCipher) Decrypt(dst, src []byte) {
 	n0 ^= s.pass(n1 + g.k[7])
 
 	// 3 rounds reverse: k7..k0
-	for round := 0; round < 3; round++ {
+	for range 3 {
 		n1 ^= s.pass(n0 + g.k[7])
 		n0 ^= s.pass(n1 + g.k[6])
 		n1 ^= s.pass(n0 + g.k[5])
@@ -103,7 +103,7 @@ func (g *gostCipher) Decrypt(dst, src []byte) {
 func (g *gostCipher) MAC(data []byte, nbits int) []byte {
 	buf := make([]byte, 8)
 	for i := 0; i+8 <= len(data); i += 8 {
-		for j := 0; j < 8; j++ {
+		for j := range 8 {
 			buf[j] ^= data[i+j]
 		}
 		g.mac64(buf)
@@ -112,7 +112,7 @@ func (g *gostCipher) MAC(data []byte, nbits int) []byte {
 	if rem != 0 {
 		block := make([]byte, 8)
 		copy(block, data[len(data)-rem:])
-		for j := 0; j < 8; j++ {
+		for j := range 8 {
 			buf[j] ^= block[j]
 		}
 		g.mac64(buf)

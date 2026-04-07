@@ -2,7 +2,7 @@ package gf2m
 
 // Mod reduces a modulo the irreducible polynomial specified by modBits.
 // This implements polynomial reduction in GF(2^m).
-func Mod(a Element, modBits ModBits) Element {
+func Mod(a Element, modBits ModBits) Element { //nolint:funlen
 	if len(modBits) == 0 || modBits[0] == 0 {
 		return a.Clone()
 	}
@@ -79,12 +79,12 @@ func Mod(a Element, modBits ModBits) Element {
 		// For each term in the polynomial
 		for k := 1; k < len(modBits) && modBits[k] != 0; k++ {
 			n := modBits[k] / 32
-			d0 := modBits[k] % 32
-			d1 := 32 - d0
+			dk0 := modBits[k] % 32
+			dk1 := 32 - dk0
 
-			ret.words[n] ^= zz << d0
-			tmpUlong := zz >> d1
-			if d0 != 0 && tmpUlong != 0 && n+1 < len(ret.words) {
+			ret.words[n] ^= zz << dk0
+			tmpUlong := zz >> dk1
+			if dk0 != 0 && tmpUlong != 0 && n+1 < len(ret.words) {
 				ret.words[n+1] ^= tmpUlong
 			}
 		}

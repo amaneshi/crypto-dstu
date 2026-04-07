@@ -23,7 +23,6 @@ func TestSharedSecretSymmetry(t *testing.T) {
 	}
 
 	for _, curve := range curves {
-		curve := curve
 		t.Run(curve.String(), func(t *testing.T) {
 			alice, err := dstu4145.GenerateKey(curve)
 			require.NoError(t, err)
@@ -38,7 +37,7 @@ func TestSharedSecretSymmetry(t *testing.T) {
 			require.Equal(t, zzA, zzB, "shared secrets differ")
 
 			// ZZ must be exactly ceil(m/8) bytes
-			require.Equal(t, (curve.M+7)/8, len(zzA), "ZZ length")
+			require.Len(t, zzA, (curve.M+7)/8, "ZZ length")
 		})
 	}
 }
@@ -76,7 +75,7 @@ func TestDeriveKeyDeterminism(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, k1, k2, "DeriveKey is not deterministic")
-	require.Equal(t, 32, len(k1), "KEK length")
+	require.Len(t, k1, 32, "KEK length")
 }
 
 // TestDeriveKeyDifferentUKM verifies different UKM produces different KEK.
@@ -99,7 +98,7 @@ func TestDeriveKeyNilUKM(t *testing.T) {
 
 	k, err := DeriveKey(zz, nil, gost34311.New)
 	require.NoError(t, err, "DeriveKey(nil ukm)")
-	require.Equal(t, 32, len(k), "KEK length")
+	require.Len(t, k, 32, "KEK length")
 }
 
 // TestKeyAgreementWithGost34311 verifies full KeyAgreement roundtrip with GOST 34.311 hash.
@@ -149,6 +148,6 @@ func TestSharedInfoDER(t *testing.T) {
 
 // TestSboxDSTUImport just ensures the gost28147 import compiles
 // (the sbox is used in GOST 34.311 hash which is used in key derivation).
-func TestSboxDSTUImport(t *testing.T) {
+func TestSboxDSTUImport(_ *testing.T) {
 	_ = gost28147.SboxDSTU
 }

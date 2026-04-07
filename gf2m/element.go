@@ -8,7 +8,7 @@ import (
 
 // Element represents an element in GF(2^m) as a polynomial over GF(2).
 // Stored as little-endian uint32 words: words[0] contains bits 0-31.
-type Element struct {
+type Element struct { //nolint:recvcheck // value receivers for read-only methods, pointer receivers for mutations — intentional
 	words []uint32
 }
 
@@ -22,28 +22,28 @@ func NewElement(wordCount int) Element {
 func FromHex(s string, wordCount int) (Element, error) {
 	s = strings.ReplaceAll(s, " ", "")
 	s = strings.TrimPrefix(s, "0x")
-	
+
 	if len(s) == 0 {
 		return NewElement(wordCount), nil
 	}
-	
+
 	// Decode hex to bytes (big-endian)
 	if len(s)%2 != 0 {
 		s = "0" + s
 	}
-	
+
 	bytes, err := hex.DecodeString(s)
 	if err != nil {
 		return Element{}, fmt.Errorf("invalid hex string: %w", err)
 	}
-	
+
 	return FromBytes(bytes, wordCount), nil
 }
 
 // FromBytes creates an Element from a big-endian byte slice.
 func FromBytes(b []byte, wordCount int) Element {
 	e := NewElement(wordCount)
-	
+
 	// Convert big-endian bytes to little-endian uint32 words
 	for i := 0; i < len(b) && i/4 < wordCount; i++ {
 		byteIdx := len(b) - 1 - i
@@ -51,7 +51,7 @@ func FromBytes(b []byte, wordCount int) Element {
 		bytePos := i % 4
 		e.words[wordIdx] |= uint32(b[byteIdx]) << (bytePos * 8)
 	}
-	
+
 	return e
 }
 
@@ -69,18 +69,18 @@ func (e Element) Bytes() []byte {
 	if bitLen == 0 {
 		return []byte{0}
 	}
-	
+
 	byteLen := (bitLen + 7) / 8
 	result := make([]byte, byteLen)
-	
-	for i := 0; i < byteLen; i++ {
+
+	for i := range byteLen {
 		wordIdx := i / 4
 		bytePos := i % 4
 		if wordIdx < len(e.words) {
 			result[byteLen-1-i] = byte(e.words[wordIdx] >> (bytePos * 8))
 		}
 	}
-	
+
 	return result
 }
 
@@ -100,15 +100,15 @@ func (e Element) BitLen() int {
 	for nz >= 0 && e.words[nz] == 0 {
 		nz--
 	}
-	
+
 	if nz < 0 {
 		return 0
 	}
-	
+
 	// Find the highest bit in that word
 	x := e.words[nz]
 	r := 1
-	
+
 	var t uint32
 	if t = x >> 16; t != 0 {
 		x = t
@@ -127,9 +127,9 @@ func (e Element) BitLen() int {
 		r += 2
 	}
 	if t = x >> 1; t != 0 {
-		r += 1
+		r++
 	}
-	
+
 	return r + nz*32
 }
 
@@ -137,11 +137,11 @@ func (e Element) BitLen() int {
 func (e Element) TestBit(n int) bool {
 	wordIdx := n / 32
 	bitPos := n % 32
-	
+
 	if wordIdx >= len(e.words) {
 		return false
 	}
-	
+
 	mask := uint32(1) << bitPos
 	return (e.words[wordIdx] & mask) != 0
 }
@@ -150,11 +150,11 @@ func (e Element) TestBit(n int) bool {
 func (e *Element) SetBit(n int) {
 	wordIdx := n / 32
 	bitPos := n % 32
-	
+
 	if wordIdx >= len(e.words) {
 		return
 	}
-	
+
 	mask := uint32(1) << bitPos
 	e.words[wordIdx] |= mask
 }
@@ -163,11 +163,11 @@ func (e *Element) SetBit(n int) {
 func (e *Element) ClearBit(n int) {
 	wordIdx := n / 32
 	bitPos := n % 32
-	
+
 	if wordIdx >= len(e.words) {
 		return
 	}
-	
+
 	mask := uint32(1) << bitPos
 	e.words[wordIdx] &^= mask
 }
@@ -185,17 +185,14 @@ func (e Element) IsZero() bool {
 // Equal returns true if two elements are equal.
 func (e Element) Equal(other Element) bool {
 	// Compare up to the length of the shorter element
-	minLen := len(e.words)
-	if len(other.words) < minLen {
-		minLen = len(other.words)
-	}
-	
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(other.words), len(e.words))
+
+	for i := range minLen {
 		if e.words[i] != other.words[i] {
 			return false
 		}
 	}
-	
+
 	// Check remaining words are zero
 	for i := minLen; i < len(e.words); i++ {
 		if e.words[i] != 0 {
@@ -207,7 +204,7 @@ func (e Element) Equal(other Element) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 

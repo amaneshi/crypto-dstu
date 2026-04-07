@@ -9,7 +9,7 @@ import (
 	"crypto-dstu/ua"
 )
 
-// multiFlag implements flag.Value for flags that may be repeated (e.g. -cert, -tsp).
+// multiFlag implements [flag.Value] for flags that may be repeated (e.g. -cert, -tsp).
 type multiFlag []string
 
 func (m *multiFlag) String() string { return strings.Join(*m, ",") }
@@ -80,7 +80,7 @@ func mustWrite(path string, data []byte) {
 }
 
 // fatalf prints an error to stderr and exits with code 1.
-func fatalf(format string, args ...interface{}) {
+func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "dstu: "+format+"\n", args...)
 	os.Exit(1)
 }

@@ -2,7 +2,7 @@ package kalyna
 
 // sboxesEnc contains the four 256-entry forward S-boxes for Kalyna (identical to Kupyna's).
 // sboxesDec contains the corresponding inverse S-boxes for decryption.
-// Source: Roman-Oliynykov/Kalyna-reference tables.c
+// Source: Roman-Oliynykov/Kalyna-reference tables.c.
 var sboxesEnc = [4][256]byte{
 	{
 		0xa8, 0x43, 0x5f, 0x06, 0x6b, 0x75, 0x6c, 0x59, 0x71, 0xdf, 0x87, 0x95, 0x17, 0xf0, 0xd8, 0x09,

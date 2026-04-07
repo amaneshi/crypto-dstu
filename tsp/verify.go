@@ -24,7 +24,7 @@ func VerifyToken(tokenDER []byte, originalHash []byte, nonce *big.Int, caCerts [
 	if err != nil {
 		return nil, errors.New("tsp: parse token: " + err.Error())
 	}
-	if err := cms.VerifySigned(msg, nil, caCerts); err != nil {
+	if err = cms.VerifySigned(msg, nil, caCerts); err != nil {
 		return nil, errors.New("tsp: verify token signature: " + err.Error())
 	}
 

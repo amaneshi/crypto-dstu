@@ -48,7 +48,7 @@ Options:
 	filename := fs.String("filename", "", "attachment filename")
 	includeChain := fs.String("include-chain", "none", "cert chain: none|ref|full")
 
-	fs.Parse(args)
+	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	if *key == "" {
 		fmt.Fprintln(os.Stderr, "dstu sign: -key is required")
@@ -72,7 +72,7 @@ Options:
 		Email:    *email,
 		Filename: *filename,
 	}
-	_ = *tspLevel    // TSP stamping is a future extension on top of existing ua.SignOptions
+	_ = *tspLevel     // TSP stamping is a future extension on top of existing ua.SignOptions
 	_ = *includeChain // CAdES-C/X chain embedding is a future extension
 
 	var result []byte

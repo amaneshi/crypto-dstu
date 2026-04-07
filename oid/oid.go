@@ -6,14 +6,14 @@ import "encoding/asn1"
 // Source: cryptonite pkix.h, DSTU 4145-2002, certificate format regulation
 // http://zakon4.rada.gov.ua/laws/show/z1398-12
 
-// Signature algorithm OIDs
+// Signature algorithm OIDs.
 var (
 	DSTU4145WithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
 	DSTU4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
 	DSTU4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
 )
 
-// Named curve OIDs (index 0..9 → PB_163..PB_431)
+// Named curve OIDs (index 0..9 → PB_163..PB_431).
 var (
 	CurvePB163 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 0}
 	CurvePB167 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 1}
@@ -27,14 +27,14 @@ var (
 	CurvePB431 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 9}
 )
 
-// GOST 28147-89 cipher OIDs
+// GOST 28147-89 cipher OIDs.
 var (
 	GOST28147     = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3}
 	GOST28147CFB  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3, 1}
 	GOST28147Wrap = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3, 2}
 )
 
-// Hash algorithm OIDs
+// Hash algorithm OIDs.
 var (
 	GOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 1}
 	Kupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 2, 1}
@@ -42,21 +42,21 @@ var (
 	Kupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 2, 3}
 )
 
-// Subject DN attribute OIDs — Ukrainian PKI specific
+// Subject DN attribute OIDs — Ukrainian PKI specific.
 var (
 	// EDRPOU — Єдиний державний реєстр підприємств і організацій України
-	// Corporate identification code (8 digits)
+	// Corporate identification code (8 digits).
 	EDRPOU = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 11, 1, 4, 1, 1}
 
 	// DRFO — Державний реєстр фізичних осіб
-	// Personal tax identification number (10 digits)
+	// Personal tax identification number (10 digits).
 	DRFO = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 11, 1, 4, 1, 2}
 
-	// IPN — alternative tax number attribute
+	// IPN — alternative tax number attribute.
 	IPN = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 11, 1, 4, 2, 1}
 )
 
-// Standard X.509 attribute OIDs referenced in Ukrainian certificates
+// Standard X.509 attribute OIDs referenced in Ukrainian certificates.
 var (
 	OIDCommonName         = asn1.ObjectIdentifier{2, 5, 4, 3}
 	OIDOrganization       = asn1.ObjectIdentifier{2, 5, 4, 10}
@@ -71,7 +71,7 @@ var (
 	OIDSurname            = asn1.ObjectIdentifier{2, 5, 4, 4}
 )
 
-// X.509 extension OIDs
+// X.509 extension OIDs.
 var (
 	OIDExtSubjectKeyID        = asn1.ObjectIdentifier{2, 5, 29, 14}
 	OIDExtKeyUsage            = asn1.ObjectIdentifier{2, 5, 29, 15}

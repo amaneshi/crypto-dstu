@@ -1,7 +1,7 @@
 package kupyna
 
 // sboxes contains the four 256-entry S-boxes used by Kupyna (identical to Kalyna's).
-// Source: Roman-Oliynykov/Kupyna-reference tables.c
+// Source: Roman-Oliynykov/Kupyna-reference tables.c.
 var sboxes = [4][256]byte{
 	{
 		0xa8, 0x43, 0x5f, 0x06, 0x6b, 0x75, 0x6c, 0x59, 0x71, 0xdf, 0x87, 0x95, 0x17, 0xf0, 0xd8, 0x09,

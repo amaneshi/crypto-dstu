@@ -17,19 +17,7 @@ func uint64sToBytes(words []uint64) []byte {
 	return b
 }
 
-type kalynaVec struct {
-	name      string
-	newCipher func([]byte) (interface {
-		Encrypt(dst, src []byte)
-		Decrypt(dst, src []byte)
-		BlockSize() int
-	}, error)
-	pt  []uint64
-	key []uint64
-	ct  []uint64
-}
-
-// Reference test vectors from Roman-Oliynykov/Kalyna-reference main.c
+// Reference test vectors from Roman-Oliynykov/Kalyna-reference main.c.
 var encryptVectors = []struct {
 	name string
 	new  func([]byte) (interface {

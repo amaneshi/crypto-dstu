@@ -8,18 +8,18 @@ import (
 	"crypto-dstu/gost28147"
 )
 
-// PKCS#12 / PFX OIDs
+// PKCS#12 / PFX OIDs.
 var (
-	// PFX contentType OIDs
+	// PFX contentType OIDs.
 	oidDataContentType          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
 	oidEncryptedDataContentType = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 6}
 
-	// SafeBag OIDs
+	// SafeBag OIDs.
 	oidKeyBag              = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 12, 10, 1, 1}
 	oidPKCS8ShroudedKeyBag = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 12, 10, 1, 2}
 	oidCertBag             = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 12, 10, 1, 3}
 
-	// CertBag type OID
+	// CertBag type OID.
 	oidX509Certificate = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 22, 1}
 )
 
@@ -69,7 +69,7 @@ type safeBag struct {
 // Handles both plain-data and encrypted-data content (GOST or AES/3DES encrypted).
 // For encrypted content, password is used via PBES2 / PBKDF2.
 //
-// Reference: cryptonite src/storage/c/file/pkcs12.c
+// Reference: cryptonite src/storage/c/file/pkcs12.c.
 func ParsePKCS12(data []byte, password string) ([]*KeyCertPair, error) {
 	data = MaybePEM(data)
 
@@ -93,8 +93,10 @@ func ParsePKCS12(data []byte, password string) ([]*KeyCertPair, error) {
 	var keys []*dstu4145.PrivateKey
 	var certs [][]byte
 
+	var ks []*dstu4145.PrivateKey
+	var cs [][]byte
 	for _, safe := range safes {
-		ks, cs, err := parseSafeBags(safe, password)
+		ks, cs, err = parseSafeBags(safe, password)
 		if err != nil {
 			return nil, err
 		}
@@ -129,28 +131,32 @@ func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
 
 	// The Content is [0] EXPLICIT OCTET STRING containing an OCTET STRING
 	var outer []byte
-	if _, err := asn1.Unmarshal(ci.Content.Bytes, &outer); err != nil {
+	var err error
+	_, err = asn1.Unmarshal(ci.Content.Bytes, &outer)
+	if err != nil {
 		return nil, errors.New("keystore: PKCS12: authSafe content: " + err.Error())
 	}
 
 	// outer is a DER SEQUENCE OF ContentInfo
 	var safeContents []contentInfo
-	if _, err := asn1.Unmarshal(outer, &safeContents); err != nil {
+	_, err = asn1.Unmarshal(outer, &safeContents)
+	if err != nil {
 		return nil, errors.New("keystore: PKCS12: AuthenticatedSafe: " + err.Error())
 	}
 
 	result := make([][]byte, 0, len(safeContents))
+	var plain []byte
 	for _, sc := range safeContents {
 		switch {
 		case sc.ContentType.Equal(oidDataContentType):
-			var plain []byte
-			if _, err := asn1.Unmarshal(sc.Content.Bytes, &plain); err != nil {
+			_, err = asn1.Unmarshal(sc.Content.Bytes, &plain)
+			if err != nil {
 				return nil, errors.New("keystore: PKCS12: SafeContents Data: " + err.Error())
 			}
 			result = append(result, plain)
 
 		case sc.ContentType.Equal(oidEncryptedDataContentType):
-			plain, err := decryptPKCS12Content(sc.Content.Bytes, password)
+			plain, err = decryptPKCS12Content(sc.Content.Bytes, password)
 			if err != nil {
 				return nil, err
 			}
@@ -166,7 +172,9 @@ func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
 // decryptPKCS12Content decrypts an EncryptedData ContentInfo.
 func decryptPKCS12Content(rawContent []byte, password string) ([]byte, error) {
 	var ed encryptedData
-	if _, err := asn1.Unmarshal(rawContent, &ed); err != nil {
+	var err error
+	_, err = asn1.Unmarshal(rawContent, &ed)
+	if err != nil {
 		return nil, errors.New("keystore: PKCS12: EncryptedData: " + err.Error())
 	}
 
@@ -188,7 +196,9 @@ func decryptPKCS12Content(rawContent []byte, password string) ([]byte, error) {
 
 	// Attempt PBES2 decryption
 	var outer encryptedPrivateKeyInfo
-	if rest, err := asn1.Unmarshal(epkiDER, &outer); err != nil || len(rest) != 0 {
+	var rest []byte
+	rest, err = asn1.Unmarshal(epkiDER, &outer)
+	if err != nil || len(rest) != 0 {
 		return nil, errors.New("keystore: PKCS12: EPKI roundtrip failed")
 	}
 

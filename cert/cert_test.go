@@ -27,7 +27,7 @@ func TestOIDCurveNameLookup(t *testing.T) {
 	require.Equal(t, "DSTU_PB_257", oid.CurveNameByOID(oid.CurvePB257))
 	require.Equal(t, "DSTU_PB_163", oid.CurveNameByOID(oid.CurvePB163))
 	require.Equal(t, "DSTU_PB_431", oid.CurveNameByOID(oid.CurvePB431))
-	require.Equal(t, "", oid.CurveNameByOID(asn1.ObjectIdentifier{9, 9, 9}))
+	require.Empty(t, oid.CurveNameByOID(asn1.ObjectIdentifier{9, 9, 9}))
 }
 
 func TestOIDAlgorithmName(t *testing.T) {
@@ -98,7 +98,12 @@ func bePadBytes(b []byte, n int) []byte {
 // buildMinimalCert creates a minimal synthetic DER certificate for testing.
 // It contains a TBS with version, serial, validity, subject, and a DSTU public key,
 // then appends a dummy signature algorithm and signature.
-func buildMinimalCert(t *testing.T, priv *dstu4145.PrivateKey, sigAlgOID asn1.ObjectIdentifier, subjectAttrs []interface{}) []byte {
+func buildMinimalCert(
+	t *testing.T,
+	priv *dstu4145.PrivateKey,
+	sigAlgOID asn1.ObjectIdentifier,
+	subjectAttrs []any,
+) []byte {
 	t.Helper()
 
 	curve := priv.Curve
@@ -109,7 +114,9 @@ func buildMinimalCert(t *testing.T, priv *dstu4145.PrivateKey, sigAlgOID asn1.Ob
 	byteLen := (curve.M + 7) / 8
 	xLE := leReverse(bePadBytes(pub.Q.X.Bytes(), byteLen))
 	yLE := leReverse(bePadBytes(pub.Q.Y.Bytes(), byteLen))
-	pkLE := append(xLE, yLE...)
+	pkLE := make([]byte, len(xLE)+len(yLE))
+	copy(pkLE, xLE)
+	copy(pkLE[len(xLE):], yLE)
 
 	// Find curve OID
 	params := dstu4145.ParamsByName("DSTU_PB_257")
@@ -189,7 +196,7 @@ func hashForAlg(t *testing.T, data []byte, sigAlgOID asn1.ObjectIdentifier) []by
 }
 
 // buildSubjectDER builds a minimal SEQUENCE { SET { SEQUENCE { OID, UTF8String } } }.
-func buildSubjectDER(t *testing.T, attrs []interface{}) []byte {
+func buildSubjectDER(t *testing.T, attrs []any) []byte {
 	t.Helper()
 	// attrs is pairs: [oid, value, oid, value, ...]
 	type atv struct {
@@ -229,7 +236,7 @@ func TestParseCertificateBasic(t *testing.T) {
 	priv, err := dstu4145.GenerateKey(ec.DSTU_PB_257())
 	require.NoError(t, err)
 
-	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []interface{}{
+	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []any{
 		oid.OIDCommonName, "Test User",
 	})
 
@@ -247,7 +254,7 @@ func TestParseCertificateUkrainianDN(t *testing.T) {
 	priv, err := dstu4145.GenerateKey(ec.DSTU_PB_257())
 	require.NoError(t, err)
 
-	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []interface{}{
+	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []any{
 		oid.OIDCommonName, "Іваненко Іван Іванович",
 		oid.EDRPOU, "12345678",
 		oid.DRFO, "1234567890",
@@ -322,7 +329,7 @@ func TestVerifyCertChain(t *testing.T) {
 
 	// Build a self-signed root cert; VerifyCertChain finds root by matching
 	// root.Subject.Bytes == cert.Issuer.Bytes. A self-signed cert satisfies this.
-	rootDER := buildMinimalCert(t, root, oid.DSTU4145WithGOST34311, []interface{}{
+	rootDER := buildMinimalCert(t, root, oid.DSTU4145WithGOST34311, []any{
 		oid.OIDCommonName, "Test CA",
 	})
 	rootCert, err := ParseCertificate(rootDER)
@@ -349,7 +356,7 @@ func TestGetCertInfo(t *testing.T) {
 	priv, err := dstu4145.GenerateKey(ec.DSTU_PB_257())
 	require.NoError(t, err)
 
-	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []interface{}{
+	der := buildMinimalCert(t, priv, oid.DSTU4145WithGOST34311, []any{
 		oid.OIDCommonName, "Test",
 		oid.EDRPOU, "12345678",
 		oid.DRFO, "1234567890",

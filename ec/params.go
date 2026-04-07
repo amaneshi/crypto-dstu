@@ -1,3 +1,4 @@
+//nolint:revive,staticcheck // DSTU_PB_xxx function names match the Ukrainian standard document verbatim; renaming to CamelCase would break the public API
 package ec
 
 import (
@@ -24,7 +25,7 @@ func mustFromHex(s string, words int) gf2m.Element {
 
 // Standard DSTU 4145-2002 elliptic curves
 
-// DSTU_PB_257 returns the DSTU curve over GF(2^257)
+// DSTU_PB_257 returns the DSTU curve over GF(2^257).
 func DSTU_PB_257() *Curve {
 	words := 9 // ceil(257/32) = 9
 
@@ -38,22 +39,33 @@ func DSTU_PB_257() *Curve {
 	return NewCurve(257, gf2m.ModBits257, a, b, gx, gy, n, 4)
 }
 
-// DSTU_PB_431 returns the DSTU curve over GF(2^431)
+// DSTU_PB_431 returns the DSTU curve over GF(2^431).
 func DSTU_PB_431() *Curve {
 	words := 14 // ceil(431/32) = 14
 
 	a := mustFromHex("1", words)
-	b := mustFromHex("003CE10490F6A708FC26DFE8C3D27C4F94E690134D5BFF988D8D28AAEAEDE975936C66BAC536B18AE2DC312CA493117DAA469C640CAF3", words)
-	gx := mustFromHex("1A62BA79D98133A16BBAE7ED9A8E03C32E0824D57AEF72F88986874E5AAE49C27BED49A2A95058068426C2171E99FD3B43C5947C857D", words)
-	gy := mustFromHex("70B5E1E14031C1F70BBEFE96BDDE66F451754B4CA5F48DA241F331AA396B8D1839A855C1769B1EA14BA53308B5E2723724E090E02DB9", words)
+	b := mustFromHex(
+		"003CE10490F6A708FC26DFE8C3D27C4F94E690134D5BFF988D8D28AAEAEDE975936C66BAC536B18AE2DC312CA493117DAA469C640CAF3",
+		words,
+	)
+	gx := mustFromHex(
+		"1A62BA79D98133A16BBAE7ED9A8E03C32E0824D57AEF72F88986874E5AAE49C27BED49A2A95058068426C2171E99FD3B43C5947C857D",
+		words,
+	)
+	gy := mustFromHex(
+		"70B5E1E14031C1F70BBEFE96BDDE66F451754B4CA5F48DA241F331AA396B8D1839A855C1769B1EA14BA53308B5E2723724E090E02DB9",
+		words,
+	)
 
-	n := mustDecodeHex("3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBA3175458009A8C0A724F02F81AA8A1FCBAF80D90C7A95110504CF")
+	n := mustDecodeHex(
+		"3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBA3175458009A8C0A724F02F81AA8A1FCBAF80D90C7A95110504CF",
+	)
 
 	return NewCurve(431, gf2m.ModBits431, a, b, gx, gy, n, 2)
 }
 
 // DSTU_PB_163 returns the DSTU curve over GF(2^163)
-// Parameters verified from ikripaka/dstu4145-rust and ukurwa4145
+// Parameters verified from ikripaka/dstu4145-rust and ukurwa4145.
 func DSTU_PB_163() *Curve {
 	words := 6 // ceil(163/32) = 6
 
@@ -67,7 +79,7 @@ func DSTU_PB_163() *Curve {
 	return NewCurve(163, gf2m.ModBits163, a, b, gx, gy, n, 2)
 }
 
-// DSTU_PB_167 returns the DSTU curve over GF(2^167)
+// DSTU_PB_167 returns the DSTU curve over GF(2^167).
 func DSTU_PB_167() *Curve {
 	words := 6 // ceil(167/32) = 6
 
@@ -83,7 +95,7 @@ func DSTU_PB_167() *Curve {
 }
 
 // DSTU_PB_173 returns the DSTU curve over GF(2^173)
-// Parameters from ikripaka/dstu4145-rust
+// Parameters from ikripaka/dstu4145-rust.
 func DSTU_PB_173() *Curve {
 	words := 6 // ceil(173/32) = 6
 
@@ -98,7 +110,7 @@ func DSTU_PB_173() *Curve {
 }
 
 // DSTU_PB_179 returns the DSTU curve over GF(2^179)
-// Parameters from ikripaka/dstu4145-rust
+// Parameters from ikripaka/dstu4145-rust.
 func DSTU_PB_179() *Curve {
 	words := 6 // ceil(179/32) = 6
 
@@ -113,7 +125,7 @@ func DSTU_PB_179() *Curve {
 }
 
 // DSTU_PB_191 returns the DSTU curve over GF(2^191)
-// Parameters from ikripaka/dstu4145-rust
+// Parameters from ikripaka/dstu4145-rust.
 func DSTU_PB_191() *Curve {
 	words := 6 // ceil(191/32) = 6
 
@@ -128,7 +140,7 @@ func DSTU_PB_191() *Curve {
 }
 
 // DSTU_PB_233 returns the DSTU curve over GF(2^233)
-// Polynomial fixed to x^233+x^9+x^4+x+1 per DSTU 4145-2002 Table 1
+// Polynomial fixed to x^233+x^9+x^4+x+1 per DSTU 4145-2002 Table 1.
 func DSTU_PB_233() *Curve {
 	words := 8 // ceil(233/32) = 8
 
@@ -143,7 +155,7 @@ func DSTU_PB_233() *Curve {
 }
 
 // DSTU_PB_307 returns the DSTU curve over GF(2^307)
-// Parameters from ikripaka/dstu4145-rust
+// Parameters from ikripaka/dstu4145-rust.
 func DSTU_PB_307() *Curve {
 	words := 10 // ceil(307/32) = 10
 
@@ -158,14 +170,23 @@ func DSTU_PB_307() *Curve {
 }
 
 // DSTU_PB_367 returns the DSTU curve over GF(2^367)
-// Parameters from ikripaka/dstu4145-rust
+// Parameters from ikripaka/dstu4145-rust.
 func DSTU_PB_367() *Curve {
 	words := 12 // ceil(367/32) = 12
 
 	a := mustFromHex("1", words)
-	b := mustFromHex("43FC8AD242B0B7A6F3D1627AD5654447556B47BF6AA4A64B0C2AFE42CADAB8F93D92394C79A79755437B56995136", words)
-	gx := mustFromHex("324A6EDDD512F08C49A99AE0D3F961197A76413E7BE81A400CA681E09639B5FE12E59A109F78BF4A373541B3B9A1", words)
-	gy := mustFromHex("1AB597A5B4477F59E39539007C7F977D1A567B92B043A49C6B61984C3FE3481AAF454CD41BA1F051626442B3C10", words)
+	b := mustFromHex(
+		"43FC8AD242B0B7A6F3D1627AD5654447556B47BF6AA4A64B0C2AFE42CADAB8F93D92394C79A79755437B56995136",
+		words,
+	)
+	gx := mustFromHex(
+		"324A6EDDD512F08C49A99AE0D3F961197A76413E7BE81A400CA681E09639B5FE12E59A109F78BF4A373541B3B9A1",
+		words,
+	)
+	gy := mustFromHex(
+		"1AB597A5B4477F59E39539007C7F977D1A567B92B043A49C6B61984C3FE3481AAF454CD41BA1F051626442B3C10",
+		words,
+	)
 
 	n := mustDecodeHex("40000000000000000000000000000000000000000000009C300B75A3FA824F22428FD28CE8812245EF44049B2D49")
 

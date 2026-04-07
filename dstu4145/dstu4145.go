@@ -37,7 +37,7 @@ func (priv *PrivateKey) Public() *PublicKey {
 	return &PublicKey{Q: q, Curve: priv.Curve}
 }
 
-// Public implements crypto.Signer.
+// PublicKey implements [crypto.Signer].
 func (priv *PrivateKey) PublicKey() crypto.PublicKey {
 	return priv.Public()
 }
@@ -59,7 +59,7 @@ func GenerateKey(curve *ec.Curve) (*PrivateKey, error) {
 }
 
 // Sign signs the pre-hashed digest using the private key.
-// Implements crypto.Signer.
+// Implements [crypto.Signer].
 func (priv *PrivateKey) Sign(rng io.Reader, digest []byte, _ crypto.SignerOpts) ([]byte, error) {
 	sig, err := Sign(rng, priv, digest)
 	if err != nil {
@@ -93,7 +93,7 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 		}
 
 		// R = e·G
-		R := curve.ScalarBaseMul(e)
+		R := curve.ScalarBaseMul(e) //nolint:gocritic // R is standard DSTU 4145 spec notation
 		if R.IsInfinity() {
 			continue
 		}
@@ -153,7 +153,7 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 	// R' = s·G + r_int·(-Q)  (equivalent to s·G - r_int·Q)
 	sG := curve.ScalarBaseMul(sig.S)
 	rQ := pub.Q.ScalarMul(rInt)
-	Rprime := sG.Add(rQ.Neg())
+	Rprime := sG.Add(rQ.Neg()) //nolint:gocritic // Rprime is standard DSTU 4145 spec notation
 
 	if Rprime.IsInfinity() {
 		return false
@@ -196,18 +196,18 @@ func fieldElemToInt(e gf2m.Element) *big.Int {
 }
 
 // randFieldElement returns a random integer in [1, max-1].
-func randFieldElement(rng io.Reader, max *big.Int) (*big.Int, error) {
-	b := make([]byte, (max.BitLen()+7)/8)
+func randFieldElement(rng io.Reader, bound *big.Int) (*big.Int, error) {
+	b := make([]byte, (bound.BitLen()+7)/8)
 	for {
 		if _, err := io.ReadFull(rng, b); err != nil {
 			return nil, errors.New("dstu4145: rand read failed: " + err.Error())
 		}
 		// Mask top bits to avoid bias
-		if excess := uint(len(b)*8) - uint(max.BitLen()); excess > 0 {
+		if excess := uint(len(b)*8) - uint(bound.BitLen()); excess > 0 {
 			b[0] >>= excess
 		}
 		k := new(big.Int).SetBytes(b)
-		if k.Sign() > 0 && k.Cmp(max) < 0 {
+		if k.Sign() > 0 && k.Cmp(bound) < 0 {
 			return k, nil
 		}
 	}

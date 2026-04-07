@@ -69,7 +69,7 @@ func fieldElemFromLE(b []byte, words int) gf2m.Element {
 	padded := make([]byte, words*4)
 	copy(padded, b)
 	ws := make([]uint32, words)
-	for i := 0; i < words; i++ {
+	for i := range words {
 		ws[i] = uint32(padded[i*4]) |
 			uint32(padded[i*4+1])<<8 |
 			uint32(padded[i*4+2])<<16 |

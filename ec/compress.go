@@ -1,8 +1,10 @@
 package ec
 
 import (
-	"crypto-dstu/gf2m"
+	"errors"
 	"fmt"
+
+	"crypto-dstu/gf2m"
 )
 
 // Compress returns the compressed representation of the point.
@@ -22,7 +24,7 @@ func (p *Point) Compress() []byte {
 // Since we only store x, we compute y and return the canonical point.
 func (c *Curve) Expand(compressed []byte) (*Point, error) {
 	if len(compressed) == 0 {
-		return nil, fmt.Errorf("compressed point is empty")
+		return nil, errors.New("compressed point is empty")
 	}
 
 	x := gf2m.FromBytes(compressed, c.Words)
@@ -59,7 +61,7 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 
 	// Verify the point is on the curve
 	if !c.Contains(point) {
-		return nil, fmt.Errorf("expanded point is not on curve")
+		return nil, errors.New("expanded point is not on curve")
 	}
 
 	return point, nil
@@ -71,7 +73,7 @@ func fsquad(w gf2m.Element, modBits gf2m.ModBits) (gf2m.Element, error) {
 	m := modBits.M()
 
 	if m%2 == 0 {
-		return gf2m.Element{}, fmt.Errorf("fsquad only works for odd m")
+		return gf2m.Element{}, errors.New("fsquad only works for odd m")
 	}
 
 	// For odd m, use half-trace algorithm:
@@ -93,40 +95,20 @@ func fsquad(w gf2m.Element, modBits gf2m.ModBits) (gf2m.Element, error) {
 	check := gf2m.Add(zSqr, z)
 
 	if !check.Equal(w) {
-		return gf2m.Element{}, fmt.Errorf("no solution exists for z² + z = w")
+		return gf2m.Element{}, errors.New("no solution exists for z² + z = w")
 	}
 
 	return z, nil
 }
 
-// trace computes the trace of an element in GF(2^m).
-// trace(a) = a + a^2 + a^4 + ... + a^(2^(m-1))
-func trace(a gf2m.Element, modBits gf2m.ModBits) bool {
-	m := modBits.M()
-	result := a.Clone()
-	temp := a.Clone()
-
-	// BUG FIX: The loop condition should iterate m-1 times total
-	// We start with result = a (which is a^(2^0))
-	// Then we need to add a^(2^1), a^(2^2), ..., a^(2^(m-1))
-	// That's m-1 more terms, so we iterate from i=1 to i<m
-	for i := 1; i < m; i++ {
-		temp = gf2m.ModSqr(temp, modBits)
-		result = gf2m.Add(result, temp)
-	}
-
-	// Trace is the least significant bit
-	return result.TestBit(0)
-}
-
 // computeYForZeroX computes y when x = 0.
-// For x = 0: y² = b, so y = b^(2^(m-1))
+// For x = 0: y² = b, so y = b^(2^(m-1)).
 func computeYForZeroX(c *Curve) gf2m.Element {
 	m := c.M
 	y := c.B.Clone()
 
 	// Compute b^(2^(m-1)) by repeated squaring
-	for i := 0; i < m-1; i++ {
+	for range m - 1 {
 		y = gf2m.ModSqr(y, c.ModBits)
 	}
 

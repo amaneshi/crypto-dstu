@@ -54,9 +54,11 @@ func Decode(data []byte) (*Container, error) {
 	}
 
 	c := &Container{}
+	var h *Header
+	var sub []Section
 	for _, s := range raw {
 		if headerLabels[s.Label] {
-			h, err := DecodeHeader(s.Contents)
+			h, err = DecodeHeader(s.Contents)
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +68,7 @@ func Decode(data []byte) (*Container, error) {
 		switch s.Label {
 		case "QLB_SIGN", "QLB_CRYPT":
 			// QLB internal format: nested sub-sections within the section contents
-			sub, err := decodeQLB(s.Label, s.Contents)
+			sub, err = decodeQLB(s.Label, s.Contents)
 			if err != nil {
 				// Non-fatal: store as-is
 				c.Sections = append(c.Sections, s)

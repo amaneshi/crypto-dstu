@@ -26,21 +26,18 @@ type cfbEncrypter struct{ *cfbStream }
 type cfbDecrypter struct{ *cfbStream }
 
 func (c *cfbEncrypter) XORKeyStream(dst, src []byte) {
-	for i := 0; i < len(src); i++ {
+	for i := range src {
 		if i%BlockSize == 0 {
 			c.block.Encrypt(c.gamma[:], c.iv[:])
 		}
 		j := i % BlockSize
 		dst[i] = src[i] ^ c.gamma[j]
 		c.iv[j] = dst[i]
-		if j == BlockSize-1 {
-			// iv is now fully updated; next encrypt will use it
-		}
 	}
 }
 
 func (c *cfbDecrypter) XORKeyStream(dst, src []byte) {
-	for i := 0; i < len(src); i++ {
+	for i := range src {
 		if i%BlockSize == 0 {
 			c.block.Encrypt(c.gamma[:], c.iv[:])
 		}

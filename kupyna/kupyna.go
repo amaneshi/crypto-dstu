@@ -5,6 +5,7 @@ package kupyna
 import (
 	"encoding/binary"
 	"hash"
+	"slices"
 )
 
 // digest holds the internal state for a Kupyna hash computation.
@@ -53,8 +54,8 @@ func (d *digest) Reset() {
 func (d *digest) Size() int      { return d.hashSize }
 func (d *digest) BlockSize() int { return d.blockSize }
 
-func (d *digest) Write(p []byte) (n int, err error) {
-	n = len(p)
+func (d *digest) Write(p []byte) (int, error) {
+	n := len(p)
 	d.totalBits += uint64(n) * 8
 	// Append to buffer
 	d.buf = append(d.buf, p...)
@@ -105,7 +106,7 @@ func (d *digest) checkSum() []byte {
 	pad = append(pad, lenBytes[:]...)
 
 	// Process remaining buf + padding as complete blocks
-	remaining := append(d.buf, pad...)
+	remaining := slices.Concat(d.buf, pad)
 	for len(remaining) >= d.blockSize {
 		compress(d.state, remaining[:d.blockSize], d.rounds)
 		remaining = remaining[d.blockSize:]

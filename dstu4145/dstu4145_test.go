@@ -19,7 +19,6 @@ func TestSignVerifyRoundtrip(t *testing.T) {
 	}
 
 	for _, p := range AllParams() {
-		p := p
 		t.Run(p.Name, func(t *testing.T) {
 			priv, err := GenerateKey(p.Curve)
 			require.NoError(t, err, "GenerateKey")
@@ -51,7 +50,7 @@ func TestInvalidSignature(t *testing.T) {
 
 	// Tamper with R (use an obviously different element — all low bits set)
 	badR := sig.R.Clone()
-	for i := 0; i < curve.Words*32; i++ {
+	for i := range curve.Words * 32 {
 		badR.SetBit(i)
 	}
 	// badR is now all-ones (max field element); extremely unlikely to equal r'
@@ -99,7 +98,7 @@ func TestMarshalRoundtrip(t *testing.T) {
 	require.True(t, Verify(pub, digest, sig2), "Verify failed on unmarshaled signature")
 }
 
-// TestCryptoSignerInterface verifies that PrivateKey implements crypto.Signer.
+// TestCryptoSignerInterface verifies that PrivateKey implements [crypto.Signer].
 func TestCryptoSignerInterface(t *testing.T) {
 	curve := ec.DSTU_PB_257()
 	digest := make([]byte, 32)

@@ -98,7 +98,7 @@ func BenchmarkKupyna256_1K(b *testing.B) {
 	data := make([]byte, 1024)
 	b.SetBytes(int64(len(data)))
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		h := New256()
 		h.Write(data)
 		h.Sum(nil)

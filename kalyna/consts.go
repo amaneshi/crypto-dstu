@@ -4,23 +4,20 @@ const (
 	bitsInWord = 64
 	bitsInByte = 8
 
-	// Block sizes in bits
+	// Block sizes in bits.
 	kBlock128 = 128
 	kBlock256 = 256
 	kBlock512 = 512
 
-	// Key sizes in bits
+	// Key sizes in bits.
 	kKey128 = 128
 	kKey256 = 256
 	kKey512 = 512
 
-	// Round counts
+	// Round counts.
 	kNR128 = 10
 	kNR256 = 14
 	kNR512 = 18
-
-	// Reduction polynomial for GF(2^8): x^8 + x^4 + x^3 + x^2 + 1
-	kReductionPoly = 0x011d
 )
 
 // mdsMatrix is the 8×8 MDS matrix over GF(2^8).

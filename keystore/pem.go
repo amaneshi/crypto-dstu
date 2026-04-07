@@ -11,7 +11,7 @@ import (
 
 // IsPEM reports whether data begins with a PEM header.
 func IsPEM(data []byte) bool {
-	for i := 0; i < len(data); i++ {
+	for i := range data {
 		if data[i] == '-' {
 			return len(data[i:]) >= 5 && string(data[i:i+5]) == "-----"
 		}

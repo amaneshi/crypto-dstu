@@ -44,7 +44,9 @@ func czoCert(t *testing.T, key *dstu4145.PrivateKey, cn string, serial int64) *c
 	cnBytes := []byte(cn)
 	oidCN := []byte{0x06, 0x03, 0x55, 0x04, 0x03}
 	utf8val := append([]byte{0x0c, byte(len(cnBytes))}, cnBytes...)
-	inner := append(oidCN, utf8val...)
+	inner := make([]byte, len(oidCN)+len(utf8val))
+	copy(inner, oidCN)
+	copy(inner[len(oidCN):], utf8val)
 	atv := append([]byte{0x30, byte(len(inner))}, inner...)
 	rdn := append([]byte{0x31, byte(len(atv))}, atv...)
 	issuerBytes := append([]byte{0x30, byte(len(rdn))}, rdn...)
@@ -60,7 +62,7 @@ func czoCert(t *testing.T, key *dstu4145.PrivateKey, cn string, serial int64) *c
 	}
 }
 
-func czoBox(t *testing.T) (*Box, *dstu4145.PrivateKey, *cert.Certificate) {
+func czoBox(t *testing.T) (*Box, *cert.Certificate) {
 	t.Helper()
 	key := czoKey(t)
 	c := czoCert(t, key, "CZO-Test-UA", 5001)
@@ -71,7 +73,7 @@ func czoBox(t *testing.T) (*Box, *dstu4145.PrivateKey, *cert.Certificate) {
 		CryptCert:  c,
 		Role:       cert.RolePersonal,
 	}}
-	return b, key, c
+	return b, c
 }
 
 // ---- Box lifecycle ----
@@ -84,7 +86,7 @@ func TestCZO_BoxLoadCABundleInvalid(t *testing.T) {
 }
 
 func TestCZO_BoxAddTSPAndKeyByRole(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	b.AddTSP("http://tsp.czo.gov.ua/")
 	require.Len(t, b.TSPClients, 1)
 	require.Equal(t, "http://tsp.czo.gov.ua/", b.TSPClients[0].URL)
@@ -96,7 +98,7 @@ func TestCZO_BoxAddTSPAndKeyByRole(t *testing.T) {
 // ---- SignDocument / UnsignDocument (CAdES-BES style) ----
 
 func TestCZO_SignUnsign_Attached(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	content := []byte("<Document>CZO test</Document>")
 
 	signed, err := b.SignDocument(content, SignOptions{NoTax: true})
@@ -113,7 +115,7 @@ func TestCZO_SignUnsign_Attached(t *testing.T) {
 }
 
 func TestCZO_SignUnsign_TransportContainer(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	content := []byte("<xml>UA Tax Document</xml>")
 
 	signed, err := b.SignDocument(content, SignOptions{
@@ -131,7 +133,7 @@ func TestCZO_SignUnsign_TransportContainer(t *testing.T) {
 }
 
 func TestCZO_SignUnsign_Detached(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	content := []byte("detached CZO document content")
 
 	signed, err := b.SignDocument(content, SignOptions{NoTax: true, Detached: true})
@@ -145,7 +147,7 @@ func TestCZO_SignUnsign_Detached(t *testing.T) {
 }
 
 func TestCZO_SignUnsign_CertInfo(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	content := []byte("cert info test")
 
 	signed, err := b.SignDocument(content, SignOptions{NoTax: true})
@@ -163,7 +165,7 @@ func TestCZO_SignUnsign_CertInfo(t *testing.T) {
 }
 
 func TestCZO_SignUnsign_InvalidDER(t *testing.T) {
-	b, _, _ := czoBox(t)
+	b, _ := czoBox(t)
 	_, err := b.UnsignDocument([]byte{0x00, 0x01, 0x02})
 	require.Error(t, err)
 }
@@ -171,7 +173,7 @@ func TestCZO_SignUnsign_InvalidDER(t *testing.T) {
 // ---- Encrypt / Decrypt ----
 
 func TestCZO_EncryptDecrypt(t *testing.T) {
-	b, _, c := czoBox(t)
+	b, c := czoBox(t)
 	content := []byte("confidential CZO document")
 
 	enc, err := b.EncryptDocument(content, c)
@@ -183,8 +185,8 @@ func TestCZO_EncryptDecrypt(t *testing.T) {
 }
 
 func TestCZO_DecryptWrongKey(t *testing.T) {
-	b1, _, c1 := czoBox(t)
-	b2, _, _ := czoBox(t)
+	b1, c1 := czoBox(t)
+	b2, _ := czoBox(t)
 
 	enc, err := b1.EncryptDocument([]byte("secret"), c1)
 	require.NoError(t, err)
@@ -197,7 +199,7 @@ func TestCZO_DecryptWrongKey(t *testing.T) {
 // ---- Sign + Encrypt full roundtrip ----
 
 func TestCZO_SignAndEncrypt_Roundtrip(t *testing.T) {
-	b, _, c := czoBox(t)
+	b, c := czoBox(t)
 	content := []byte("<xml>Signed and encrypted tax document</xml>")
 
 	container, err := b.SignAndEncrypt(content, c, SignOptions{
@@ -218,7 +220,7 @@ func TestCZO_SignAndEncrypt_Roundtrip(t *testing.T) {
 }
 
 func TestCZO_SignAndEncrypt_NoTax(t *testing.T) {
-	b, _, c := czoBox(t)
+	b, c := czoBox(t)
 	content := []byte("raw sign+encrypt")
 
 	der, err := b.SignAndEncrypt(content, c, SignOptions{NoTax: true})
@@ -233,7 +235,7 @@ func TestCZO_SignAndEncrypt_NoTax(t *testing.T) {
 }
 
 func TestCZO_SignAndEncrypt_ContainerStructure(t *testing.T) {
-	b, _, c := czoBox(t)
+	b, c := czoBox(t)
 	content := []byte("container structure test")
 
 	raw, err := b.SignAndEncrypt(content, c, SignOptions{Filename: "doc.xml"})
@@ -267,7 +269,7 @@ func TestCZO_GetCertInfo(t *testing.T) {
 // ---- CMS-level verification via Box CACerts ----
 
 func TestCZO_VerifyWithCACerts(t *testing.T) {
-	b, _, signerCert := czoBox(t)
+	b, signerCert := czoBox(t)
 
 	// Add signer cert as "trusted CA" so chain verification passes
 	b.CACerts = append(b.CACerts, signerCert)
@@ -346,7 +348,6 @@ func TestCZO_Real_Box_LoadSignerCert(t *testing.T) {
 func TestCZO_Real_Box_AllFormats_DSTU(t *testing.T) {
 	formats := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long"}
 	for _, format := range formats {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			data, err := os.ReadFile(czo.Path("cades/DSTU/enveloped/" + format + "/test.txt.p7s"))
 			require.NoError(t, err)

@@ -6,7 +6,7 @@ import (
 )
 
 // Section represents a named data section in a transport container.
-// Wire format: label\0 + uint32LE(len(Contents)) + Contents
+// Wire format: label\0 + uint32LE(len(Contents)) + Contents.
 type Section struct {
 	Label    string
 	Contents []byte

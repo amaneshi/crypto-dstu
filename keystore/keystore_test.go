@@ -60,7 +60,6 @@ func TestMaybePEM(t *testing.T) {
 
 func TestRawKeyRoundtrip(t *testing.T) {
 	for _, curve := range []*ec.Curve{ec.DSTU_PB_257(), ec.DSTU_PB_163()} {
-		curve := curve
 		t.Run(curve.String(), func(t *testing.T) {
 			priv, err := dstu4145.GenerateKey(curve)
 			if err != nil {

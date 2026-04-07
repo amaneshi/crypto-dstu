@@ -54,10 +54,10 @@ var (
 
 // Status codes for PKIStatusInfo.
 const (
-	StatusGranted            = 0
-	StatusGrantedWithMods    = 1
-	StatusRejection          = 2
-	StatusWaiting            = 3
-	StatusRevocationWarning  = 4
-	StatusRevocationNotif    = 5
+	StatusGranted           = 0
+	StatusGrantedWithMods   = 1
+	StatusRejection         = 2
+	StatusWaiting           = 3
+	StatusRevocationWarning = 4
+	StatusRevocationNotif   = 5
 )

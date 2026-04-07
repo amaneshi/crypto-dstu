@@ -32,7 +32,9 @@ func (b *Box) DecryptDocument(data []byte) ([]byte, error) {
 
 	cmsDER := data
 	// Try transport container first
-	if container, err := transport.Decode(data); err == nil {
+	var container *transport.Container
+	container, err = transport.Decode(data)
+	if err == nil {
 		if s := container.FindSection("UA1_CRYPT"); s != nil {
 			cmsDER = s.Contents
 		}

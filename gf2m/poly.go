@@ -6,9 +6,9 @@ package gf2m
 // The array is terminated by 0.
 type ModBits []int
 
-// Standard irreducible polynomials for DSTU 4145-2002 curves
+// Standard irreducible polynomials for DSTU 4145-2002 curves.
 var (
-	// Pentanomials and trinomials
+	// ModBits163 and related are pentanomials and trinomials for DSTU 4145-2002.
 	ModBits163 = ModBits{163, 7, 6, 3, 0}  // x^163 + x^7 + x^6 + x^3 + 1
 	ModBits167 = ModBits{167, 6, 0}        // x^167 + x^6 + 1
 	ModBits173 = ModBits{173, 10, 2, 1, 0} // x^173 + x^10 + x^2 + x + 1 (pentanomial)

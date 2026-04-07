@@ -6,7 +6,7 @@ package kupyna
 // multiplyGF multiplies two bytes in GF(2^8) with reduction polynomial 0x11d.
 func multiplyGF(x, y byte) byte {
 	var r byte
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		if y&1 == 1 {
 			r ^= x
 		}
@@ -23,7 +23,7 @@ func multiplyGF(x, y byte) byte {
 // subBytes applies S-box substitution: column j uses sbox[row % 4].
 func subBytes(state [][rows]byte) {
 	for j := range state {
-		for i := 0; i < rows; i++ {
+		for i := range rows {
 			state[j][i] = sboxes[i%4][state[j][i]]
 		}
 	}
@@ -35,15 +35,15 @@ func subBytes(state [][rows]byte) {
 func shiftBytes(state [][rows]byte) {
 	cols := len(state)
 	temp := make([]byte, cols)
-	for i := 0; i < rows; i++ {
+	for i := range rows {
 		shift := i
 		if cols == nb1024 && i == rows-1 {
 			shift = 11
 		}
-		for j := 0; j < cols; j++ {
+		for j := range cols {
 			temp[(j+shift)%cols] = state[j][i]
 		}
-		for j := 0; j < cols; j++ {
+		for j := range cols {
 			state[j][i] = temp[j]
 		}
 	}
@@ -53,9 +53,9 @@ func shiftBytes(state [][rows]byte) {
 func mixColumns(state [][rows]byte) {
 	var result [rows]byte
 	for col := range state {
-		for row := 0; row < rows; row++ {
+		for row := range rows {
 			var product byte
-			for b := 0; b < rows; b++ {
+			for b := range rows {
 				product ^= multiplyGF(state[col][b], mdsMatrix[row][b])
 			}
 			result[row] = product
@@ -65,7 +65,7 @@ func mixColumns(state [][rows]byte) {
 }
 
 // addRoundConstantP adds round constant for permutation P (T⊕).
-// state[col][0] ^= (col * 0x10) ^ round
+// state[col][0] ^= (col * 0x10) ^ round.
 func addRoundConstantP(state [][rows]byte, round int) {
 	for i := range state {
 		state[i][0] ^= byte((i * 0x10) ^ round)
@@ -81,11 +81,11 @@ func addRoundConstantQ(state [][rows]byte, round int) {
 		constant := uint64(0x00F0F0F0F0F0F0F3) ^ (uint64((cols-j-1)*0x10^round) << 56)
 		// Add to column interpreted as little-endian uint64
 		var val uint64
-		for b := 0; b < rows; b++ {
+		for b := range rows {
 			val |= uint64(state[j][b]) << (uint(b) * 8)
 		}
 		val += constant
-		for b := 0; b < rows; b++ {
+		for b := range rows {
 			state[j][b] = byte(val >> (uint(b) * 8))
 		}
 	}
@@ -93,7 +93,7 @@ func addRoundConstantQ(state [][rows]byte, round int) {
 
 // permP applies permutation P (used with h⊕m block): AddConstantP → SubBytes → ShiftBytes → MixColumns.
 func permP(state [][rows]byte, rounds int) {
-	for r := 0; r < rounds; r++ {
+	for r := range rounds {
 		addRoundConstantP(state, r)
 		subBytes(state)
 		shiftBytes(state)
@@ -103,7 +103,7 @@ func permP(state [][rows]byte, rounds int) {
 
 // permQ applies permutation Q (used with m block): AddConstantQ → SubBytes → ShiftBytes → MixColumns.
 func permQ(state [][rows]byte, rounds int) {
-	for r := 0; r < rounds; r++ {
+	for r := range rounds {
 		addRoundConstantQ(state, r)
 		subBytes(state)
 		shiftBytes(state)
@@ -112,14 +112,14 @@ func permQ(state [][rows]byte, rounds int) {
 }
 
 // compress processes one block using the Davies-Meyer construction:
-// h = P(h⊕m) ⊕ Q(m) ⊕ h
+// h = P(h⊕m) ⊕ Q(m) ⊕ h.
 func compress(h [][rows]byte, block []byte, rounds int) {
 	cols := len(h)
 	// Build temp1 = h ⊕ m, temp2 = m
 	temp1 := make([][rows]byte, cols)
 	temp2 := make([][rows]byte, cols)
-	for j := 0; j < cols; j++ {
-		for i := 0; i < rows; i++ {
+	for j := range cols {
+		for i := range rows {
 			b := block[j*rows+i]
 			temp1[j][i] = h[j][i] ^ b
 			temp2[j][i] = b
@@ -127,8 +127,8 @@ func compress(h [][rows]byte, block []byte, rounds int) {
 	}
 	permP(temp1, rounds)
 	permQ(temp2, rounds)
-	for j := 0; j < cols; j++ {
-		for i := 0; i < rows; i++ {
+	for j := range cols {
+		for i := range rows {
 			h[j][i] ^= temp1[j][i] ^ temp2[j][i]
 		}
 	}
@@ -138,12 +138,12 @@ func compress(h [][rows]byte, block []byte, rounds int) {
 func outputTransform(h [][rows]byte, rounds int) {
 	cols := len(h)
 	temp := make([][rows]byte, cols)
-	for j := 0; j < cols; j++ {
+	for j := range cols {
 		temp[j] = h[j]
 	}
 	permP(temp, rounds)
-	for j := 0; j < cols; j++ {
-		for i := 0; i < rows; i++ {
+	for j := range cols {
+		for i := range rows {
 			h[j][i] ^= temp[j][i]
 		}
 	}
@@ -153,20 +153,9 @@ func outputTransform(h [][rows]byte, rounds int) {
 func stateToBytes(state [][rows]byte) []byte {
 	out := make([]byte, len(state)*rows)
 	for j := range state {
-		for i := 0; i < rows; i++ {
+		for i := range rows {
 			out[j*rows+i] = state[j][i]
 		}
 	}
 	return out
-}
-
-// bytesToState converts a flat byte slice to column-major state.
-func bytesToState(b []byte, cols int) [][rows]byte {
-	state := make([][rows]byte, cols)
-	for j := 0; j < cols; j++ {
-		for i := 0; i < rows; i++ {
-			state[j][i] = b[j*rows+i]
-		}
-	}
-	return state
 }

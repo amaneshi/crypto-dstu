@@ -29,7 +29,7 @@ Options:
 	role := fs.String("role", "", "key role")
 	verbose := fs.Bool("v", false, "print signer info to stderr")
 
-	fs.Parse(args)
+	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	if *key == "" {
 		fmt.Fprintln(os.Stderr, "dstu decrypt: -key is required")

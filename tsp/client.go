@@ -2,6 +2,7 @@ package tsp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -44,7 +45,7 @@ func (c *Client) Timestamp(hash []byte, hashAlgOID asn1.ObjectIdentifier) (*Resp
 
 // Send transmits a pre-encoded TSP request DER and returns the parsed response.
 func (c *Client) Send(reqDER []byte) (*Response, error) {
-	httpReq, err := http.NewRequest(http.MethodPost, c.URL, bytes.NewReader(reqDER))
+	httpReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, c.URL, bytes.NewReader(reqDER))
 	if err != nil {
 		return nil, errors.New("tsp: build HTTP request: " + err.Error())
 	}

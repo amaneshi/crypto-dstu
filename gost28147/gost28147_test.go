@@ -90,7 +90,7 @@ func TestKeyWrapUnwrapRoundtrip(t *testing.T) {
 
 	wrapped, err := WrapKey(kek, cek, iv)
 	require.NoError(t, err, "WrapKey")
-	require.Equal(t, 44, len(wrapped), "wrapped length")
+	require.Len(t, wrapped, 44, "wrapped length")
 
 	got, err := UnwrapKey(kek, wrapped)
 	require.NoError(t, err, "UnwrapKey")
@@ -133,7 +133,7 @@ func TestMultipleEncryptDecrypt(t *testing.T) {
 	require.NoError(t, err, "NewCipher")
 
 	// Encrypt 4 blocks
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		pt := make([]byte, 8)
 		for j := range pt {
 			pt[j] = byte(i*8 + j)

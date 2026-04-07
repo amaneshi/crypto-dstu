@@ -69,25 +69,29 @@ func czoHashKupyna256(data []byte) []byte {
 }
 
 // buildCAdESBES creates a CAdES-BES (attached) CMS SignedData for content.
-func buildCAdESBES(t *testing.T, content []byte) (cmsDER []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate) {
+func buildCAdESBES(
+	t *testing.T,
+	content []byte,
+) ([]byte, *dstu4145.PrivateKey, *cert.Certificate) {
 	t.Helper()
-	key = czoGenerateKey(t)
-	signerCert = czoMakeCert(t, key, "CZO-Test-Signer", 1001)
-	var err error
-	cmsDER, err = Sign(content, key, signerCert, SignOptions{})
+	key := czoGenerateKey(t)
+	signerCert := czoMakeCert(t, key, "CZO-Test-Signer", 1001)
+	cmsDER, err := Sign(content, key, signerCert, SignOptions{})
 	require.NoError(t, err)
-	return
+	return cmsDER, key, signerCert
 }
 
 // buildCAdESBESDetached creates a CAdES-BES detached CMS SignedData.
-func buildCAdESBESDetached(t *testing.T, content []byte) (cmsDER []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate) {
+func buildCAdESBESDetached(
+	t *testing.T,
+	content []byte,
+) ([]byte, *cert.Certificate) {
 	t.Helper()
-	key = czoGenerateKey(t)
-	signerCert = czoMakeCert(t, key, "CZO-Test-Signer-Detached", 1002)
-	var err error
-	cmsDER, err = Sign(content, key, signerCert, SignOptions{Detached: true})
+	key := czoGenerateKey(t)
+	signerCert := czoMakeCert(t, key, "CZO-Test-Signer-Detached", 1002)
+	cmsDER, err := Sign(content, key, signerCert, SignOptions{Detached: true})
 	require.NoError(t, err)
-	return
+	return cmsDER, signerCert
 }
 
 // ---- synthetic fixture directory ----
@@ -107,7 +111,7 @@ func writeSyntheticFixturesWithCerts(t *testing.T) (string, []*cert.Certificate)
 	require.NoError(t, os.WriteFile(filepath.Join(cadesDir, "bes.p7s"), bes, 0o644))
 
 	// detached.p7s
-	det, _, detCert := buildCAdESBESDetached(t, content)
+	det, detCert := buildCAdESBESDetached(t, content)
 	require.NoError(t, os.WriteFile(filepath.Join(cadesDir, "detached.p7s"), det, 0o644))
 
 	// content/doc.txt
@@ -164,7 +168,7 @@ func TestCZO_CAdES_BES_TamperedContent(t *testing.T) {
 
 func TestCZO_CAdES_BES_Detached(t *testing.T) {
 	content := []byte("detached CZO document")
-	cmsDER, _, signerCert := buildCAdESBESDetached(t, content)
+	cmsDER, signerCert := buildCAdESBESDetached(t, content)
 
 	msg, err := ParseSigned(cmsDER)
 	require.NoError(t, err)
@@ -177,7 +181,7 @@ func TestCZO_CAdES_BES_Detached(t *testing.T) {
 
 func TestCZO_CAdES_BES_DetachedWrongContent(t *testing.T) {
 	content := []byte("correct content")
-	cmsDER, _, signerCert := buildCAdESBESDetached(t, content)
+	cmsDER, signerCert := buildCAdESBESDetached(t, content)
 
 	_, err := VerifySignedRaw(cmsDER, []byte("wrong content"), []*cert.Certificate{signerCert})
 	require.Error(t, err)
@@ -361,7 +365,6 @@ func TestCZO_Real_DSTU7564_T_Enveloped(t *testing.T) {
 func TestCZO_Real_AllCAdES_DSTU_Enveloped(t *testing.T) {
 	formats := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"}
 	for _, format := range formats {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			p := czo.Path("cades/DSTU/enveloped/" + format + "/test.txt.p7s")
 			data, err := os.ReadFile(p)
@@ -389,7 +392,6 @@ func TestCZO_Real_AllCAdES_DSTU_Enveloped_Verify(t *testing.T) {
 		require.True(t, msg.Signers[0].Valid)
 	})
 	for _, format := range []string{"CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"} {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			p := czo.Path("cades/DSTU/enveloped/" + format + "/test.txt.p7s")
 			data, err := os.ReadFile(p)
@@ -420,7 +422,6 @@ func TestCZO_Real_AllCAdES_DSTU_Detached(t *testing.T) {
 		require.True(t, verified.Signers[0].Valid)
 	})
 	for _, format := range []string{"CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"} {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			sigPath := czo.Path("cades/DSTU/detached/" + format + "/test.txt.p7s")
 			contentPath := czo.Path("cades/DSTU/detached/" + format + "/test.txt")
@@ -439,7 +440,6 @@ func TestCZO_Real_AllCAdES_DSTU_Detached(t *testing.T) {
 func TestCZO_Real_AllCAdES_DSTU7564_Enveloped(t *testing.T) {
 	formats := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"}
 	for _, format := range formats {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			p := czo.Path("cades/DSTU-7564/enveloped/" + format + "/test.txt.p7s")
 			data, err := os.ReadFile(p)
@@ -454,7 +454,6 @@ func TestCZO_Real_AllCAdES_DSTU7564_Enveloped(t *testing.T) {
 func TestCZO_Real_AllCAdES_DSTU7564_Detached(t *testing.T) {
 	formats := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"}
 	for _, format := range formats {
-		format := format
 		t.Run(format, func(t *testing.T) {
 			sigPath := czo.Path("cades/DSTU-7564/detached/" + format + "/test.txt.p7s")
 			contentPath := czo.Path("cades/DSTU-7564/detached/" + format + "/test.txt")
@@ -479,7 +478,6 @@ func TestCZO_Real_AllCAdES_DSTU7564_Detached(t *testing.T) {
 func TestCZO_Real_XAdES_DSTU_FilesExist(t *testing.T) {
 	variants := []string{"XAdES-B-B", "XAdES-B-T", "XAdES-B-LT", "XAdES-B-LTA"}
 	for _, v := range variants {
-		v := v
 		t.Run(v+"/enveloped", func(t *testing.T) {
 			requireNonEmpty(t, czo.Path("xades/DSTU/enveloped/"+v+"/test.xml"))
 		})
@@ -493,7 +491,6 @@ func TestCZO_Real_XAdES_DSTU_FilesExist(t *testing.T) {
 func TestCZO_Real_XAdES_DSTU7564_FilesExist(t *testing.T) {
 	variants := []string{"XAdES-B-B", "XAdES-B-T", "XAdES-B-LT", "XAdES-B-LTA"}
 	for _, v := range variants {
-		v := v
 		t.Run(v+"/enveloped", func(t *testing.T) {
 			requireNonEmpty(t, czo.Path("xades/DSTU-7564/enveloped/"+v+"/test.xml"))
 		})
@@ -507,9 +504,7 @@ func TestCZO_Real_XAdES_DSTU7564_FilesExist(t *testing.T) {
 func TestCZO_Real_PAdES_FilesExist(t *testing.T) {
 	variants := []string{"PAdES-B-B", "PAdES-B-T", "PAdES-B-LT", "PAdES-B-LTA"}
 	for _, alg := range []string{"DSTU", "DSTU-7564"} {
-		alg := alg
 		for _, v := range variants {
-			v := v
 			t.Run(alg+"/"+v, func(t *testing.T) {
 				requireNonEmpty(t, czo.Path("pades/"+alg+"/"+v+"/Test.pdf"))
 			})
@@ -521,15 +516,12 @@ func TestCZO_Real_ASiCS_FilesExist(t *testing.T) {
 	cadesVariants := []string{"CAdES-BES", "CAdES-T", "CAdES-C", "CAdES-X_Long", "CAdES-X_Long-Full"}
 	xadesVariants := []string{"XAdES-B-B", "XAdES-B-T", "XAdES-B-LT", "XAdES-B-LTA"}
 	for _, alg := range []string{"DSTU", "DSTU-7564"} {
-		alg := alg
 		for _, v := range cadesVariants {
-			v := v
 			t.Run(alg+"/"+v, func(t *testing.T) {
 				requireNonEmpty(t, czo.Path("asics/"+alg+"/"+v+"/test.txt.asics"))
 			})
 		}
 		for _, v := range xadesVariants {
-			v := v
 			t.Run(alg+"/"+v, func(t *testing.T) {
 				requireNonEmpty(t, czo.Path("asics/"+alg+"/"+v+"/test.txt.asics"))
 			})
@@ -540,7 +532,6 @@ func TestCZO_Real_ASiCS_FilesExist(t *testing.T) {
 func TestCZO_Real_ASiCE_FilesExist(t *testing.T) {
 	variants := []string{"XAdES-B-B", "XAdES-B-T", "XAdES-B-LT", "XAdES-B-LTA"}
 	for _, v := range variants {
-		v := v
 		t.Run(v, func(t *testing.T) {
 			requireNonEmpty(t, czo.Path("asice/DSTU/"+v+"/test.txt.asice"))
 		})
@@ -552,7 +543,7 @@ func requireNonEmpty(t *testing.T, path string) {
 	t.Helper()
 	info, err := os.Stat(path)
 	require.NoError(t, err, "file missing: %s", path)
-	require.Greater(t, info.Size(), int64(0), "file empty: %s", path)
+	require.Positive(t, info.Size(), "file empty: %s", path)
 }
 
 func TestCZO_Real_SignerCertLoaded(t *testing.T) {

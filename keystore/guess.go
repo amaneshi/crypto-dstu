@@ -102,10 +102,11 @@ func ParseJKSWithPassword(data []byte, password string) (*ParseResult, error) {
 
 	var keys []*dstu4145.PrivateKey
 	var certs [][]byte
+	var priv *dstu4145.PrivateKey
 
 	for _, entry := range entries {
 		// Each entry's KeyDER is a PKCS#8 encrypted blob (same as Key-6.dat)
-		if priv, err := ParseKey6(entry.KeyDER, password); err == nil {
+		if priv, err = ParseKey6(entry.KeyDER, password); err == nil {
 			keys = append(keys, priv)
 		}
 		certs = append(certs, entry.CertChain...)

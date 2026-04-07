@@ -5,6 +5,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"math/big"
+	"slices"
 	"time"
 
 	"crypto-dstu/cert"
@@ -172,7 +173,8 @@ func parseOneSignerInfo(data []byte) (SignerInfo, error) {
 	// UnsignedAttrs: if next tag is 0xa1 (implicit [1]), consume it
 	if len(rest) > 0 && rest[0] == 0xa1 {
 		var raw asn1.RawValue
-		r, err := asn1.Unmarshal(rest, &raw)
+		var r []byte
+		r, err = asn1.Unmarshal(rest, &raw)
 		if err == nil {
 			si.UnsignedAttrs = asn1.RawValue{FullBytes: rest[:len(rest)-len(r)]}
 			rest = r
@@ -194,7 +196,13 @@ type parsedSignedData struct {
 
 // marshalSignedData manually encodes a SignedData SEQUENCE.
 // certDERs contains raw DER of certificates to embed in [0] IMPLICIT.
-func marshalSignedData(version int, digestAlgOID asn1.ObjectIdentifier, eci EncapsulatedContentInfo, signerInfos []SignerInfo, certDERs ...[]byte) ([]byte, error) {
+func marshalSignedData(
+	version int,
+	digestAlgOID asn1.ObjectIdentifier,
+	eci EncapsulatedContentInfo,
+	signerInfos []SignerInfo,
+	certDERs ...[]byte,
+) ([]byte, error) {
 	versionDER, err := asn1.Marshal(version)
 	if err != nil {
 		return nil, err
@@ -216,8 +224,9 @@ func marshalSignedData(version int, digestAlgOID asn1.ObjectIdentifier, eci Enca
 
 	// SignerInfos SET OF
 	var siBytes []byte
+	var sib []byte
 	for _, si := range signerInfos {
-		sib, err := marshalSignerInfo(si)
+		sib, err = marshalSignerInfo(si)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +260,8 @@ func marshalECI(eci EncapsulatedContentInfo) ([]byte, error) {
 	inner := oidDER
 	if len(eci.EContent) > 0 {
 		// OCTET STRING wrapped in EXPLICIT [0]
-		contentDER, err := asn1.Marshal(eci.EContent)
+		var contentDER []byte
+		contentDER, err = asn1.Marshal(eci.EContent)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +274,9 @@ func marshalECI(eci EncapsulatedContentInfo) ([]byte, error) {
 func parseSignedDataBytes(data []byte) (*parsedSignedData, error) {
 	// Unwrap the outer SEQUENCE tag to get the inner content bytes.
 	var outer asn1.RawValue
-	if _, err := asn1.Unmarshal(data, &outer); err != nil {
+	var err error
+	_, err = asn1.Unmarshal(data, &outer)
+	if err != nil {
 		return nil, errors.New("cms: parse SignedData outer: " + err.Error())
 	}
 	data = outer.Bytes
@@ -286,7 +298,8 @@ func parseSignedDataBytes(data []byte) (*parsedSignedData, error) {
 	// Parse the first AlgorithmIdentifier from the SET (simplified)
 	if len(digestAlgsRaw.Bytes) > 0 {
 		var algID AlgorithmIdentifier
-		if _, err := asn1.Unmarshal(digestAlgsRaw.Bytes, &algID); err == nil {
+		_, err = asn1.Unmarshal(digestAlgsRaw.Bytes, &algID)
+		if err == nil {
 			sd.DigestAlgorithms = []AlgorithmIdentifier{algID}
 		}
 	}
@@ -462,14 +475,13 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 	if err != nil {
 		return nil, err
 	}
-	inner := append(oidDER, ci.Content.FullBytes...)
-	return marshalSEQ(inner), nil
+	return marshalSEQ(slices.Concat(oidDER, ci.Content.FullBytes)), nil
 }
 
 // ParseSigned parses a DER-encoded ContentInfo/SignedData.
 // For detached signatures, content will be nil; call VerifySigned with the detached content.
 func ParseSigned(der []byte) (*SignedMessage, error) {
-	_, sdBytes, err := parseContentInfo(der, OIDSignedData)
+	sdBytes, err := parseContentInfo(der, OIDSignedData)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +497,8 @@ func ParseSigned(der []byte) (*SignedMessage, error) {
 	}
 
 	if len(sd.CertBytes) > 0 {
-		certs, err := cert.ParseCertificates(sd.CertBytes)
+		var certs []*cert.Certificate
+		certs, err = cert.ParseCertificates(sd.CertBytes)
 		if err == nil {
 			msg.Certificates = certs
 		}
@@ -552,6 +565,14 @@ func VerifySigned(msg *SignedMessage, content []byte, roots []*cert.Certificate)
 			sr.Valid = false
 			continue
 		}
+		// If trusted roots are provided, verify the signer certificate chain.
+		if len(roots) > 0 {
+			if err := cert.VerifyCertChain(sr.Certificate, roots); err != nil {
+				sr.Error = errors.New("cms: certificate chain verification failed: " + err.Error())
+				sr.Valid = false
+				continue
+			}
+		}
 		// We cannot re-verify without the raw SignerInfo — mark as structurally valid
 		// when certificate is present. Full sig verification requires raw SignedAttrs bytes.
 		sr.Valid = true
@@ -562,8 +583,8 @@ func VerifySigned(msg *SignedMessage, content []byte, roots []*cert.Certificate)
 
 // VerifySignedRaw verifies a raw DER-encoded SignedData against the given content.
 // This is the full verification path including signature math.
-func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*SignedMessage, error) {
-	_, sdBytes, err := parseContentInfo(der, OIDSignedData)
+func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*SignedMessage, error) { //nolint:funlen
+	sdBytes, err := parseContentInfo(der, OIDSignedData)
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +643,8 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 		// Verify message digest attribute
 		if len(si.SignedAttrs.FullBytes) > 0 {
 			// Extract claimed digest from signed attrs
-			claimedDigest, err := extractMessageDigest(si.SignedAttrs.FullBytes)
+			var claimedDigest []byte
+			claimedDigest, err = extractMessageDigest(si.SignedAttrs.FullBytes)
 			if err != nil {
 				sr.Error = err
 				msg.Signers = append(msg.Signers, sr)
@@ -642,7 +664,9 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 
 			// Only verify sig-alg OIDs we know how to handle.
 			if !oid.IsDSTU4145SigAlg(si.SignatureAlgorithm.Algorithm) {
-				sr.Error = errors.New("cms: unsupported signature algorithm: " + si.SignatureAlgorithm.Algorithm.String())
+				sr.Error = errors.New(
+					"cms: unsupported signature algorithm: " + si.SignatureAlgorithm.Algorithm.String(),
+				)
 				msg.Signers = append(msg.Signers, sr)
 				continue
 			}
@@ -658,7 +682,8 @@ func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*Si
 			}
 
 			words := sr.Certificate.PublicKey.Curve.Words
-			sig, err := unmarshalSignatureCMS(si.Signature, words)
+			var sig *dstu4145.Signature
+			sig, err = unmarshalSignatureCMS(si.Signature, words)
 			if err != nil {
 				sr.Error = errors.New("cms: unmarshal signature: " + err.Error())
 				msg.Signers = append(msg.Signers, sr)
@@ -723,10 +748,13 @@ func extractSigningTime(setDER []byte) time.Time {
 			var t time.Time
 			// a.Values.FullBytes is SET { time }; unwrap the SET
 			var inner asn1.RawValue
-			if _, err := asn1.Unmarshal(a.Values.FullBytes, &inner); err != nil {
+			var parseErr error
+			_, parseErr = asn1.Unmarshal(a.Values.FullBytes, &inner)
+			if parseErr != nil {
 				continue
 			}
-			if _, err := asn1.Unmarshal(inner.Bytes, &t); err != nil {
+			_, parseErr = asn1.Unmarshal(inner.Bytes, &t)
+			if parseErr != nil {
 				continue
 			}
 			return t
@@ -744,11 +772,13 @@ func extractMessageDigest(setDER []byte) ([]byte, error) {
 	for _, a := range attrs {
 		if a.Type.Equal(OIDMessageDigest) {
 			var inner asn1.RawValue
-			if _, err := asn1.Unmarshal(a.Values.FullBytes, &inner); err != nil {
+			_, err = asn1.Unmarshal(a.Values.FullBytes, &inner)
+			if err != nil {
 				return nil, errors.New("cms: parse messageDigest SET: " + err.Error())
 			}
 			var digest []byte
-			if _, err := asn1.Unmarshal(inner.Bytes, &digest); err != nil {
+			_, err = asn1.Unmarshal(inner.Bytes, &digest)
+			if err != nil {
 				return nil, errors.New("cms: parse messageDigest value: " + err.Error())
 			}
 			return digest, nil
@@ -778,26 +808,27 @@ func parseRawAttributes(setDER []byte) ([]rawAttribute, error) {
 	inner := outer.Bytes
 
 	var attrs []rawAttribute
+	var seq asn1.RawValue
+	var loopErr error
+	var valRest []byte
+	var loopOID asn1.ObjectIdentifier
 	for len(inner) > 0 {
-		var seq asn1.RawValue
-		rest, err := asn1.Unmarshal(inner, &seq)
-		if err != nil {
+		inner, loopErr = asn1.Unmarshal(inner, &seq)
+		if loopErr != nil {
 			break
 		}
-		inner = rest
 		// seq.Bytes = OID || SET
-		var oid asn1.ObjectIdentifier
-		valRest, err := asn1.Unmarshal(seq.Bytes, &oid)
-		if err != nil {
+		valRest, loopErr = asn1.Unmarshal(seq.Bytes, &loopOID)
+		if loopErr != nil {
 			continue
 		}
 		// valRest = SET { value }
 		attrs = append(attrs, rawAttribute{
-			Type:   oid,
+			Type:   loopOID,
 			Values: asn1.RawValue{FullBytes: valRest},
 		})
 	}
-	return attrs, nil
+	return attrs, nil //nolint:nilerr // best-effort: return successfully parsed attributes even if last entry was malformed
 }
 
 type rawAttribute struct {
@@ -807,40 +838,41 @@ type rawAttribute struct {
 
 // parseContentInfo parses a manually-encoded ContentInfo SEQUENCE and returns
 // the expected OID check error and the inner content bytes (after unwrapping [0] EXPLICIT).
-func parseContentInfo(der []byte, expectedOID asn1.ObjectIdentifier) (asn1.ObjectIdentifier, []byte, error) {
+func parseContentInfo(der []byte, expectedOID asn1.ObjectIdentifier) ([]byte, error) {
 	// Outer SEQUENCE
 	var outer asn1.RawValue
 	rest, err := asn1.Unmarshal(der, &outer)
 	if err != nil {
-		return nil, nil, errors.New("cms: parse ContentInfo: " + err.Error())
+		return nil, errors.New("cms: parse ContentInfo: " + err.Error())
 	}
 	if len(rest) > 0 {
-		return nil, nil, errors.New("cms: trailing bytes after ContentInfo")
+		return nil, errors.New("cms: trailing bytes after ContentInfo")
 	}
 
 	inner := outer.Bytes
 
 	// OID
 	var oid asn1.ObjectIdentifier
-	rest2, err := asn1.Unmarshal(inner, &oid)
+	var rest2 []byte
+	rest2, err = asn1.Unmarshal(inner, &oid)
 	if err != nil {
-		return nil, nil, errors.New("cms: parse ContentInfo OID: " + err.Error())
+		return nil, errors.New("cms: parse ContentInfo OID: " + err.Error())
 	}
 	if expectedOID != nil && !oid.Equal(expectedOID) {
-		return oid, nil, errors.New("cms: unexpected ContentInfo OID: " + oid.String())
+		return nil, errors.New("cms: unexpected ContentInfo OID: " + oid.String())
 	}
 
 	// rest2 should be [0] EXPLICIT { content }
 	if len(rest2) == 0 {
-		return oid, nil, errors.New("cms: ContentInfo has no content")
+		return nil, errors.New("cms: ContentInfo has no content")
 	}
 	var contentWrapper asn1.RawValue
-	if _, err := asn1.Unmarshal(rest2, &contentWrapper); err != nil {
-		// Try treating rest2 directly as the content
-		return oid, rest2, nil
+	_, err = asn1.Unmarshal(rest2, &contentWrapper)
+	if err != nil {
+		return rest2, nil //nolint:nilerr // fallback: some CMS implementations omit the [0] EXPLICIT wrapper; treat bytes as raw content
 	}
 	// contentWrapper.Bytes is the actual content DER
-	return oid, contentWrapper.Bytes, nil
+	return contentWrapper.Bytes, nil
 }
 
 // marshalEXPLICIT wraps content in an EXPLICIT context tag.

@@ -133,7 +133,7 @@ func TestHeaderEncodeDecodeRoundtrip(t *testing.T) {
 	require.Equal(t, h.CRC32File, decoded.CRC32File)
 	require.Equal(t, h.Subject, decoded.Subject)
 	require.Equal(t, h.GetStamp, decoded.GetStamp)
-	require.Equal(t, "", decoded.Result) // empty → not encoded → decoded as ""
+	require.Empty(t, decoded.Result) // empty → not encoded → decoded as ""
 }
 
 func TestHeaderEmptyFields(t *testing.T) {
@@ -142,7 +142,7 @@ func TestHeaderEmptyFields(t *testing.T) {
 	decoded, err := DecodeHeader(encoded)
 	require.NoError(t, err)
 	require.Equal(t, "only.xml", decoded.Filename)
-	require.Equal(t, "", decoded.SndName)
+	require.Empty(t, decoded.SndName)
 }
 
 func TestHeaderNullTerminator(t *testing.T) {

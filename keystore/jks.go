@@ -55,7 +55,7 @@ const (
 //	        cert_type length-prefixed UTF8
 //	        cert_data length-prefixed bytes
 //
-// Reference: dstucrypt/jksreader parse.js + pavlo-v-chernykh/keystore-go
+// Reference: dstucrypt/jksreader parse.js + pavlo-v-chernykh/keystore-go.
 func ParseJKS(data []byte) ([]JKSEntry, error) {
 	r := &byteReader{b: data}
 
@@ -77,32 +77,35 @@ func ParseJKS(data []byte) ([]JKSEntry, error) {
 
 	entries := make([]JKSEntry, 0, count)
 
-	for i := uint32(0); i < count; i++ {
-		tag, err := r.readUint32()
+	var tag uint32
+	var alias string
+	for range count {
+		tag, err = r.readUint32()
 		if err != nil {
 			return nil, errors.New("keystore: JKS: truncated tag")
 		}
 
-		alias, err := r.readUTF()
+		alias, err = r.readUTF()
 		if err != nil {
 			return nil, errors.New("keystore: JKS: truncated alias")
 		}
 
 		// Skip 8-byte timestamp
-		if err := r.skip(8); err != nil {
+		if err = r.skip(8); err != nil {
 			return nil, errors.New("keystore: JKS: truncated timestamp")
 		}
 
+		var entry JKSEntry
 		switch tag {
 		case 1: // key entry
-			entry, err := parseJKSKeyEntry(r, alias)
+			entry, err = parseJKSKeyEntry(r, alias)
 			if err != nil {
 				return nil, err
 			}
 			entries = append(entries, entry)
 
 		case 2: // trusted certificate entry — store nothing, skip
-			if err := skipJKSCert(r); err != nil {
+			if err = skipJKSCert(r); err != nil {
 				return nil, err
 			}
 
@@ -136,12 +139,13 @@ func parseJKSKeyEntry(r *byteReader, alias string) (JKSEntry, error) {
 	}
 
 	certs := make([][]byte, 0, certCount)
-	for j := uint32(0); j < certCount; j++ {
+	var certData []byte
+	for range certCount {
 		// cert type string (e.g. "X.509")
-		if _, err := r.readUTF(); err != nil {
+		if _, err = r.readUTF(); err != nil {
 			return JKSEntry{}, errors.New("keystore: JKS: truncated cert type")
 		}
-		certData, err := r.readLenBytes()
+		certData, err = r.readLenBytes()
 		if err != nil {
 			return JKSEntry{}, errors.New("keystore: JKS: truncated cert data")
 		}

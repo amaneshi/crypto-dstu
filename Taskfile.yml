@@ -1,0 +1,52 @@
+version: '3'
+
+env:
+  LINT_VERSION: v2.11.4
+
+tasks:
+  default:
+    cmds:
+      - task: lint
+
+  lint-only:
+    silent: true
+    cmds:
+      - echo "--> Running linter {{.LINT_VERSION}}"
+      - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.LINT_VERSION}} run
+
+  lint-fix-only:
+    silent: true
+    internal: true
+    cmds:
+      - echo "--> Running linter {{.LINT_VERSION}} with fix"
+      - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.LINT_VERSION}} run --fix
+
+  go.mod:
+    silent: true
+    internal: true
+    cmds:
+      - echo "--> Verify go.mod file"
+      - git add go.mod && git add go.sum
+      - go mod tidy -v && git --no-pager diff --quiet go.mod go.sum
+
+  update-deps:
+    silent: true
+    cmds:
+      - echo "--> Update go.mod file"
+      - go get -u ./... && go mod tidy
+
+  lint:
+    silent: true
+    cmds:
+      - task: go.mod
+      - task: lint-only
+
+  lint-fix:
+    silent: true
+    cmds:
+      - task: go.mod
+      - task: lint-fix-only
+
+  test:
+    silent: true
+    cmd: go test -race ./...

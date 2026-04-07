@@ -2,6 +2,13 @@ package gost28147
 
 import "errors"
 
+const (
+	wrapKeySize    = 44
+	wrapMACBits    = 32
+	wrapIVSize     = 8
+	wrapCEKICVSize = 40
+)
+
 // wrapIV is the fixed IV used in the outer CFB encryption step of key wrapping.
 var wrapIV = []byte{0x4a, 0xdd, 0xa2, 0x2c, 0x79, 0xe8, 0x21, 0x05}
 
@@ -23,13 +30,16 @@ func WrapKey(kek, cek, iv []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := block.(*gostCipher)
+	g, ok := block.(*gostCipher)
+	if !ok {
+		return nil, errors.New("gost28147: internal error: unexpected cipher type")
+	}
 
 	// Compute 4-byte MAC over cek
-	icv := g.MAC(cek, 32) // 32 bits = 4 bytes
+	icv := g.MAC(cek, wrapMACBits) // 32 bits = 4 bytes
 
 	// cekicv = cek || icv (40 bytes)
-	cekicv := make([]byte, 40)
+	cekicv := make([]byte, wrapCEKICVSize)
 	copy(cekicv, cek)
 	copy(cekicv[32:], icv)
 
@@ -40,14 +50,14 @@ func WrapKey(kek, cek, iv []byte) ([]byte, error) {
 	}
 
 	// temp2 = iv || temp1 (8 + 36 = 44 bytes)
-	temp2 := make([]byte, 44)
+	temp2 := make([]byte, wrapKeySize)
 	copy(temp2, iv)
-	copy(temp2[8:], temp1)
+	copy(temp2[wrapIVSize:], temp1)
 
 	// temp3 = reverse(temp2)
-	temp3 := make([]byte, 44)
-	for i := 0; i < 44; i++ {
-		temp3[i] = temp2[44-1-i]
+	temp3 := make([]byte, wrapKeySize)
+	for i := range wrapKeySize {
+		temp3[i] = temp2[wrapKeySize-1-i]
 	}
 
 	// result = CFB-encrypt(wrapIV, temp3), take first 44 bytes
@@ -56,7 +66,7 @@ func WrapKey(kek, cek, iv []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return result[:44], nil
+	return result[:wrapKeySize], nil
 }
 
 // UnwrapKey unwraps a 44-byte wrapped key using a 32-byte key-encryption key (kek).
@@ -74,7 +84,10 @@ func UnwrapKey(kek, wcek []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := block.(*gostCipher)
+	g, ok := block.(*gostCipher)
+	if !ok {
+		return nil, errors.New("gost28147: internal error: unexpected cipher type")
+	}
 
 	// temp3 = CFB-decrypt(wrapIV, wcek)
 	temp3, err := DecryptCFB(kek, wrapIV, wcek)
@@ -83,9 +96,9 @@ func UnwrapKey(kek, wcek []byte) ([]byte, error) {
 	}
 
 	// temp2 = reverse(temp3)
-	temp2 := make([]byte, 44)
-	for i := 0; i < 44; i++ {
-		temp2[i] = temp3[44-1-i]
+	temp2 := make([]byte, wrapKeySize)
+	for i := range wrapKeySize {
+		temp2[i] = temp3[wrapKeySize-1-i]
 	}
 
 	// iv = temp2[0:8], temp1 = temp2[8:44] (36 bytes of cekicv)
@@ -104,7 +117,7 @@ func UnwrapKey(kek, wcek []byte) ([]byte, error) {
 	icvCheck := g.MAC(cek, 32)
 
 	var errBits byte
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		errBits |= icv[i] ^ icvCheck[i]
 	}
 	if errBits != 0 {

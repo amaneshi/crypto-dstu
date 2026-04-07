@@ -8,20 +8,20 @@ import (
 
 // DomainParams bundles a curve with its OID and recommended hash OID.
 type DomainParams struct {
-	Name     string
-	Curve    *ec.Curve
-	OID      asn1.ObjectIdentifier // curve parameter OID
-	HashOID  asn1.ObjectIdentifier // associated signature+hash algorithm OID
+	Name    string
+	Curve   *ec.Curve
+	OID     asn1.ObjectIdentifier // curve parameter OID
+	HashOID asn1.ObjectIdentifier // associated signature+hash algorithm OID
 }
 
-// Ukrainian PKI OID arcs (DSTU 4145)
+// Ukrainian PKI OID arcs (DSTU 4145).
 var (
-	// Signature+hash algorithm OIDs
-	OIDDstu4145WithGost34311  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	OIDDstu4145WithKupyna256  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
-	OIDDstu4145WithKupyna512  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
+	// OIDDstu4145WithGost34311 and related are signature+hash algorithm OIDs.
+	OIDDstu4145WithGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
+	OIDDstu4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
+	OIDDstu4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
 
-	// Curve parameter OIDs (index 0..9 maps to PB_163..PB_431)
+	// OIDCurvePB163 and related are curve parameter OIDs (index 0..9 maps to PB_163..PB_431).
 	OIDCurvePB163 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 0}
 	OIDCurvePB167 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 1}
 	OIDCurvePB173 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 2}

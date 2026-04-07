@@ -43,8 +43,9 @@ func (b *Box) LoadKey(data []byte, password string) error {
 
 	// Parse embedded certs
 	var parsedCerts []*cert.Certificate
+	var c *cert.Certificate
 	for _, derBytes := range result.Certs {
-		c, err := cert.ParseCertificate(derBytes)
+		c, err = cert.ParseCertificate(derBytes)
 		if err != nil {
 			continue
 		}
@@ -69,9 +70,7 @@ func (b *Box) LoadKey(data []byte, password string) error {
 	}
 
 	// Add any unmatched certs to CACerts pool
-	for _, c := range parsedCerts {
-		b.CACerts = append(b.CACerts, c)
-	}
+	b.CACerts = append(b.CACerts, parsedCerts...)
 
 	return nil
 }

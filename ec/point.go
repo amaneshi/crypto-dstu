@@ -51,7 +51,7 @@ func (p *Point) Equal(q *Point) bool {
 }
 
 // Add returns p + q using affine coordinates.
-// For curve y² + xy = x³ + ax² + b
+// For curve y² + xy = x³ + ax² + b.
 func (p *Point) Add(q *Point) *Point {
 	if p.Curve != q.Curve {
 		panic("points must be on the same curve")
@@ -141,7 +141,7 @@ func (p *Point) Double() *Point {
 }
 
 // Neg returns -p (the negation of p).
-// For binary curves: -P = (x, x + y)
+// For binary curves: -P = (x, x + y).
 func (p *Point) Neg() *Point {
 	if p.Inf {
 		return p.Clone()
@@ -172,7 +172,7 @@ func (p *Point) ScalarMul(k *big.Int) *Point {
 	addend := p.Clone()
 
 	// Simple double-and-add from LSB to MSB
-	for i := 0; i < k.BitLen(); i++ {
+	for i := range k.BitLen() {
 		if k.Bit(i) == 1 {
 			result = result.Add(addend)
 		}

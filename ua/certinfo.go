@@ -10,21 +10,21 @@ import (
 
 // CertInfo holds human-readable fields extracted from a certificate.
 type CertInfo struct {
-	Serial       string
-	Issuer       string
-	Subject      string
-	CommonName   string
-	Organization string
-	Title        string
-	EDRPOU       string
-	DRFO         string
-	Email        string
-	NotBefore    time.Time
-	NotAfter     time.Time
-	Role         cert.Role
-	IsCA         bool
-	Algorithm    string
-	CurveName    string
+	Serial       string    `json:"serial"`
+	Issuer       string    `json:"issuer"`
+	Subject      string    `json:"subject"`
+	CommonName   string    `json:"commonName"`
+	Organization string    `json:"organization"`
+	Title        string    `json:"title"`
+	EDRPOU       string    `json:"edrpou"`
+	DRFO         string    `json:"drfo"`
+	Email        string    `json:"email"`
+	NotBefore    time.Time `json:"notBefore"`
+	NotAfter     time.Time `json:"notAfter"`
+	Role         cert.Role `json:"role"`
+	IsCA         bool      `json:"isCA"`
+	Algorithm    string    `json:"algorithm"`
+	CurveName    string    `json:"curveName"`
 }
 
 // GetCertInfo parses a DER or PEM certificate and returns a CertInfo.

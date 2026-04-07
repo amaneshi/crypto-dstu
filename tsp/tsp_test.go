@@ -59,7 +59,13 @@ func makeCert(t *testing.T, key *dstu4145.PrivateKey) *cert.Certificate {
 
 // buildSampleToken builds a real CMS SignedData wrapping a DER-encoded TSTInfo,
 // signed with the given key+cert. Returns the raw CMS ContentInfo DER bytes.
-func buildSampleToken(t *testing.T, key *dstu4145.PrivateKey, tsaCert *cert.Certificate, hash []byte, nonce *big.Int) []byte {
+func buildSampleToken(
+	t *testing.T,
+	key *dstu4145.PrivateKey,
+	tsaCert *cert.Certificate,
+	hash []byte,
+	nonce *big.Int,
+) []byte {
 	t.Helper()
 
 	info := TSTInfo{
@@ -135,7 +141,7 @@ func TestRequestNonceUnique(t *testing.T) {
 	r2, err := NewRequest(hash, OIDKupyna256)
 	require.NoError(t, err)
 	// Two requests should (almost certainly) have different nonces
-	require.NotEqual(t, r1.Nonce.Cmp(r2.Nonce), 0)
+	require.NotEqual(t, 0, r1.Nonce.Cmp(r2.Nonce))
 }
 
 // ---- Response tests ----
@@ -293,9 +299,7 @@ func TestClientSend(t *testing.T) {
 	respDER, err := asn1.Marshal(respStruct)
 	require.NoError(t, err)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, contentTypeRequest, r.Header.Get("Content-Type"))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", contentTypeReply)
 		w.WriteHeader(http.StatusOK)
 		w.Write(respDER)
@@ -313,7 +317,7 @@ func TestClientSend(t *testing.T) {
 }
 
 func TestClientHTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()

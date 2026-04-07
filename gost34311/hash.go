@@ -89,7 +89,7 @@ func (d *digest) checkSum() [32]byte {
 		d.buf[i] = 0
 	}
 	var m32 [8]uint32
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		m32[i] = binary.LittleEndian.Uint32(d.buf[i*4:])
 	}
 	add256(&d.sigma, &m32)
@@ -99,14 +99,14 @@ func (d *digest) checkSum() [32]byte {
 
 	// Hash the bit-length block
 	var lenBlock [32]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		binary.LittleEndian.PutUint32(lenBlock[i*4:], d.mLen[i])
 	}
 	d.hashStep(lenBlock[:])
 
 	// Hash the sigma (checksum) block
 	var sigmaBlock [32]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		binary.LittleEndian.PutUint32(sigmaBlock[i*4:], d.sigma[i])
 	}
 	d.hashStep(sigmaBlock[:])
@@ -132,7 +132,7 @@ func (d *digest) update() {
 
 	// Add block to sigma
 	var m32 [8]uint32
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		m32[i] = binary.LittleEndian.Uint32(d.buf[i*4:])
 	}
 	add256(&d.sigma, &m32)
@@ -142,7 +142,7 @@ func (d *digest) update() {
 func (d *digest) hashStep(m []byte) {
 	var h32 [8]uint32
 	var m32 [8]uint32
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		h32[i] = binary.LittleEndian.Uint32(d.hash[i*4:])
 		m32[i] = binary.LittleEndian.Uint32(m[i*4:])
 	}
@@ -197,7 +197,7 @@ func (d *digest) hashStep(m []byte) {
 
 	// s = uint32→bytes of state
 	var s [32]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		binary.LittleEndian.PutUint32(s[i*4:], state[i])
 	}
 
@@ -209,17 +209,17 @@ func (d *digest) hashStep(m []byte) {
 
 // copyKeys implements cryptonite's copy_keys macro:
 // interleaves bytes of (x1,x2,x3,x4) into (y1,y2,y3,y4).
-func copyKeys(x1, x2, x3, x4 uint32) (y1, y2, y3, y4 uint32) {
-	y1 = (x1 & 0x000000ff) | (x2&0x000000ff)<<8 | (x3&0x000000ff)<<16 | (x4&0x000000ff)<<24
-	y2 = (x1&0x0000ff00)>>8 | (x2 & 0x0000ff00) | (x3&0x0000ff00)<<8 | (x4&0x0000ff00)<<16
-	y3 = (x1&0x00ff0000)>>16 | (x2&0x00ff0000)>>8 | (x3 & 0x00ff0000) | (x4&0x00ff0000)<<8
-	y4 = (x1&0xff000000)>>24 | (x2&0xff000000)>>16 | (x3&0xff000000)>>8 | (x4 & 0xff000000)
-	return
+func copyKeys(x1, x2, x3, x4 uint32) (uint32, uint32, uint32, uint32) {
+	v1 := (x1 & 0x000000ff) | (x2&0x000000ff)<<8 | (x3&0x000000ff)<<16 | (x4&0x000000ff)<<24
+	v2 := (x1&0x0000ff00)>>8 | (x2 & 0x0000ff00) | (x3&0x0000ff00)<<8 | (x4&0x0000ff00)<<16
+	v3 := (x1&0x00ff0000)>>16 | (x2&0x00ff0000)>>8 | (x3 & 0x00ff0000) | (x4&0x00ff0000)<<8
+	v4 := (x1&0xff000000)>>24 | (x2&0xff000000)>>16 | (x3&0xff000000)>>8 | (x4 & 0xff000000)
+	return v1, v2, v3, v4
 }
 
 // generateKeys generates 32 uint32 subkeys from h and m.
 // Directly ported from cryptonite generate_keys().
-func generateKeys(h *[8]uint32, m *[8]uint32, k *[32]uint32) {
+func generateKeys(h *[8]uint32, m *[8]uint32, k *[32]uint32) { //nolint:funlen
 	h0, h1, h2, h3 := h[0], h[1], h[2], h[3]
 	h4, h5, h6, h7 := h[4], h[5], h[6], h[7]
 	m0, m1, m2, m3 := m[0], m[1], m[2], m[3]
@@ -285,7 +285,7 @@ func generateKeys(h *[8]uint32, m *[8]uint32, k *[32]uint32) {
 // add256 adds b into a as a 256-bit little-endian integer (8×uint32 words).
 func add256(a *[8]uint32, b *[8]uint32) {
 	var carry uint64
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		sum := uint64(a[i]) + uint64(b[i]) + carry
 		a[i] = uint32(sum)
 		carry = sum >> 32
@@ -294,10 +294,10 @@ func add256(a *[8]uint32, b *[8]uint32) {
 
 // mixTransform implements cryptonite mix_transform operating on uint16 words.
 // a, b, c are 32-byte inputs; out is 32-byte output.
-func mixTransform(a, b, c, out []byte) {
+func mixTransform(a, b, c, out []byte) { //nolint:funlen
 	// Read as 16 uint16 LE words each
 	var av, bv, cv [16]uint16
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		av[i] = binary.LittleEndian.Uint16(a[i*2:])
 		bv[i] = binary.LittleEndian.Uint16(b[i*2:])
 		cv[i] = binary.LittleEndian.Uint16(c[i*2:])
@@ -384,7 +384,7 @@ func mixTransform(a, b, c, out []byte) {
 	ov[14] = p7 ^ a0 ^ a6 ^ a8 ^ b2 ^ b7 ^ b9 ^ b12 ^ b15 ^ c8
 	ov[15] = p6 ^ a2 ^ a7 ^ a9 ^ a12 ^ a15 ^ b0 ^ b8 ^ b10 ^ b13 ^ c2 ^ c9 ^ c15
 
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		binary.LittleEndian.PutUint16(out[i*2:], ov[i])
 	}
 }

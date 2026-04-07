@@ -14,7 +14,7 @@ import (
 	"crypto-dstu/oid"
 )
 
-// newHashForOID returns a new hash.Hash for the given digest algorithm OID.
+// newHashForOID returns a new [hash.Hash] for the given digest algorithm OID.
 // Supported: Kupyna-256 (DSTU 7564), GOST 34.311-95.
 // Falls back to Kupyna-256 for unknown OIDs.
 func newHashForOID(o asn1.ObjectIdentifier) hash.Hash {
@@ -63,10 +63,7 @@ func unmarshalSignatureCMS(b []byte, words int) (*dstu4145.Signature, error) {
 	}
 	half := len(b) / 2
 	// Adjust words to match the actual half-length in case curve word size differs
-	halfWords := (half + 3) / 4
-	if halfWords > words {
-		halfWords = words
-	}
+	halfWords := min((half+3)/4, words)
 	_ = halfWords
 	rLE := b[:half]
 	sLE := b[half:]
@@ -79,7 +76,7 @@ func unmarshalSignatureCMS(b []byte, words int) (*dstu4145.Signature, error) {
 	padded := make([]byte, words*4)
 	copy(padded, rLE)
 	ws := make([]uint32, words)
-	for i := 0; i < words; i++ {
+	for i := range words {
 		ws[i] = uint32(padded[i*4]) |
 			uint32(padded[i*4+1])<<8 |
 			uint32(padded[i*4+2])<<16 |

@@ -13,10 +13,10 @@ import (
 // OIDs used in Key-6.dat / PKCS#8 encrypted containers (Ukrainian PKI profile).
 // Source: cryptonite storage_errors.h, pkcs5.c, and Ukrainian PKI OID registry.
 var (
-	// PBES2 (RFC 2898)
+	// PBES2 (RFC 2898).
 	oidPBES2 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 13}
 
-	// PBKDF2 (RFC 2898)
+	// PBKDF2 (RFC 2898).
 	oidPBKDF2 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
 
 	// HMAC-GOST34311 PRF OID used in Ukrainian PBKDF2
@@ -90,12 +90,15 @@ func ParseKey6(data []byte, password string) (*dstu4145.PrivateKey, error) {
 	}
 
 	if !epki.Algorithm.Algorithm.Equal(oidPBES2) {
-		return nil, errors.New("keystore: Key6: unsupported encryption algorithm (expected PBES2): " + epki.Algorithm.Algorithm.String())
+		return nil, errors.New(
+			"keystore: Key6: unsupported encryption algorithm (expected PBES2): " + epki.Algorithm.Algorithm.String(),
+		)
 	}
 
 	// Parse PBES2-params from AlgorithmIdentifier.parameters
 	var p2 pbes2Params
-	if _, err := asn1.Unmarshal(epki.Algorithm.Parameters.FullBytes, &p2); err != nil {
+	_, err = asn1.Unmarshal(epki.Algorithm.Parameters.FullBytes, &p2)
+	if err != nil {
 		return nil, errors.New("keystore: Key6: PBES2-params: " + err.Error())
 	}
 
@@ -105,7 +108,8 @@ func ParseKey6(data []byte, password string) (*dstu4145.PrivateKey, error) {
 
 	// Parse PBKDF2-params
 	var kdfP pbkdf2Params
-	if _, err := asn1.Unmarshal(p2.KDF.Parameters.FullBytes, &kdfP); err != nil {
+	_, err = asn1.Unmarshal(p2.KDF.Parameters.FullBytes, &kdfP)
+	if err != nil {
 		return nil, errors.New("keystore: Key6: PBKDF2-params: " + err.Error())
 	}
 	if kdfP.Iterations < 1 {
@@ -198,8 +202,12 @@ func pbkdf2GOST(password, salt []byte, iterations, keyLen int, useGOST bool) ([]
 
 // pbkdf2WithHMAC is a generic PBKDF2 implementation using a supplied HMAC function.
 // F(P, S, c, i) = U1 ⊕ U2 ⊕ ... ⊕ Uc
-// where U1 = HMAC(P, S || INT(i)), Uj = HMAC(P, U_{j-1})
-func pbkdf2WithHMAC(password, salt []byte, iterations, keyLen int, hmacFn func(key, data []byte) []byte) ([]byte, error) {
+// where U1 = HMAC(P, S || INT(i)), Uj = HMAC(P, U_{j-1}).
+func pbkdf2WithHMAC(
+	password, salt []byte,
+	iterations, keyLen int,
+	hmacFn func(key, data []byte) []byte,
+) ([]byte, error) {
 	hashLen := len(hmacFn(password, salt))
 	dk := make([]byte, 0, keyLen)
 	block := 1
@@ -243,15 +251,15 @@ func hmacGost34311(key, data []byte) []byte {
 
 	ipad := make([]byte, blockSize)
 	opad := make([]byte, blockSize)
-	for i := 0; i < blockSize; i++ {
+	for i := range blockSize {
 		ipad[i] = k[i] ^ 0x36
 		opad[i] = k[i] ^ 0x5c
 	}
 
 	// inner = H(ipad || data)
 	inner := gost34311.New()
-	inner.Write(ipad)
-	inner.Write(data)
+	_, _ = inner.Write(ipad)
+	_, _ = inner.Write(data)
 	innerSum := inner.Sum(nil)
 
 	// outer = H(opad || inner)
@@ -346,11 +354,11 @@ func hmacSHA1(key, data []byte) []byte {
 	copy(k, key)
 	ipad := make([]byte, blockSize)
 	opad := make([]byte, blockSize)
-	for i := 0; i < blockSize; i++ {
+	for i := range blockSize {
 		ipad[i] = k[i] ^ 0x36
 		opad[i] = k[i] ^ 0x5c
 	}
-	innerArr := sha1.Sum(append(ipad, data...))
-	outerArr := sha1.Sum(append(opad, innerArr[:]...))
+	innerArr := sha1.Sum(append(append([]byte(nil), ipad...), data...))
+	outerArr := sha1.Sum(append(append([]byte(nil), opad...), innerArr[:]...))
 	return outerArr[:]
 }

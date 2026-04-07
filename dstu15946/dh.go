@@ -37,7 +37,7 @@ func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, 
 	}
 
 	// Step 2: S = d · Q
-	S := peer.Q.ScalarMul(priv.D)
+	S := peer.Q.ScalarMul(priv.D) //nolint:gocritic // S is standard DSTU 4145 spec notation
 	if S.IsInfinity() {
 		return nil, errors.New("dstu15946: shared point is point at infinity")
 	}

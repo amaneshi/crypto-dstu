@@ -7,8 +7,9 @@ import (
 
 // Header holds the fields of a TRANSPORTABLE header section.
 // Wire format inside the section content:
-//   KEY=VALUE\r\n  (for each non-empty field)
-//   \0             (null terminator)
+//
+//	KEY=VALUE\r\n  (for each non-empty field)
+//	\0             (null terminator)
 type Header struct {
 	Filename  string // FILENAME
 	SndName   string // SND_NAME
@@ -65,24 +66,24 @@ func EncodeHeader(h *Header) []byte {
 }
 
 // DecodeHeader parses the Contents of a TRANSPORTABLE section into a Header.
-// Format: KEY=VALUE\r\n ... \0
+// Format: KEY=VALUE\r\n ... \0.
 func DecodeHeader(data []byte) (*Header, error) {
 	h := &Header{}
 	// Trim at null terminator
 	if idx := bytes.IndexByte(data, 0x00); idx >= 0 {
 		data = data[:idx]
 	}
-	for _, line := range strings.Split(string(data), "\r\n") {
+	for line := range strings.SplitSeq(string(data), "\r\n") {
 		line = strings.TrimRight(line, "\n")
 		if line == "" {
 			continue
 		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			continue
 		}
-		key := line[:eq]
-		val := line[eq+1:]
+		key := before
+		val := after
 		for _, f := range headerFields {
 			if f.key == key {
 				f.set(h, val)

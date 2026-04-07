@@ -12,7 +12,7 @@ import (
 
 // VerifyCert verifies cert's signature using issuerCert's public key.
 // It also checks the validity period.
-// Reference: cryptonite pkix_verify.c
+// Reference: cryptonite pkix_verify.c.
 func VerifyCert(cert *Certificate, issuerCert *Certificate) error {
 	if err := checkValidity(cert, time.Now()); err != nil {
 		return err

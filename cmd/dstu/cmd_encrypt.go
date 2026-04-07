@@ -27,7 +27,7 @@ Options:
 	input := fs.String("input", "-", "input file")
 	output := fs.String("output", "-", "output file")
 
-	fs.Parse(args)
+	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	if *key == "" {
 		fmt.Fprintln(os.Stderr, "dstu encrypt: -key is required")

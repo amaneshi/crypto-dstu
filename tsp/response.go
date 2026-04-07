@@ -73,9 +73,12 @@ func ParseTSTInfo(tokenDER []byte) (*TSTInfo, error) {
 		return nil, err
 	}
 	var info TSTInfo
-	if rest, err := asn1.Unmarshal(tstInfoBytes, &info); err != nil {
+	var rest []byte
+	rest, err = asn1.Unmarshal(tstInfoBytes, &info)
+	if err != nil {
 		return nil, errors.New("tsp: parse TSTInfo: " + err.Error())
-	} else if len(rest) > 0 {
+	}
+	if len(rest) > 0 {
 		return nil, errors.New("tsp: parse TSTInfo: trailing data")
 	}
 	return &info, nil
@@ -86,7 +89,9 @@ func ParseTSTInfo(tokenDER []byte) (*TSTInfo, error) {
 func extractTSTInfoBytes(tokenDER []byte) ([]byte, error) {
 	// ContentInfo = SEQUENCE { OID, [0] EXPLICIT content }
 	var ciSeq asn1.RawValue
-	if _, err := asn1.Unmarshal(tokenDER, &ciSeq); err != nil {
+	var err error
+	_, err = asn1.Unmarshal(tokenDER, &ciSeq)
+	if err != nil {
 		return nil, errors.New("tsp: parse ContentInfo: " + err.Error())
 	}
 	inner := ciSeq.Bytes
@@ -100,14 +105,16 @@ func extractTSTInfoBytes(tokenDER []byte) ([]byte, error) {
 
 	// [0] EXPLICIT { SignedData SEQUENCE }
 	var ctx0 asn1.RawValue
-	if _, err := asn1.Unmarshal(rest, &ctx0); err != nil {
+	_, err = asn1.Unmarshal(rest, &ctx0)
+	if err != nil {
 		return nil, errors.New("tsp: parse ContentInfo content: " + err.Error())
 	}
 	sdBytes := ctx0.Bytes
 
 	// SignedData SEQUENCE — unwrap
 	var sdSeq asn1.RawValue
-	if _, err := asn1.Unmarshal(sdBytes, &sdSeq); err != nil {
+	_, err = asn1.Unmarshal(sdBytes, &sdSeq)
+	if err != nil {
 		return nil, errors.New("tsp: parse SignedData: " + err.Error())
 	}
 	data := sdSeq.Bytes
@@ -128,7 +135,8 @@ func extractTSTInfoBytes(tokenDER []byte) ([]byte, error) {
 
 	// EncapsulatedContentInfo SEQUENCE
 	var eciSeq asn1.RawValue
-	if _, err := asn1.Unmarshal(data, &eciSeq); err != nil {
+	_, err = asn1.Unmarshal(data, &eciSeq)
+	if err != nil {
 		return nil, errors.New("tsp: parse ECI: " + err.Error())
 	}
 	eciInner := eciSeq.Bytes
@@ -145,11 +153,13 @@ func extractTSTInfoBytes(tokenDER []byte) ([]byte, error) {
 		return nil, errors.New("tsp: ECI has no encapsulated content")
 	}
 	var ctx asn1.RawValue
-	if _, err := asn1.Unmarshal(eciRest, &ctx); err != nil {
+	_, err = asn1.Unmarshal(eciRest, &ctx)
+	if err != nil {
 		return nil, errors.New("tsp: parse ECI content wrapper: " + err.Error())
 	}
 	var tstInfoDER []byte
-	if _, err := asn1.Unmarshal(ctx.Bytes, &tstInfoDER); err != nil {
+	_, err = asn1.Unmarshal(ctx.Bytes, &tstInfoDER)
+	if err != nil {
 		return nil, errors.New("tsp: parse TSTInfo OCTET STRING: " + err.Error())
 	}
 	return tstInfoDER, nil

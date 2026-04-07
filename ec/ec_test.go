@@ -7,14 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test curve creation
+// Test curve creation.
 func TestCurveCreation(t *testing.T) {
 	curve := DSTU_PB_257()
 	require.Equal(t, 257, curve.M)
 	require.Equal(t, 4, curve.Cofactor)
 }
 
-// Test base point is on curve
+// Test base point is on curve.
 func TestBasePointOnCurve(t *testing.T) {
 	curves := []struct {
 		name  string
@@ -40,7 +40,7 @@ func TestBasePointOnCurve(t *testing.T) {
 	}
 }
 
-// Test point at infinity
+// Test point at infinity.
 func TestInfinity(t *testing.T) {
 	curve := DSTU_PB_257()
 	inf := Infinity(curve)
@@ -49,7 +49,7 @@ func TestInfinity(t *testing.T) {
 	require.True(t, curve.Contains(inf), "Infinity point should be on curve")
 }
 
-// Test point addition identity: P + O = P
+// Test point addition identity: P + O = P.
 func TestAdditionIdentity(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -62,7 +62,7 @@ func TestAdditionIdentity(t *testing.T) {
 	require.True(t, result.Equal(g), "O + P should equal P")
 }
 
-// Test point doubling
+// Test point doubling.
 func TestPointDoubling(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -77,7 +77,7 @@ func TestPointDoubling(t *testing.T) {
 	require.True(t, curve.Contains(doubled), "2*P must be on curve")
 }
 
-// Test point addition
+// Test point addition.
 func TestPointAddition(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -96,7 +96,7 @@ func TestPointAddition(t *testing.T) {
 	require.True(t, result1.Equal(result2), "Point addition must be commutative")
 }
 
-// Test scalar multiplication
+// Test scalar multiplication.
 func TestScalarMul(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -118,7 +118,7 @@ func TestScalarMul(t *testing.T) {
 	require.True(t, curve.Contains(result), "15*G must be on curve")
 }
 
-// Test scalar multiplication with zero
+// Test scalar multiplication with zero.
 func TestScalarMulZero(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -129,7 +129,7 @@ func TestScalarMulZero(t *testing.T) {
 	require.True(t, result.IsInfinity(), "0*G must be point at infinity")
 }
 
-// Test order: n*G = O
+// Test order: n*G = O.
 func TestCurveOrder(t *testing.T) {
 	curves := []struct {
 		name  string
@@ -159,7 +159,7 @@ func TestCurveOrder(t *testing.T) {
 	}
 }
 
-// Test point compression and expansion
+// Test point compression and expansion.
 func TestCompressExpand(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -176,7 +176,7 @@ func TestCompressExpand(t *testing.T) {
 	require.True(t, curve.Contains(expanded), "Expanded point must be on curve")
 }
 
-// Test compression for multiple points
+// Test compression for multiple points.
 func TestCompressExpandMultiplePoints(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -194,7 +194,7 @@ func TestCompressExpandMultiplePoints(t *testing.T) {
 	}
 }
 
-// Test associativity: (P + Q) + R = P + (Q + R)
+// Test associativity: (P + Q) + R = P + (Q + R).
 func TestAssociativity(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -214,7 +214,7 @@ func TestAssociativity(t *testing.T) {
 	require.True(t, left.Equal(right), "Point addition must be associative")
 }
 
-// Test negation
+// Test negation.
 func TestNegation(t *testing.T) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
@@ -229,7 +229,7 @@ func TestNegation(t *testing.T) {
 	require.True(t, curve.Contains(negG), "-P must be on curve")
 }
 
-// Test ScalarBaseMul
+// Test ScalarBaseMul.
 func TestScalarBaseMul(t *testing.T) {
 	curve := DSTU_PB_257()
 	k := big.NewInt(7)
@@ -240,60 +240,60 @@ func TestScalarBaseMul(t *testing.T) {
 	require.True(t, result1.Equal(result2), "ScalarBaseMul must equal BasePoint.ScalarMul")
 }
 
-// Benchmark scalar multiplication
+// Benchmark scalar multiplication.
 func BenchmarkScalarMul(b *testing.B) {
 	curve := DSTU_PB_257()
 	g := curve.BasePoint()
 	k := big.NewInt(123456789)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = g.ScalarMul(k)
 	}
 }
 
-// Benchmark point addition
+// Benchmark point addition.
 func BenchmarkPointAdd(b *testing.B) {
 	curve := DSTU_PB_257()
 	p := curve.BasePoint()
 	q := p.Double()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = p.Add(q)
 	}
 }
 
-// Benchmark point doubling
+// Benchmark point doubling.
 func BenchmarkPointDouble(b *testing.B) {
 	curve := DSTU_PB_257()
 	p := curve.BasePoint()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = p.Double()
 	}
 }
 
-// Benchmark compression
+// Benchmark compression.
 func BenchmarkCompress(b *testing.B) {
 	curve := DSTU_PB_257()
 	p := curve.BasePoint()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = p.Compress()
 	}
 }
 
-// Benchmark expansion
+// Benchmark expansion.
 func BenchmarkExpand(b *testing.B) {
 	curve := DSTU_PB_257()
 	p := curve.BasePoint()
 	compressed := p.Compress()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = curve.Expand(compressed)
 	}
 }

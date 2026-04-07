@@ -9,7 +9,7 @@ import (
 )
 
 // CertInfo holds human-readable extracted fields from a Certificate.
-type CertInfo struct {
+type CertInfo struct { //nolint:revive // CertInfo is established public API; renaming to Info would be a breaking change
 	Serial             string
 	Issuer             string
 	Subject            string
@@ -124,7 +124,7 @@ func curveName(c *Certificate) string {
 }
 
 // parseBasicConstraintsIsCA parses the BasicConstraints extension value.
-// BasicConstraints ::= SEQUENCE { cA BOOLEAN DEFAULT FALSE, ... }
+// BasicConstraints ::= SEQUENCE { cA BOOLEAN DEFAULT FALSE, ... }.
 func parseBasicConstraintsIsCA(val []byte) bool {
 	if len(val) == 0 {
 		return false
@@ -166,7 +166,7 @@ func parseKeyUsage(val []byte) []string {
 		"encipherOnly",
 	}
 	var usage []string
-	for i := 0; i < 8-unusedBits; i++ {
+	for i := range 8 - unusedBits {
 		if bits&(0x80>>uint(i)) != 0 {
 			if i < len(names) {
 				usage = append(usage, names[i])

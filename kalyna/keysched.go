@@ -7,7 +7,7 @@ import (
 // multiplyGF multiplies two bytes in GF(2^8) with reduction poly 0x11d.
 func multiplyGF(x, y byte) byte {
 	var r byte
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		if y&1 == 1 {
 			r ^= x
 		}
@@ -81,11 +81,11 @@ func shiftRows(state []uint64) {
 	flat := wordsToBytes(state)
 	nflat := make([]byte, len(flat))
 	shift := -1
-	for row := 0; row < 8; row++ {
+	for row := range 8 {
 		if row%(8/nb) == 0 {
 			shift++
 		}
-		for col := 0; col < nb; col++ {
+		for col := range nb {
 			nflat[row+((col+shift)%nb)*8] = flat[row+col*8]
 		}
 	}
@@ -98,11 +98,11 @@ func invShiftRows(state []uint64) {
 	flat := wordsToBytes(state)
 	nflat := make([]byte, len(flat))
 	shift := -1
-	for row := 0; row < 8; row++ {
+	for row := range 8 {
 		if row%(8/nb) == 0 {
 			shift++
 		}
-		for col := 0; col < nb; col++ {
+		for col := range nb {
 			nflat[row+col*8] = flat[row+((col+shift)%nb)*8]
 		}
 	}
@@ -113,7 +113,7 @@ func invShiftRows(state []uint64) {
 func matrixMultiply(state []uint64, matrix [8][8]byte) {
 	nb := len(state)
 	flat := wordsToBytes(state)
-	for col := 0; col < nb; col++ {
+	for col := range nb {
 		var result uint64
 		for row := 7; row >= 0; row-- {
 			var product byte
@@ -202,7 +202,7 @@ func rotate(data []uint64) {
 // keyExpandKt computes the pre-round key kt.
 func keyExpandKt(key []uint64, nb, nk int) []uint64 {
 	state := make([]uint64, nb)
-	state[0] = uint64(nb+nk+1)
+	state[0] = uint64(nb + nk + 1)
 
 	k0 := make([]uint64, nb)
 	k1 := make([]uint64, nb)

@@ -3,6 +3,7 @@ package cms
 import (
 	"encoding/asn1"
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -57,7 +58,8 @@ func BuildSignedAttrs(contentType asn1.ObjectIdentifier, digest []byte, signingT
 
 	// 3. signing-time attribute (optional)
 	if !signingTime.IsZero() {
-		stVal, err := asn1.Marshal(signingTime.UTC())
+		var stVal []byte
+		stVal, err = asn1.Marshal(signingTime.UTC())
 		if err != nil {
 			return nil, errors.New("cms: marshal signingTime: " + err.Error())
 		}
@@ -93,8 +95,7 @@ func marshalAttribute(a Attribute) ([]byte, error) {
 		return nil, err
 	}
 	// Values.FullBytes already contains the SET { ... } bytes
-	seq := append(oidDER, a.Values.FullBytes...)
-	return marshalSEQ(seq), nil
+	return marshalSEQ(slices.Concat(oidDER, a.Values.FullBytes)), nil
 }
 
 // marshalSetOf wraps a single DER value in SET OF { val } (tag 0x31).
@@ -116,13 +117,14 @@ func marshalSEQ(content []byte) []byte {
 func tlv(tag byte, content []byte) []byte {
 	l := len(content)
 	var lenBytes []byte
-	if l < 0x80 {
+	switch {
+	case l < 0x80:
 		lenBytes = []byte{byte(l)}
-	} else if l < 0x100 {
+	case l < 0x100:
 		lenBytes = []byte{0x81, byte(l)}
-	} else if l < 0x10000 {
+	case l < 0x10000:
 		lenBytes = []byte{0x82, byte(l >> 8), byte(l)}
-	} else {
+	default:
 		lenBytes = []byte{0x83, byte(l >> 16), byte(l >> 8), byte(l)}
 	}
 	out := make([]byte, 1+len(lenBytes)+l)

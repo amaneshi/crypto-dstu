@@ -24,7 +24,7 @@ Options:
 	certPath := fs.String("cert", "", "certificate file")
 	asJSON := fs.Bool("json", false, "output as JSON")
 
-	fs.Parse(args)
+	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	// Also accept positional argument
 	if *certPath == "" && fs.NArg() > 0 {
@@ -45,7 +45,7 @@ Options:
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(info); err != nil {
+		if err = enc.Encode(info); err != nil {
 			fatalf("certinfo json: %v", err)
 		}
 		return
@@ -53,7 +53,7 @@ Options:
 
 	printField := func(label, value string) {
 		if value != "" {
-			fmt.Printf("%-14s %s\n", label+":", value)
+			fmt.Printf("%-14s %s\n", label+":", value) //nolint:forbidigo // CLI output
 		}
 	}
 
@@ -66,10 +66,10 @@ Options:
 	printField("Email", info.Email)
 	printField("Serial", info.Serial)
 	printField("Issuer", info.Issuer)
-	fmt.Printf("%-14s %s\n", "NotBefore:", info.NotBefore.UTC().Format(time.RFC3339))
-	fmt.Printf("%-14s %s\n", "NotAfter:", info.NotAfter.UTC().Format(time.RFC3339))
+	fmt.Printf("%-14s %s\n", "NotBefore:", info.NotBefore.UTC().Format(time.RFC3339)) //nolint:forbidigo // CLI output
+	fmt.Printf("%-14s %s\n", "NotAfter:", info.NotAfter.UTC().Format(time.RFC3339))   //nolint:forbidigo // CLI output
 	printField("Role", string(info.Role))
 	printField("Algorithm", info.Algorithm)
 	printField("Curve", info.CurveName)
-	fmt.Printf("%-14s %v\n", "IsCA:", info.IsCA)
+	fmt.Printf("%-14s %v\n", "IsCA:", info.IsCA) //nolint:forbidigo // CLI output
 }

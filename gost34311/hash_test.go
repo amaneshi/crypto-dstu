@@ -51,7 +51,10 @@ func TestVector2(t *testing.T) {
 // non-zero sync, SBOX_ID_1, 48-byte message (1.5 blocks).
 func TestVector3(t *testing.T) {
 	sync := unhex(t, "975ad259b935b5c492e24dd1cc24e0ee8c4c11255c5aa3244119cc3386b10b0a")
-	data := unhex(t, "9f4f3dfc4dfe5d7b425ece1fb62c81f3795e746d72ee40139e8691d9e4abc889632959d73e0bf139cd71813ebee679e930")
+	data := unhex(
+		t,
+		"9f4f3dfc4dfe5d7b425ece1fb62c81f3795e746d72ee40139e8691d9e4abc889632959d73e0bf139cd71813ebee679e930",
+	)
 	expected := unhex(t, "9d82d03e369b476ecc15cc8b9c73906cd395b63825b5b667a6cb62013788be30")
 
 	h := NewWithParams(gost28147.SboxDSTU, sync)

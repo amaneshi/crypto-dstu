@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test basic element creation and conversion
+// Test basic element creation and conversion.
 func TestElementCreation(t *testing.T) {
 	// Test zero element
 	e := NewElement(3)
@@ -26,7 +26,7 @@ func TestElementCreation(t *testing.T) {
 	require.True(t, e.Equal(e2), "Hex roundtrip: %s != %s", hexOut, e2.String())
 }
 
-// Test BitLen function
+// Test BitLen function.
 func TestBitLen(t *testing.T) {
 	tests := []struct {
 		hex    string
@@ -50,7 +50,7 @@ func TestBitLen(t *testing.T) {
 	}
 }
 
-// Test bit operations
+// Test bit operations.
 func TestBitOps(t *testing.T) {
 	e := NewElement(2)
 
@@ -64,7 +64,7 @@ func TestBitOps(t *testing.T) {
 	require.False(t, e.TestBit(5), "ClearBit(5)")
 }
 
-// Test addition (XOR)
+// Test addition (XOR).
 func TestAdd(t *testing.T) {
 	a, _ := FromHex("5", 1)
 	b, _ := FromHex("3", 1)
@@ -84,7 +84,7 @@ func TestAdd(t *testing.T) {
 	require.True(t, result.Equal(a), "a + 0 should equal a")
 }
 
-// Test multiplication
+// Test multiplication.
 func TestMul(t *testing.T) {
 	// Test simple multiplication
 	a, _ := FromHex("3", 1) // x + 1
@@ -106,7 +106,7 @@ func TestMul(t *testing.T) {
 	require.True(t, result1.Equal(result2), "Multiplication should be commutative")
 }
 
-// Test modular reduction
+// Test modular reduction.
 func TestMod(t *testing.T) {
 	// Use DSTU_PB_257: x^257 + x^12 + 1
 	modBits := ModBits257
@@ -120,7 +120,7 @@ func TestMod(t *testing.T) {
 	require.LessOrEqual(t, reduced.BitLen(), 257, "Mod result BitLen should be <= 257")
 }
 
-// Test modular multiplication
+// Test modular multiplication.
 func TestModMul(t *testing.T) {
 	modBits := ModBits257
 
@@ -137,7 +137,7 @@ func TestModMul(t *testing.T) {
 	require.True(t, result.Equal(result2), "ModMul should be commutative")
 }
 
-// Test modular inversion
+// Test modular inversion.
 func TestInv(t *testing.T) {
 	modBits := ModBits257
 
@@ -153,7 +153,7 @@ func TestInv(t *testing.T) {
 	require.True(t, product.Equal(one), "a * Inv(a) = %s, want 1", product.String())
 }
 
-// Test field axioms with random elements
+// Test field axioms with random elements.
 func TestFieldAxioms(t *testing.T) {
 	modBits := ModBits257
 	wordCount := modBits.WordCount()
@@ -173,8 +173,8 @@ func TestFieldAxioms(t *testing.T) {
 	require.True(t, abc1.Equal(abc2), "Multiplication is not associative")
 
 	// Test distributivity: a * (b + c) = a*b + a*c
-	bc_sum := Add(b, c)
-	left := ModMul(a, bc_sum, modBits)
+	bcSum := Add(b, c)
+	left := ModMul(a, bcSum, modBits)
 
 	ab = ModMul(a, b, modBits)
 	ac := ModMul(a, c, modBits)
@@ -183,7 +183,7 @@ func TestFieldAxioms(t *testing.T) {
 	require.True(t, left.Equal(right), "Distributivity does not hold")
 }
 
-// Test inversion for multiple field sizes
+// Test inversion for multiple field sizes.
 func TestInvMultipleFields(t *testing.T) {
 	fields := []ModBits{
 		ModBits163,
@@ -216,36 +216,36 @@ func TestInvMultipleFields(t *testing.T) {
 	}
 }
 
-// Benchmark multiplication
+// Benchmark multiplication.
 func BenchmarkMul(b *testing.B) {
 	a, _ := FromHex("123456789ABCDEF0123456789ABCDEF", 9)
 	x, _ := FromHex("FEDCBA9876543210FEDCBA987654321", 9)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = Mul(a, x)
 	}
 }
 
-// Benchmark modular multiplication
+// Benchmark modular multiplication.
 func BenchmarkModMul(b *testing.B) {
 	modBits := ModBits257
 	a, _ := FromHex("123456789ABCDEF0123456789ABCDEF", 9)
 	x, _ := FromHex("FEDCBA9876543210FEDCBA987654321", 9)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = ModMul(a, x, modBits)
 	}
 }
 
-// Benchmark inversion
+// Benchmark inversion.
 func BenchmarkInv(b *testing.B) {
 	modBits := ModBits257
 	a, _ := FromHex("123456789ABCDEF", 9)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = Inv(a, modBits)
 	}
 }
