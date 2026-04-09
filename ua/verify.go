@@ -3,9 +3,8 @@ package ua
 import (
 	"errors"
 
-	"crypto-dstu/cert"
-	"crypto-dstu/dstu4145"
-	"crypto-dstu/keystore"
+	"crypto-dstu/internal/cert"
+	"crypto-dstu/internal/keystore"
 )
 
 // VerifyCert validates a DER or PEM certificate against the Box CA pool.
@@ -15,13 +14,13 @@ func (b *Box) VerifyCert(der []byte) error {
 	if err != nil {
 		return errors.New("ua: VerifyCert: parse: " + err.Error())
 	}
-	if len(b.CACerts) == 0 {
+	if len(b.caCerts) == 0 {
 		return cert.VerifyCert(c, c) // self-check validity only
 	}
-	return cert.VerifyCertChain(c, b.CACerts)
+	return cert.VerifyCertChain(c, b.caCerts)
 }
 
-// VerifyCertPKMatch checks that a DER/PEM certificate matches a private key.
+// VerifyCertPKMatch checks that a DER/PEM certificate matches a private key container.
 // Both the certificate and key data are parsed from their raw bytes.
 func VerifyCertPKMatch(certDER []byte, keyData []byte, password string) error {
 	certDER = keystore.MaybePEM(certDER)
@@ -38,9 +37,4 @@ func VerifyCertPKMatch(certDER []byte, keyData []byte, password string) error {
 		return errors.New("ua: VerifyCertPKMatch: no keys found")
 	}
 	return cert.VerifyCertPKMatch(c, result.Keys[0])
-}
-
-// VerifyCertPKMatchDirect checks that a certificate matches an already-parsed private key.
-func VerifyCertPKMatchDirect(c *cert.Certificate, priv *dstu4145.PrivateKey) error {
-	return cert.VerifyCertPKMatch(c, priv)
 }

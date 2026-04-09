@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"crypto-dstu/cert"
-	"crypto-dstu/cms"
-	"crypto-dstu/transport"
+	"crypto-dstu/internal/cert"
+	"crypto-dstu/internal/cms"
+	"crypto-dstu/internal/transport"
 )
 
 // SignOptions controls SignDocument behaviour.
@@ -19,7 +19,6 @@ type SignOptions struct {
 
 // SignerResult holds per-signer verification output.
 type SignerResult struct {
-	Certificate *cert.Certificate
 	CertInfo    *CertInfo
 	SigningTime time.Time
 	Valid       bool
@@ -34,12 +33,22 @@ type TimestampResult struct {
 	Error error
 }
 
+// TransportHeader carries metadata extracted from an Ukrainian tax office transport container.
+type TransportHeader struct {
+	Filename  string
+	SndEmail  string
+	RcvEmail  string
+	CerType   string
+	CRC32Sign string
+	CRC32File string
+}
+
 // UnsignResult is the output of UnsignDocument.
 type UnsignResult struct {
 	Content    []byte
 	Signers    []SignerResult
 	Timestamps []TimestampResult
-	Header     *transport.Header
+	Header     *TransportHeader
 }
 
 // SignDocument signs content and returns either raw CMS DER (NoTax=true)
@@ -49,12 +58,12 @@ func (b *Box) SignDocument(content []byte, opts SignOptions) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if entry.SignCert == nil {
+	if entry.signCert == nil {
 		return nil, errors.New("ua: SignDocument: no signing certificate loaded")
 	}
 
 	cmsOpts := cms.SignOptions{Detached: opts.Detached}
-	cmsDER, err := cms.Sign(content, entry.PrivateKey, entry.SignCert, cmsOpts)
+	cmsDER, err := cms.Sign(content, entry.privateKey, entry.signCert, cmsOpts)
 	if err != nil {
 		return nil, errors.New("ua: SignDocument: " + err.Error())
 	}
@@ -66,7 +75,7 @@ func (b *Box) SignDocument(content []byte, opts SignOptions) ([]byte, error) {
 	// Wrap in transport container
 	filename := opts.Filename
 	if filename == "" {
-		filename = "document.xml"
+		filename = defaultFilename
 	}
 
 	header := &transport.Header{
@@ -96,7 +105,16 @@ func (b *Box) UnsignDocument(data []byte) (*UnsignResult, error) {
 	cmsDER := data
 	// Try transport container first
 	if container, err := transport.Decode(data); err == nil {
-		result.Header = container.Header
+		if h := container.Header; h != nil {
+			result.Header = &TransportHeader{
+				Filename:  h.Filename,
+				SndEmail:  h.SndEmail,
+				RcvEmail:  h.RcvEmail,
+				CerType:   h.CerType,
+				CRC32Sign: h.CRC32Sign,
+				CRC32File: h.CRC32File,
+			}
+		}
 		// Find a sign section
 		for _, label := range []string{"UA_SIGN1", "UA1_SIGN"} {
 			if s := container.FindSection(label); s != nil {
@@ -114,19 +132,19 @@ func (b *Box) UnsignDocument(data []byte) (*UnsignResult, error) {
 	// If no certs were embedded in the CMS, inject known certs from our Box
 	// so that SID matching (issuer+serial) can resolve the signer certificates.
 	if len(msg.Certificates) == 0 {
-		for _, e := range b.Keys {
-			if e.SignCert != nil {
-				msg.Certificates = append(msg.Certificates, e.SignCert)
+		for _, e := range b.keys {
+			if e.signCert != nil {
+				msg.Certificates = append(msg.Certificates, e.signCert)
 			}
 		}
-		msg.Certificates = append(msg.Certificates, b.CACerts...)
+		msg.Certificates = append(msg.Certificates, b.caCerts...)
 		cms.ResolveCertificates(msg)
 	}
 
-	// Verify signatures (pass CACerts for chain check, nil = skip)
+	// Verify signatures (pass caCerts for chain check, nil = skip)
 	var roots []*cert.Certificate
-	if len(b.CACerts) > 0 {
-		roots = b.CACerts
+	if len(b.caCerts) > 0 {
+		roots = b.caCerts
 	}
 	_ = cms.VerifySigned(msg, nil, roots) // best-effort; errors captured per signer
 
@@ -134,7 +152,6 @@ func (b *Box) UnsignDocument(data []byte) (*UnsignResult, error) {
 
 	for _, sr := range msg.Signers {
 		r := SignerResult{
-			Certificate: sr.Certificate,
 			SigningTime: sr.SigningTime,
 			Valid:       sr.Valid,
 		}

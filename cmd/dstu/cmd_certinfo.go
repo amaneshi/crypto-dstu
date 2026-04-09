@@ -68,7 +68,7 @@ Options:
 	printField("Issuer", info.Issuer)
 	fmt.Printf("%-14s %s\n", "NotBefore:", info.NotBefore.UTC().Format(time.RFC3339)) //nolint:forbidigo // CLI output
 	fmt.Printf("%-14s %s\n", "NotAfter:", info.NotAfter.UTC().Format(time.RFC3339))   //nolint:forbidigo // CLI output
-	printField("Role", string(info.Role))
+	printField("Role", info.Role)
 	printField("Algorithm", info.Algorithm)
 	printField("Curve", info.CurveName)
 	fmt.Printf("%-14s %v\n", "IsCA:", info.IsCA) //nolint:forbidigo // CLI output

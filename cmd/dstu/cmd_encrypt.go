@@ -48,7 +48,7 @@ Options:
 	recipientDER := mustRead(*cryptCert)
 	content := mustRead(*input)
 
-	result, err := box.EncryptForRecipientDER(content, recipientDER)
+	result, err := box.EncryptDocument(content, recipientDER)
 	if err != nil {
 		fatalf("encrypt: %v", err)
 	}

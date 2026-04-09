@@ -455,4 +455,4 @@ linters:
 
       # Crypto S-boxes and lookup tables are inherently repetitive by definition.
       - linters: [ dupl ]
-        path: '(kalyna|kupyna)/sbox\.go'
+        path: 'pkg/(kalyna|kupyna)/sbox\.go'

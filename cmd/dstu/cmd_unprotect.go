@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"crypto-dstu/keystore"
+	"crypto-dstu/ua"
 )
 
 func runUnprotect(args []string) {
@@ -48,30 +48,14 @@ Options:
 		fatalf("unprotect: read %s: %v", path, err)
 	}
 
-	result, err := keystore.Parse(data, password)
-	if err != nil {
-		result, err = keystore.ParseJKSWithPassword(data, password)
-		if err != nil {
-			fatalf("unprotect: load key: %v", err)
-		}
-	}
-	if len(result.Keys) == 0 {
-		fatalf("unprotect: no private keys found in container")
-	}
-
-	priv := result.Keys[0]
-
-	var out []byte
+	format := "pem"
 	if *asDER {
-		out, err = keystore.MarshalPrivateKeyDER(priv)
-		if err != nil {
-			fatalf("unprotect: marshal DER: %v", err)
-		}
-	} else {
-		out, err = keystore.MarshalPrivateKeyPEM(priv)
-		if err != nil {
-			fatalf("unprotect: marshal PEM: %v", err)
-		}
+		format = "der"
+	}
+
+	out, err := ua.UnprotectKey(data, password, format)
+	if err != nil {
+		fatalf("unprotect: %v", err)
 	}
 
 	mustWrite(*output, out)

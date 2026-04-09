@@ -258,7 +258,7 @@ dstu unprotect -key Key-6.dat:password > key.pem
 | Raw PKCS#8 | `.der`, `.raw` | Unencrypted DER-encoded private key |
 | PEM | `.pem` | PEM-wrapped DER |
 
-Auto-detected by `keystore.Parse`. Format is tried in the order above.
+Format is auto-detected when loading via `box.LoadKeyFile` / `box.LoadKey`.
 
 ---
 
@@ -320,8 +320,8 @@ box.LoadKeyFile("Key-6.dat", "password")
 box.AddCertFile("cert.sign.der")
 box.AddCertFile("cert.cryp.der")
 
-recipientCert, _ := cert.ParseCertificate(recipientDER)
-encrypted, err := box.EncryptDocument(content, recipientCert)
+// recipientDER is the raw DER or PEM bytes of the recipient's certificate
+encrypted, err := box.EncryptDocument(content, recipientDER)
 ```
 
 ### Decrypt
@@ -336,9 +336,8 @@ plain, err := box.DecryptDocument(encrypted)
 ### Sign and encrypt in one step (tax office workflow)
 
 ```go
-recipientCert, _ := cert.ParseCertificate(recipientDER)
-
-container, err := box.SignAndEncrypt(content, recipientCert, ua.SignOptions{
+// recipientDER is the raw DER or PEM bytes of the recipient's certificate
+container, err := box.SignAndEncrypt(content, recipientDER, ua.SignOptions{
     Email:    "me@example.com",
     Filename: "zvit.xml",
 })
@@ -358,90 +357,103 @@ fmt.Printf("Role:   %s\n", info.Role)
 fmt.Printf("Valid:  %s — %s\n", info.NotBefore.Format("2006-01-02"), info.NotAfter.Format("2006-01-02"))
 ```
 
-### Raw primitives
+### Remove password protection from a key
 
-**DSTU 4145 signature:**
+```go
+import "crypto-dstu/ua"
+
+data, _ := os.ReadFile("Key-6.dat")
+keyPEM, err := ua.UnprotectKey(data, "password", "pem")
+// keyPEM contains the raw unencrypted private key in PEM format
+```
+
+---
+
+## Raw primitives
+
+### DSTU 4145 signature
 
 ```go
 import (
     "crypto/rand"
-    "crypto-dstu/dstu4145"
-    "crypto-dstu/ec"
-    "crypto-dstu/kupyna"
+    "crypto-dstu/pkg/dstu4145"
+    "crypto-dstu/pkg/kupyna"
 )
 
-priv, err := dstu4145.GenerateKey(rand.Reader, ec.DSTU_PB_257)
+params := dstu4145.ParamsByName("DSTU_PB_257")
+priv, err := dstu4145.GenerateKey(params.Curve)
 pub := priv.Public() // *dstu4145.PublicKey
 
-// Hash the message with Kupyna-256
+// Hash with Kupyna-256
 h := kupyna.New256()
 h.Write([]byte("hello"))
 digest := h.Sum(nil)
 
-// Sign returns ASN.1-encoded (r, s) via crypto.Signer interface
+// Sign (implements crypto.Signer — returns ASN.1-encoded r,s)
 sigBytes, err := priv.Sign(rand.Reader, digest, nil)
 
-// Unmarshal to *dstu4145.Signature for low-level Verify
+// Verify
 sig, err := dstu4145.UnmarshalSignature(sigBytes, priv.Curve.Words)
-
 ok := dstu4145.Verify(pub, digest, sig)
 ```
 
-**Kupyna hash:**
+### Kupyna hash
 
 ```go
-import "crypto-dstu/kupyna"
+import "crypto-dstu/pkg/kupyna"
 
 h := kupyna.New256()
 h.Write(data)
 digest := h.Sum(nil) // 32 bytes
 ```
 
-**GOST 28147-89 encryption:**
+### GOST 28147-89 encryption
 
 ```go
-import "crypto-dstu/gost28147"
+import "crypto-dstu/pkg/gost28147"
 
 block, err := gost28147.NewCipher(key) // 32-byte key, returns cipher.Block
-// Use with gost28147.NewCFBEncrypter / gost28147.NewCFBDecrypter
-```
-
-**Load a key from any container format:**
-
-```go
-import (
-    "os"
-    "crypto-dstu/keystore"
-)
-
-data, err := os.ReadFile("Key-6.dat")
-result, err := keystore.Parse(data, "password")
-// result.Keys[0] is *dstu4145.PrivateKey, format auto-detected
-// result.Format is keystore.FormatKey6 / FormatJKS / FormatPKCS12 / etc.
+// Use with cipher.NewCFBEncrypter / cipher.NewCFBDecrypter
 ```
 
 ---
 
 ## Package reference
 
+### Public API
+
 | Package | Description |
 |---------|-------------|
-| `gf2m` | Binary field GF(2^m) arithmetic (add, mul, inv, sqr) |
-| `ec` | Elliptic curves over GF(2^m); all 10 DSTU named curves |
-| `kupyna` | DSTU 7564 Kupyna hash: `New256()`, `New384()`, `New512()` |
-| `kalyna` | DSTU 7624 Kalyna block cipher; all 5 key/block variants |
-| `gost28147` | GOST 28147-89 cipher; ECB, CFB, MAC, key-wrap |
-| `gost34311` | GOST 34.311-95 hash |
-| `dstu4145` | DSTU 4145 sign / verify / key generation; `crypto.Signer` |
-| `dstu15946` | EC Diffie-Hellman key agreement + CMS-layer KDF |
-| `keystore` | Key container parser: Key-6.dat, JKS, PKCS#12, raw, PEM |
-| `oid` | Ukrainian PKI OID registry (1.2.804.2.1.1.1.*) |
-| `cert` | X.509v3 certificate parse, chain verify, role detection |
-| `transport` | Ukrainian tax office transport container (Order #499) |
-| `cms` | CMS/PKCS#7 SignedData + EnvelopedData |
-| `tsp` | RFC 3161 Timestamp Protocol client |
-| `ua` | High-level API: `Box`, `SignDocument`, `UnsignDocument`, `EncryptDocument`, `DecryptDocument` |
+| `ua` | High-level API: `Box`, `SignDocument`, `UnsignDocument`, `EncryptDocument`, `DecryptDocument`, `UnprotectKey` |
 | `cmd/dstu` | CLI tool |
+
+### Public primitives (`pkg/`)
+
+Importable by external packages. Suitable for advanced users who need direct access to cryptographic algorithms.
+
+| Package | Description |
+|---------|-------------|
+| `pkg/gf2m` | Binary field GF(2^m) arithmetic (add, mul, inv, sqr) |
+| `pkg/ec` | Elliptic curves over GF(2^m); all 10 DSTU named curves |
+| `pkg/kupyna` | DSTU 7564 Kupyna hash: `New256()`, `New384()`, `New512()` |
+| `pkg/kalyna` | DSTU 7624 Kalyna block cipher; all 5 key/block variants |
+| `pkg/gost28147` | GOST 28147-89 cipher; ECB, CFB, MAC, key-wrap |
+| `pkg/gost34311` | GOST 34.311-95 hash |
+| `pkg/dstu4145` | DSTU 4145 sign / verify / key generation; `crypto.Signer` |
+| `pkg/dstu15946` | EC Diffie-Hellman key agreement + CMS-layer KDF |
+
+### Internal packages (`internal/`)
+
+Protocol and infrastructure layers. Accessible within this module only.
+
+| Package | Description |
+|---------|-------------|
+| `internal/keystore` | Key container parser: Key-6.dat, JKS, PKCS#12, raw, PEM |
+| `internal/oid` | Ukrainian PKI OID registry (1.2.804.2.1.1.1.*) |
+| `internal/cert` | X.509v3 certificate parse, chain verify, role detection |
+| `internal/transport` | Ukrainian tax office transport container (Order #499) |
+| `internal/cms` | CMS/PKCS#7 SignedData + EnvelopedData |
+| `internal/tsp` | RFC 3161 Timestamp Protocol client |
 
 ---
 

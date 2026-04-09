@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"crypto-dstu/cert"
-	"crypto-dstu/keystore"
+	"crypto-dstu/internal/cert"
+	"crypto-dstu/internal/keystore"
 )
 
 // CertInfo holds human-readable fields extracted from a certificate.
@@ -21,7 +21,7 @@ type CertInfo struct {
 	Email        string    `json:"email"`
 	NotBefore    time.Time `json:"notBefore"`
 	NotAfter     time.Time `json:"notAfter"`
-	Role         cert.Role `json:"role"`
+	Role         string    `json:"role"`
 	IsCA         bool      `json:"isCA"`
 	Algorithm    string    `json:"algorithm"`
 	CurveName    string    `json:"curveName"`
@@ -52,7 +52,7 @@ func certInfoFromCert(c *cert.Certificate) *CertInfo {
 		Email:        ci.Email,
 		NotBefore:    ci.NotBefore,
 		NotAfter:     ci.NotAfter,
-		Role:         cert.DetectRole(c),
+		Role:         string(cert.DetectRole(c)),
 		IsCA:         ci.IsCA,
 		Algorithm:    ci.SigAlgOID,
 		CurveName:    ci.CurveOID,

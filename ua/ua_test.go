@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"crypto-dstu/cert"
-	"crypto-dstu/dstu4145"
+	"crypto-dstu/internal/cert"
+	"crypto-dstu/pkg/dstu4145"
 )
 
 // ---- test helpers ----
@@ -49,11 +49,11 @@ func makeBox(t *testing.T) (*Box, *cert.Certificate) {
 	key := mustGenerateKey(t)
 	c := makeCert(t, key)
 	b := NewBox()
-	b.Keys = []*KeyEntry{{
-		PrivateKey: key,
-		SignCert:   c,
-		CryptCert:  c,
-		Role:       cert.RolePersonal,
+	b.keys = []*keyEntry{{
+		privateKey: key,
+		signCert:   c,
+		cryptCert:  c,
+		role:       cert.RolePersonal,
 	}}
 	return b, c
 }
@@ -63,16 +63,16 @@ func makeBox(t *testing.T) (*Box, *cert.Certificate) {
 func TestNewBox(t *testing.T) {
 	b := NewBox()
 	require.NotNil(t, b)
-	require.Empty(t, b.Keys)
-	require.Empty(t, b.CACerts)
-	require.Empty(t, b.TSPClients)
+	require.Empty(t, b.keys)
+	require.Empty(t, b.caCerts)
+	require.Empty(t, b.tspClients)
 }
 
 func TestBoxAddTSP(t *testing.T) {
 	b := NewBox()
 	b.AddTSP("http://tsp.example.com/")
-	require.Len(t, b.TSPClients, 1)
-	require.Equal(t, "http://tsp.example.com/", b.TSPClients[0].URL)
+	require.Len(t, b.tspClients, 1)
+	require.Equal(t, "http://tsp.example.com/", b.tspClients[0].URL)
 }
 
 func TestBoxFirstKeyEmpty(t *testing.T) {
@@ -83,12 +83,11 @@ func TestBoxFirstKeyEmpty(t *testing.T) {
 
 func TestBoxKeyByRole(t *testing.T) {
 	b, _ := makeBox(t)
-	e := b.KeyByRole(cert.RolePersonal)
-	require.NotNil(t, e)
-	require.Equal(t, cert.RolePersonal, e.Role)
+	i := b.KeyByRole("personal")
+	require.Equal(t, 0, i)
 
-	e2 := b.KeyByRole(cert.RoleDirector)
-	require.Nil(t, e2)
+	i2 := b.KeyByRole("director")
+	require.Equal(t, -1, i2)
 }
 
 func TestBoxAddCert(t *testing.T) {
@@ -116,7 +115,7 @@ func TestSignDocumentRawCMS(t *testing.T) {
 	require.Equal(t, content, result.Content)
 	require.Len(t, result.Signers, 1)
 	// The stub cert has no chain — signature math verifies, chain check fails without roots
-	require.NotNil(t, result.Signers[0].Certificate)
+	require.NotNil(t, result.Signers[0].CertInfo)
 }
 
 func TestSignDocumentTransportContainer(t *testing.T) {
@@ -167,7 +166,7 @@ func TestUnsignDocumentRawCMS(t *testing.T) {
 	result, err := b.UnsignDocument(signedDER)
 	require.NoError(t, err)
 	require.Equal(t, content, result.Content)
-	require.NotNil(t, result.Signers[0].Certificate)
+	require.NotNil(t, result.Signers[0].CertInfo)
 }
 
 func TestUnsignDocumentInvalidDER(t *testing.T) {
@@ -182,7 +181,7 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 	b, c := makeBox(t)
 	content := []byte("secret message")
 
-	encDER, err := b.EncryptDocument(content, c)
+	encDER, err := b.encryptDocument(content, c)
 	require.NoError(t, err)
 	require.NotEmpty(t, encDER)
 
@@ -193,7 +192,7 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 
 func TestEncryptDocumentNoKey(t *testing.T) {
 	b := NewBox()
-	_, err := b.EncryptDocument([]byte("data"), &cert.Certificate{})
+	_, err := b.EncryptDocument([]byte("data"), []byte{0x30, 0x00})
 	require.Error(t, err)
 }
 
@@ -209,7 +208,7 @@ func TestSignAndEncryptRoundtrip(t *testing.T) {
 	b, c := makeBox(t)
 	content := []byte("sign and encrypt me")
 
-	container, err := b.SignAndEncrypt(content, c, SignOptions{Filename: "enc.xml"})
+	container, err := b.signAndEncryptWithCert(content, c, SignOptions{Filename: "enc.xml"})
 	require.NoError(t, err)
 	require.NotEmpty(t, container)
 
@@ -221,14 +220,14 @@ func TestSignAndEncryptRoundtrip(t *testing.T) {
 	result, err := b.UnsignDocument(plainSigned)
 	require.NoError(t, err)
 	require.Equal(t, content, result.Content)
-	require.NotNil(t, result.Signers[0].Certificate)
+	require.NotNil(t, result.Signers[0].CertInfo)
 }
 
 func TestSignAndEncryptNoTax(t *testing.T) {
 	b, c := makeBox(t)
 	content := []byte("raw sign+encrypt")
 
-	der, err := b.SignAndEncrypt(content, c, SignOptions{NoTax: true})
+	der, err := b.signAndEncryptWithCert(content, c, SignOptions{NoTax: true})
 	require.NoError(t, err)
 	require.NotEmpty(t, der)
 
@@ -253,7 +252,7 @@ func TestCertInfoFromCert(t *testing.T) {
 	c := makeCert(t, key)
 	info := certInfoFromCert(c)
 	require.NotNil(t, info)
-	require.Equal(t, cert.RoleOther, info.Role) // stub cert has no DRFO/EDRPOU → "other"
+	require.Equal(t, string(cert.RoleOther), info.Role) // stub cert has no DRFO/EDRPOU → "other"
 	require.False(t, info.IsCA)
 }
 
@@ -281,19 +280,4 @@ func TestVerifyCertExpired(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expired")
 	_ = b
-}
-
-func TestVerifyCertPKMatchDirect(t *testing.T) {
-	key := mustGenerateKey(t)
-	c := makeCert(t, key)
-	err := VerifyCertPKMatchDirect(c, key)
-	require.NoError(t, err)
-}
-
-func TestVerifyCertPKMatchDirectWrongKey(t *testing.T) {
-	key1 := mustGenerateKey(t)
-	key2 := mustGenerateKey(t)
-	c := makeCert(t, key1)
-	err := VerifyCertPKMatchDirect(c, key2)
-	require.Error(t, err)
 }

@@ -4,25 +4,25 @@ import (
 	"errors"
 	"os"
 
-	"crypto-dstu/cert"
-	"crypto-dstu/dstu4145"
-	"crypto-dstu/keystore"
-	"crypto-dstu/tsp"
+	"crypto-dstu/internal/cert"
+	"crypto-dstu/internal/keystore"
+	"crypto-dstu/internal/tsp"
+	"crypto-dstu/pkg/dstu4145"
 )
 
-// KeyEntry holds a private key with its associated certificates.
-type KeyEntry struct {
-	PrivateKey *dstu4145.PrivateKey
-	SignCert   *cert.Certificate // signing certificate
-	CryptCert  *cert.Certificate // encryption certificate (may be same as SignCert)
-	Role       cert.Role
+// keyEntry holds a private key with its associated certificates (internal).
+type keyEntry struct {
+	privateKey *dstu4145.PrivateKey
+	signCert   *cert.Certificate
+	cryptCert  *cert.Certificate
+	role       cert.Role
 }
 
 // Box is a stateful context that manages keys, certificates, CA list and TSP config.
 type Box struct {
-	Keys       []*KeyEntry
-	CACerts    []*cert.Certificate
-	TSPClients []*tsp.Client
+	keys       []*keyEntry
+	caCerts    []*cert.Certificate
+	tspClients []*tsp.Client
 }
 
 // NewBox creates an empty Box.
@@ -53,24 +53,24 @@ func (b *Box) LoadKey(data []byte, password string) error {
 	}
 
 	for _, priv := range result.Keys {
-		entry := &KeyEntry{PrivateKey: priv}
+		entry := &keyEntry{privateKey: priv}
 		// Match certs to this key
 		for _, c := range parsedCerts {
 			if cert.VerifyCertPKMatch(c, priv) == nil {
-				if entry.SignCert == nil {
-					entry.SignCert = c
-					entry.CryptCert = c
+				if entry.signCert == nil {
+					entry.signCert = c
+					entry.cryptCert = c
 				}
 			}
 		}
-		if entry.SignCert != nil {
-			entry.Role = cert.DetectRole(entry.SignCert)
+		if entry.signCert != nil {
+			entry.role = cert.DetectRole(entry.signCert)
 		}
-		b.Keys = append(b.Keys, entry)
+		b.keys = append(b.keys, entry)
 	}
 
-	// Add any unmatched certs to CACerts pool
-	b.CACerts = append(b.CACerts, parsedCerts...)
+	// Add any unmatched certs to caCerts pool
+	b.caCerts = append(b.caCerts, parsedCerts...)
 
 	return nil
 }
@@ -91,7 +91,7 @@ func (b *Box) AddCert(der []byte) error {
 	if err != nil {
 		return errors.New("ua: AddCert: " + err.Error())
 	}
-	b.CACerts = append(b.CACerts, c)
+	b.caCerts = append(b.caCerts, c)
 	return nil
 }
 
@@ -105,14 +105,14 @@ func (b *Box) AddCertFile(path string) error {
 }
 
 // LoadCABundle parses a DER or PEM certificate bundle (concatenated certs or PKCS#7 certs-only)
-// and adds all found certificates to the CACerts pool.
+// and adds all found certificates to the CA pool.
 func (b *Box) LoadCABundle(data []byte) error {
 	data = keystore.MaybePEM(data)
 	certs, err := cert.ParseCertificates(data)
 	if err != nil {
 		return errors.New("ua: LoadCABundle: " + err.Error())
 	}
-	b.CACerts = append(b.CACerts, certs...)
+	b.caCerts = append(b.caCerts, certs...)
 	return nil
 }
 
@@ -127,23 +127,54 @@ func (b *Box) LoadCABundleFile(path string) error {
 
 // AddTSP registers a TSP server URL.
 func (b *Box) AddTSP(url string) {
-	b.TSPClients = append(b.TSPClients, tsp.NewClient(url))
+	b.tspClients = append(b.tspClients, tsp.NewClient(url))
 }
 
-// KeyByRole returns the first KeyEntry whose cert role matches, or nil.
-func (b *Box) KeyByRole(role cert.Role) *KeyEntry {
-	for _, e := range b.Keys {
-		if e.Role == role {
-			return e
+// KeyByRole returns the index of the first key whose cert role matches the given string, or -1.
+// Role values: "personal", "fop", "director", "stamp", "other".
+func (b *Box) KeyByRole(role string) int {
+	r := cert.Role(role)
+	for i, e := range b.keys {
+		if e.role == r {
+			return i
 		}
 	}
-	return nil
+	return -1
 }
 
-// firstKey returns the first available KeyEntry, or an error if none loaded.
-func (b *Box) firstKey() (*KeyEntry, error) {
-	if len(b.Keys) == 0 {
+// UnprotectKey parses a key container and returns the raw private key as DER or PEM bytes.
+// format must be "der" or "pem".
+func UnprotectKey(data []byte, password string, format string) ([]byte, error) {
+	result, err := keystore.Parse(data, password)
+	if err != nil {
+		result, err = keystore.ParseJKSWithPassword(data, password)
+		if err != nil {
+			return nil, errors.New("ua: UnprotectKey: " + err.Error())
+		}
+	}
+	if len(result.Keys) == 0 {
+		return nil, errors.New("ua: UnprotectKey: no private keys found in container")
+	}
+	var out []byte
+	switch format {
+	case "der":
+		out, err = keystore.MarshalPrivateKeyDER(result.Keys[0])
+		if err != nil {
+			return nil, errors.New("ua: UnprotectKey: marshal DER: " + err.Error())
+		}
+	default:
+		out, err = keystore.MarshalPrivateKeyPEM(result.Keys[0])
+		if err != nil {
+			return nil, errors.New("ua: UnprotectKey: marshal PEM: " + err.Error())
+		}
+	}
+	return out, nil
+}
+
+// firstKey returns the first available keyEntry, or an error if none loaded.
+func (b *Box) firstKey() (*keyEntry, error) {
+	if len(b.keys) == 0 {
 		return nil, errors.New("ua: no keys loaded")
 	}
-	return b.Keys[0], nil
+	return b.keys[0], nil
 }

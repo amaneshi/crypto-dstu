@@ -78,7 +78,7 @@ Options:
 	var result []byte
 	if *cryptCert != "" {
 		recipientDER := mustRead(*cryptCert)
-		result, err = box.SignAndEncryptDER(content, recipientDER, opts)
+		result, err = box.SignAndEncrypt(content, recipientDER, opts)
 		if err != nil {
 			fatalf("sign+encrypt: %v", err)
 		}
