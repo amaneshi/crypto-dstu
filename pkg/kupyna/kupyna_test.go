@@ -94,6 +94,81 @@ func TestSumDoesNotMutate(t *testing.T) {
 	require.Equal(t, hex.EncodeToString(sum1), hex.EncodeToString(sum2), "Sum must not mutate state")
 }
 
+// TestKMAC256_CryptoniteVector uses the exact test vector from
+// _ref/cryptonite/src/cryptoniteUtest/c/utest_dstu7564.c test_dstu7564_hmac.
+func TestKMAC256_CryptoniteVector(t *testing.T) {
+	key, err := hex.DecodeString("707172737475767778797a7b7c7d7e7f80818283")
+	require.NoError(t, err)
+	msg := []byte("Hello World")
+	exp, err := hex.DecodeString("ac9b3027afaa041cb623b098d51200801432290afa30311d11b2450f3d95d98a")
+	require.NoError(t, err)
+
+	h := NewKMAC256(key)
+	_, err = h.Write(msg)
+	require.NoError(t, err)
+	got := h.Sum(nil)
+	require.Equal(t, exp, got)
+}
+
+func TestKMAC256_SumDoesNotMutate(t *testing.T) {
+	key := []byte("secretkey")
+	msg := []byte("test message")
+	h := NewKMAC256(key)
+	h.Write(msg)
+	s1 := h.Sum(nil)
+	s2 := h.Sum(nil)
+	require.Equal(t, s1, s2, "Sum must not mutate KMAC state")
+}
+
+func TestKMAC256_ResetPreservesKey(t *testing.T) {
+	key, _ := hex.DecodeString("707172737475767778797a7b7c7d7e7f80818283")
+	msg := []byte("Hello World")
+	exp, _ := hex.DecodeString("ac9b3027afaa041cb623b098d51200801432290afa30311d11b2450f3d95d98a")
+
+	h := NewKMAC256(key)
+	h.Write([]byte("something else entirely"))
+	h.Reset()
+	h.Write(msg)
+	got := h.Sum(nil)
+	require.Equal(t, exp, got, "Reset must restore keyed initial state")
+}
+
+func TestKMAC256_DifferentKeysDifferentMAC(t *testing.T) {
+	key1 := []byte("key1")
+	key2 := []byte("key2")
+	msg := []byte("same message")
+
+	h1 := NewKMAC256(key1)
+	h1.Write(msg)
+	h2 := NewKMAC256(key2)
+	h2.Write(msg)
+	require.NotEqual(t, h1.Sum(nil), h2.Sum(nil), "different keys must produce different MACs")
+}
+
+func TestKMAC256_EmptyKey(t *testing.T) {
+	h := NewKMAC256([]byte{})
+	_, err := h.Write([]byte("msg"))
+	require.NoError(t, err)
+	got := h.Sum(nil)
+	require.Len(t, got, 32)
+}
+
+func TestKMAC512_Size(t *testing.T) {
+	key := []byte("key")
+	h := NewKMAC512(key)
+	h.Write([]byte("data"))
+	got := h.Sum(nil)
+	require.Len(t, got, 64)
+}
+
+func TestKMAC384_Size(t *testing.T) {
+	key := []byte("key")
+	h := NewKMAC384(key)
+	h.Write([]byte("data"))
+	got := h.Sum(nil)
+	require.Len(t, got, 48)
+}
+
 func BenchmarkKupyna256_1K(b *testing.B) {
 	data := make([]byte, 1024)
 	b.SetBytes(int64(len(data)))

@@ -28,3 +28,6 @@ coverage.html
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary reference clones
+_ref/
