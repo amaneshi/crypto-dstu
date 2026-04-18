@@ -9,11 +9,13 @@ Pure Go implementation of Ukrainian national cryptographic standards for digital
 | DSTU 4145-2002 | Digital signature over elliptic curves GF(2^m); all 10 named curves |
 | DSTU 7564:2014 | Kupyna hash function (256 / 384 / 512-bit) |
 | DSTU 7624:2014 | Kalyna block cipher (all 5 variants) |
-| GOST 28147-89 | Block cipher, Ukrainian S-box; ECB / CFB / MAC / key-wrap |
+| GOST 28147-89 | Block cipher, Ukrainian S-box; ECB / CFB / CTR (gamma) / MAC / key-wrap |
 | GOST 34.311-95 | Hash function |
 | DSTU ISO/IEC 15946-3 | Elliptic-curve key agreement (ECDH) |
 | CMS / PKCS#7 | SignedData (CAdES-BES) + EnvelopedData |
 | RFC 3161 | Timestamp Protocol (TSP) |
+| RFC 2986 | PKCS#10 Certificate Signing Request |
+| RFC 6960 | Online Certificate Status Protocol (OCSP) |
 | Order #499 | Ukrainian tax office transport container format |
 
 No CGo. No external cryptographic dependencies.
@@ -413,7 +415,69 @@ digest := h.Sum(nil) // 32 bytes
 import "crypto-dstu/pkg/gost28147"
 
 block, err := gost28147.NewCipher(key) // 32-byte key, returns cipher.Block
-// Use with cipher.NewCFBEncrypter / cipher.NewCFBDecrypter
+// CFB mode
+stream := cipher.NewCFBEncrypter(block, iv)
+// CTR (gamma) mode
+stream, err = gost28147.NewCTR(block, iv) // iv must be 8 bytes
+```
+
+### HMAC
+
+```go
+import "crypto-dstu/pkg/hmac"
+
+// Generic HMAC (works with any hash.Hash factory)
+mac := hmac.New(sha256.New, key)
+mac.Write(data)
+tag := mac.Sum(nil)
+
+// HMAC-GOST34311 (Ukrainian standard; sync = 32-byte IV, nil → zero)
+mac = hmac.NewGOST34311(key, nil)
+mac.Write(data)
+tag = mac.Sum(nil)
+
+// HMAC-Kupyna
+mac = hmac.NewKupyna256(key)
+mac = hmac.NewKupyna512(key)
+```
+
+### PKCS#10 Certificate Signing Request
+
+```go
+import (
+    "crypto-dstu/internal/csr"
+    "crypto-dstu/internal/oid"
+    "crypto-dstu/pkg/dstu4145"
+    "crypto-dstu/pkg/ec"
+)
+
+priv, _ := dstu4145.GenerateKey(ec.DSTU_PB_257())
+
+der, err := csr.Create(&csr.Request{
+    Subject: []csr.AttributeTypeAndValue{
+        {Type: oid.OIDCommonName, Value: "Іваненко Іван"},
+        {Type: oid.EDRPOU,       Value: "12345678"},
+    },
+}, priv)
+
+// Parse and verify
+parsed, err := csr.Parse(der)
+err = parsed.Verify()
+```
+
+### OCSP certificate status check
+
+```go
+import "crypto-dstu/internal/ocsp"
+
+client := &ocsp.Client{} // URL taken from cert AIA extension
+resp, err := client.Check(subjectCert, issuerCert)
+if resp.Responses[0].Status == ocsp.Good {
+    // certificate is valid
+}
+
+// Or extract AIA OCSP URLs manually
+urls := ocsp.AIAOCSPURLs(cert)
 ```
 
 ---
@@ -435,12 +499,13 @@ Importable by external packages. Suitable for advanced users who need direct acc
 |---------|-------------|
 | `pkg/gf2m` | Binary field GF(2^m) arithmetic (add, mul, inv, sqr) |
 | `pkg/ec` | Elliptic curves over GF(2^m); all 10 DSTU named curves |
-| `pkg/kupyna` | DSTU 7564 Kupyna hash: `New256()`, `New384()`, `New512()` |
-| `pkg/kalyna` | DSTU 7624 Kalyna block cipher; all 5 key/block variants |
-| `pkg/gost28147` | GOST 28147-89 cipher; ECB, CFB, MAC, key-wrap |
+| `pkg/kupyna` | DSTU 7564 Kupyna hash (`New256/384/512`) + KMAC256/384/512 |
+| `pkg/kalyna` | DSTU 7624 Kalyna block cipher; all 5 key/block variants + CTR/CBC/CFB/OFB/CMAC/XTS/KW |
+| `pkg/gost28147` | GOST 28147-89 cipher; ECB, CFB, CTR (gamma), MAC, key-wrap |
 | `pkg/gost34311` | GOST 34.311-95 hash |
 | `pkg/dstu4145` | DSTU 4145 sign / verify / key generation; `crypto.Signer` |
 | `pkg/dstu15946` | EC Diffie-Hellman key agreement + CMS-layer KDF |
+| `pkg/hmac` | HMAC wrapper: generic `New`, `NewGOST34311`, `NewKupyna256`, `NewKupyna512` |
 
 ### Internal packages (`internal/`)
 
@@ -454,6 +519,8 @@ Protocol and infrastructure layers. Accessible within this module only.
 | `internal/transport` | Ukrainian tax office transport container (Order #499) |
 | `internal/cms` | CMS/PKCS#7 SignedData + EnvelopedData |
 | `internal/tsp` | RFC 3161 Timestamp Protocol client |
+| `internal/csr` | PKCS#10 CSR build, sign, parse, verify (DSTU 4145 + EDRPOU/DRFO) |
+| `internal/ocsp` | RFC 6960 OCSP request/response + HTTP client with AIA extraction |
 
 ---
 

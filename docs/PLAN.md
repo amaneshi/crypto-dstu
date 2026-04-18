@@ -432,15 +432,26 @@ crypto-dstu/
 - [x] HMAC-GOST34311 cryptonite reference vector passes; Reset preserves keyed state
 - [x] 0 lint issues (`task lint` clean)
 
-### Phase 19 — OCSP Client & PKCS#10 CSR `[internal/ocsp/, internal/csr/]` ⬜ Planned
+### Phase 19 — OCSP Client & PKCS#10 CSR `[internal/ocsp/, internal/csr/]` ✅ Complete
 > **Reference:** `_ref/cryptonite/src/pkix/c/api/ocsp_*.h`, `certification_request.h`
 
-- [ ] OCSP request build + DER marshal (`internal/ocsp`)
-- [ ] OCSP response parse + signature verify
-- [ ] HTTP client with AIA URL extraction from certificate
-- [ ] PKCS#10 CSR build + sign with DSTU 4145 key (`internal/csr`)
-- [ ] CSR parse + self-signature verify
-- [ ] Ukrainian DN attributes (EDRPOU, DRFO) survive CSR round-trip
+- [x] OCSP request build + DER marshal — `internal/ocsp/request.go`
+  - `CertID` constructed from subject + issuer cert, hash by OID (Kupyna-256/384/512, GOST34311)
+  - `Request.Marshal()` produces RFC 6960 `OCSPRequest` DER
+- [x] OCSP response parse + signature verify — `internal/ocsp/response.go`
+  - `ParseResponse(der)` → `Response` with `Good`/`Revoked`/`Unknown` + times
+  - `Response.Verify(issuer)` — DSTU 4145 signature check over `TBSResponseData`
+- [x] HTTP client with AIA URL extraction — `internal/ocsp/client.go`
+  - `Client.Check(subject, issuer)` — POST to AIA OCSP URL or configured override
+  - `AIAOCSPURLs(cert)` — extracts `uniformResourceIdentifier` entries from AIA extension
+- [x] PKCS#10 CSR build + sign with DSTU 4145 key — `internal/csr/csr.go`
+  - `Create(req, priv)` — builds CRI, hashes, signs, marshals DER
+  - Uncompressed x‖y SPKI encoding for exact public-key recovery on parse
+  - Sig alg OID defaults from curve params; override supported
+- [x] CSR parse + self-signature verify
+  - `Parse(der)` → `ParsedRequest`; `Verify()` re-hashes CRI and checks DSTU sig
+- [x] Ukrainian DN attributes (EDRPOU, DRFO) survive CSR round-trip
+- [x] 9 OCSP tests + 6 CSR tests; 0 lint issues (`task lint` clean)
 
 ---
 
@@ -466,7 +477,7 @@ crypto-dstu/
 | 16 | `pkg/kupyna` (KMAC) | ✅ Complete | KMAC256/384/512; cryptonite-exact construction; all vectors pass |
 | 17 | `pkg/kalyna` (modes) | ✅ Complete | CTR/CBC/CFB/OFB/CMAC/XTS/KW; cryptonite-exact; 0 lint issues; GCM deferred |
 | 18 | `pkg/gost28147/` (CTR) + `pkg/hmac/` | ✅ Complete | CTR mode (C1/C2 constants, 24-byte gamma, cryptonite-exact); HMAC-GOST34311/Kupyna256/512 |
-| 19 | `internal/ocsp/` + `internal/csr/` | ⬜ Planned | New; OCSP revocation + PKCS#10 CSR |
+| 19 | `internal/ocsp/` + `internal/csr/` | ✅ Complete | PKCS#10 CSR (Create/Parse/Verify, EDRPOU/DRFO round-trip); OCSP request/response/client |
 
 ### Dependency Graph
 
