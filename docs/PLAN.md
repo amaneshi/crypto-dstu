@@ -417,14 +417,20 @@ crypto-dstu/
 - [x] 0 lint issues (`task lint` clean)
 - [ ] GCM AEAD + GMAC — deferred to future phase (requires full GF(2^m) GHASH)
 
-### Phase 18 — GOST 28147 CTR Mode & HMAC `[pkg/gost28147/, pkg/hmac/]` ⬜ Planned
+### Phase 18 — GOST 28147 CTR Mode & HMAC `[pkg/gost28147/, pkg/hmac/]` ✅ Complete
 > **Reference:** `_ref/cryptonite/src/cryptonite/c/gost28147.h`, `hmac.h`
 
-- [ ] GOST 28147 CTR (gamma) mode — `NewCTR(block, iv) cipher.Stream`
-- [ ] CTR counter increment constants match cryptonite (C1=0x01010101, C2=0x01010104)
-- [ ] New `pkg/hmac` package: generic `New(h, key)` + `NewGOST34311`, `NewKupyna256`, `NewKupyna512`
-- [ ] HMAC-GOST34311 supports `sync` parameter (8-byte IV)
-- [ ] Test vectors from cryptonite unit tests
+- [x] GOST 28147 CTR (gamma) mode — `NewCTR(block, iv) cipher.Stream` — `pkg/gost28147/ctr.go`
+  - Feed: 6 uint32s (24 bytes); IV → feed[4:6] → ECB-encrypt → seed
+  - `ctr_next_feed`: C1=0x01010101, C2=0x01010104 with carry (GOST §8)
+  - Gamma generated as 3 ECB blocks; byte-level offset for partial use
+- [x] `SboxGOST34311` (RFC 4357 GostR3411-94-TestParamSet / SBOX_ID_11) added to `pkg/gost28147/sbox.go`
+- [x] CTR test vectors from cryptonite `utest_gost28147.c` pass (basic, incremental, multi-block)
+- [x] `pkg/hmac`: `New(factory, key)`, `Equal(mac1, mac2)` — `pkg/hmac/hmac.go`
+- [x] `NewGOST34311(key, sync)` — HMAC-GOST34311-95 with SboxDSTU + 32-byte sync vector
+- [x] `NewKupyna256(key)`, `NewKupyna512(key)`
+- [x] HMAC-GOST34311 cryptonite reference vector passes; Reset preserves keyed state
+- [x] 0 lint issues (`task lint` clean)
 
 ### Phase 19 — OCSP Client & PKCS#10 CSR `[internal/ocsp/, internal/csr/]` ⬜ Planned
 > **Reference:** `_ref/cryptonite/src/pkix/c/api/ocsp_*.h`, `certification_request.h`
@@ -459,7 +465,7 @@ crypto-dstu/
 | 15 | `README.md` | ✅ Complete | Root docs; depends on Phase 14 |
 | 16 | `pkg/kupyna` (KMAC) | ✅ Complete | KMAC256/384/512; cryptonite-exact construction; all vectors pass |
 | 17 | `pkg/kalyna` (modes) | ✅ Complete | CTR/CBC/CFB/OFB/CMAC/XTS/KW; cryptonite-exact; 0 lint issues; GCM deferred |
-| 18 | `pkg/gost28147/` (CTR) + `pkg/hmac/` | ⬜ Planned | Extends Phase 4; cryptonite gap |
+| 18 | `pkg/gost28147/` (CTR) + `pkg/hmac/` | ✅ Complete | CTR mode (C1/C2 constants, 24-byte gamma, cryptonite-exact); HMAC-GOST34311/Kupyna256/512 |
 | 19 | `internal/ocsp/` + `internal/csr/` | ⬜ Planned | New; OCSP revocation + PKCS#10 CSR |
 
 ### Dependency Graph
