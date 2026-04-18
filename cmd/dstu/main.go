@@ -21,6 +21,10 @@ func main() {
 		runEncrypt(os.Args[2:])
 	case "certinfo":
 		runCertInfo(os.Args[2:])
+	case "csr":
+		runCSR(os.Args[2:])
+	case "ocsp":
+		runOCSP(os.Args[2:])
 	case "unprotect":
 		runUnprotect(os.Args[2:])
 	case "-h", "--help", "help":
@@ -40,6 +44,8 @@ commands:
   decrypt     Decrypt and/or verify an incoming document
   encrypt     Encrypt a document for a recipient
   certinfo    Print certificate information
+  csr         Generate a PKCS#10 Certificate Signing Request
+  ocsp        Check certificate revocation status via OCSP
   unprotect   Remove password protection from a key container
 
 Run "dstu <command> -h" for command-specific help.

@@ -227,6 +227,68 @@ dstu certinfo -cert cert.sign.der -json
 
 ---
 
+### Generate a Certificate Signing Request
+
+```bash
+# Generate a fresh key + CSR for a Ukrainian entity:
+dstu csr \
+  -cn "Іваненко Іван Іванович" \
+  -org "ТОВ Приклад" \
+  -country UA \
+  -edrpou 12345678 \
+  -output request.csr.der
+
+# Use an existing key:
+dstu csr \
+  -key Key-6.dat:password \
+  -cn "Іваненко Іван" \
+  -output request.csr.der
+```
+
+#### `dstu csr` flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-key path[:password]` | | Existing key container (optional; fresh key generated if omitted) |
+| `-curve name` | `DSTU_PB_257` | Curve for generated key |
+| `-cn value` | | Common name (Subject CN) |
+| `-org value` | | Organisation (Subject O) |
+| `-country value` | | Country code (Subject C) |
+| `-edrpou value` | | EDRPOU code |
+| `-drfo value` | | DRFO personal tax number |
+| `-output path` | stdout | Output DER file |
+
+---
+
+### Check certificate revocation status (OCSP)
+
+```bash
+dstu ocsp \
+  -cert cert.sign.der \
+  -issuer issuer.cer
+```
+
+With explicit responder URL:
+
+```bash
+dstu ocsp \
+  -cert cert.sign.der \
+  -issuer issuer.cer \
+  -url http://ocsp.acsk.privatbank.ua
+```
+
+Exit codes: `0` = good, `2` = revoked, `3` = unknown.
+
+#### `dstu ocsp` flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-cert path` | required | Certificate to check |
+| `-issuer path` | required | Issuer certificate |
+| `-url url` | | Override OCSP responder URL (default: from AIA extension) |
+
+---
+
 ### Remove password from key container
 
 ```bash
