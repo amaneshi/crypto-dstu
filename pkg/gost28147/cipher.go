@@ -121,6 +121,39 @@ func (g *gostCipher) MAC(data []byte, nbits int) []byte {
 	return buf[:nbytes]
 }
 
+// encrypt2 encrypts two uint32 words in-place (matches base_cycle8 for 2 words / 8 bytes).
+// Used by CTR init to encrypt the IV words.
+func (g *gostCipher) encrypt2(n0, n1 *uint32) {
+	s := g.sbox
+	a, b := *n0, *n1
+	for range 3 {
+		b ^= s.pass(a + g.k[0])
+		a ^= s.pass(b + g.k[1])
+		b ^= s.pass(a + g.k[2])
+		a ^= s.pass(b + g.k[3])
+		b ^= s.pass(a + g.k[4])
+		a ^= s.pass(b + g.k[5])
+		b ^= s.pass(a + g.k[6])
+		a ^= s.pass(b + g.k[7])
+	}
+	b ^= s.pass(a + g.k[7])
+	a ^= s.pass(b + g.k[6])
+	b ^= s.pass(a + g.k[5])
+	a ^= s.pass(b + g.k[4])
+	b ^= s.pass(a + g.k[3])
+	a ^= s.pass(b + g.k[2])
+	b ^= s.pass(a + g.k[1])
+	a ^= s.pass(b + g.k[0])
+	*n1, *n0 = a, b
+}
+
+// encryptWords encrypts 6 uint32 words (3 GOST blocks) in-place for CTR gamma generation.
+func (g *gostCipher) encryptWords(w []uint32) {
+	for i := 0; i < len(w); i += 2 {
+		g.encrypt2(&w[i], &w[i+1])
+	}
+}
+
 // mac64 applies 2 rounds (16 passes) of the cipher to the MAC accumulator.
 // Output convention matches cryptonite MAC_KEY_ORDER: buf[0:4]=n1, buf[4:8]=n0
 // (same swap as Encrypt output, so MAC result is consistent with block output).

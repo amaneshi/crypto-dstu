@@ -147,6 +147,83 @@ func TestMultipleEncryptDecrypt(t *testing.T) {
 	}
 }
 
+// TestCTR verifies GOST 28147 CTR mode against cryptonite reference vector.
+// Reference: cryptonite utest_gost28147.c gost28147_ctr_test (SBOX_ID_11).
+func TestCTR(t *testing.T) {
+	key := mustHex("0100000002000000030000000400000005000000060000000700000008000000")
+	iv := mustHex("0300000003000000")
+	data := mustHex("0102030405060708090a0b0c0d0e0f101112131415161718")
+	exp := mustHex("da21005efbea34aa48d17ebf1c4f52a18eca42d3ff4b46f4")
+
+	block, err := NewCipherWithSbox(key, SboxGOST34311)
+	require.NoError(t, err)
+
+	stream, err := NewCTR(block, iv)
+	require.NoError(t, err)
+
+	got := make([]byte, len(data))
+	stream.XORKeyStream(got, data)
+	require.Equal(t, exp, got, "CTR encrypt")
+
+	block2, err := NewCipherWithSbox(key, SboxGOST34311)
+	require.NoError(t, err)
+	stream2, err := NewCTR(block2, iv)
+	require.NoError(t, err)
+	plain := make([]byte, len(got))
+	stream2.XORKeyStream(plain, got)
+	require.Equal(t, data, plain, "CTR decrypt (self-inverse)")
+}
+
+// TestCTRIncremental verifies that CTR mode is byte-by-byte resumable.
+// Reference: cryptonite utest_gost28147.c gost28147_ctr_2_test (SBOX_ID_11).
+func TestCTRIncremental(t *testing.T) {
+	key := mustHex("0100000002000000030000000400000005000000060000000700000008000000")
+	iv := mustHex("0300000003000000")
+	data1 := mustHex("010203")
+	data2 := mustHex("0405060708090a0b0c0d0e0f101112131415161718")
+	exp := mustHex("da21005efbea34aa48d17ebf1c4f52a18eca42d3ff4b46f4")
+
+	block, err := NewCipherWithSbox(key, SboxGOST34311)
+	require.NoError(t, err)
+	stream, err := NewCTR(block, iv)
+	require.NoError(t, err)
+
+	c1 := make([]byte, len(data1))
+	stream.XORKeyStream(c1, data1)
+	c2 := make([]byte, len(data2))
+	stream.XORKeyStream(c2, data2)
+	got := make([]byte, 0, len(c1)+len(c2))
+	got = append(got, c1...)
+	got = append(got, c2...)
+	require.Equal(t, exp, got, "CTR incremental encrypt")
+}
+
+// TestCTRLong verifies CTR mode across multiple 24-byte gamma blocks.
+// Reference: cryptonite utest_gost28147.c gost28147_ctr_3_test (SBOX_ID_11).
+func TestCTRLong(t *testing.T) {
+	key := mustHex("0100000002000000030000000400000005000000060000000700000008000000")
+	iv := mustHex("0300000003000000")
+	data := mustHex(
+		"0102030405060708090a0b0c0d0e0f101112131415161718" +
+			"191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f" +
+			"303132333435363738393a3b3c3d3e3f40",
+	)
+	exp := mustHex(
+		"da21005efbea34aa48d17ebf1c4f52a18eca42d3ff4b46f4" +
+			"0bd18016490ddff6e446981c559778e4273350c755e2113d" +
+			"d8c2533450b2d481d004af84b8daa2cc",
+	)
+
+	block, err := NewCipherWithSbox(key, SboxGOST34311)
+	require.NoError(t, err)
+	stream, err := NewCTR(block, iv)
+	require.NoError(t, err)
+
+	got := make([]byte, len(data))
+	stream.XORKeyStream(got, data)
+	require.Equal(t, exp, got, "CTR long encrypt")
+}
+
 // TestCFBKnownVector uses a known-good CFB vector to verify correctness.
 // This tests that the same key+iv+plaintext always produces the same ciphertext.
 func TestCFBDeterministic(t *testing.T) {
