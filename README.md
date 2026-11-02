@@ -557,6 +557,11 @@ parsed, err := csr.Parse(der)
 err = parsed.Verify()
 ```
 
+CSR output uses the national compressed-key and signature encodings, including
+GOST ONB requests on all five standard ONB curves. Older library CSRs remain
+readable. See [CSR encoding and validation](docs/csr.md) for the exact coverage
+and compatibility change.
+
 ### OCSP certificate status check
 
 ```go
@@ -656,7 +661,7 @@ the current matrix does not establish production readiness or support for
 untested profiles.
 
 - [ ] **Additional provider profiles:** resolve ONB certificate/CMS interoperability
-  with the pinned IIT SDK and validate ONB CSR and modern Kupyna/Kalyna encodings
+  with the pinned IIT SDK and validate modern ONB Kupyna/Kalyna encodings
   before enabling them. Smaller PB modern encryption combinations and arbitrary
   Unicode/provider password compatibility remain unverified. ONB arithmetic and
   GOST paths now have independent Cryptonite vectors; see [ONB coverage](docs/onb.md).

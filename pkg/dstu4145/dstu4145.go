@@ -86,14 +86,14 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 
 	// Convert the digest to a field element (m bits), not an order-sized integer.
 	h := truncate(digest, curve.M, curve.Words)
+	h, err := curve.DecodeField(h)
+	if err != nil {
+		return nil, err
+	}
 	if h.IsZero() {
 		// h = 1 per jkurwa spec
 		one, _ := gf2m.FromHex("1", curve.Words)
 		h = one
-	}
-	h, err := curve.DecodeField(h)
-	if err != nil {
-		return nil, err
 	}
 
 	for {
@@ -156,13 +156,13 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 
 	// Truncate hash
 	h := truncate(digest, curve.M, curve.Words)
-	if h.IsZero() {
-		one, _ := gf2m.FromHex("1", curve.Words)
-		h = one
-	}
 	h, err := curve.DecodeField(h)
 	if err != nil {
 		return false
+	}
+	if h.IsZero() {
+		one, _ := gf2m.FromHex("1", curve.Words)
+		h = one
 	}
 
 	// r_int from signature field element

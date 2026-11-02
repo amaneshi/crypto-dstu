@@ -4,15 +4,14 @@
 package csr
 
 import (
-	"crypto"
+	"bytes"
 	"crypto/rand"
 	"encoding/asn1"
 	"errors"
+	"math/big"
 
 	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
-	"github.com/amaneshi/crypto-dstu/pkg/ec"
-	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
 	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
@@ -33,7 +32,7 @@ type certificationRequestInfo struct {
 	Version   int
 	Subject   asn1.RawValue
 	PublicKey subjectPublicKeyInfo
-	// Attributes [0] IMPLICIT Attributes OPTIONAL
+	// Required for national output; absent only in legacy library requests.
 	Attributes asn1.RawValue `asn1:"tag:0,optional"`
 }
 
@@ -55,17 +54,17 @@ type Request struct {
 	// Use oid.OIDCommonName, oid.EDRPOU, oid.DRFO etc. as Type.
 	Subject []AttributeTypeAndValue
 	// SignatureAlgorithmOID overrides the default derived from the key's curve.
-	// Leave nil to use the curve's recommended hash OID (GOST34311 or Kupyna256).
+	// Leave nil to use the curve's GOST PB/ONB signature algorithm.
 	SignatureAlgorithmOID asn1.ObjectIdentifier
 }
 
 // Create builds, signs, and returns a DER-encoded PKCS#10 CSR.
 func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
-	if priv == nil || priv.Curve == nil {
-		return nil, errors.New("csr: missing private key")
+	if req == nil || priv == nil || priv.Curve == nil || priv.D == nil {
+		return nil, errors.New("csr: missing request or private key")
 	}
-	if priv.Curve.IsONB() {
-		return nil, errors.New("csr: ONB CSR profile is not supported")
+	if priv.D.Sign() <= 0 || priv.D.Cmp(new(big.Int).SetBytes(priv.Curve.N)) >= 0 {
+		return nil, errors.New("csr: private scalar out of range")
 	}
 	privKey := priv
 
@@ -78,6 +77,9 @@ func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
 		}
 		sigAlgOID = params.HashOID
 	}
+	if err := checkSignatureProfile(sigAlgOID, priv.Curve); err != nil {
+		return nil, err
+	}
 
 	// Build Subject DER (SEQUENCE of SET of SEQUENCE{OID, UTF8String}).
 	subjectDER, err := buildSubjectDER(req.Subject)
@@ -86,7 +88,7 @@ func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
 	}
 
 	// Build SubjectPublicKeyInfo.
-	spki, err := buildSPKI(privKey)
+	spki, err := buildNationalSPKI(privKey, sigAlgOID)
 	if err != nil {
 		return nil, errors.New("csr: building SPKI: " + err.Error())
 	}
@@ -98,15 +100,23 @@ func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
 	}
 
 	// Hash the CRI.
-	digest, err := hashData(criDER, sigAlgOID)
+	digest, err := hashNational(criDER, sigAlgOID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Sign.
-	sigDER, err := priv.Sign(rand.Reader, digest, crypto.Hash(0))
+	sig, err := dstu4145.Sign(rand.Reader, priv, digest)
 	if err != nil {
 		return nil, errors.New("csr: signing: " + err.Error())
+	}
+	rawSignature, err := dstu4145.MarshalSignatureRaw(sig, priv.Curve)
+	if err != nil {
+		return nil, err
+	}
+	sigDER, err := asn1.Marshal(rawSignature)
+	if err != nil {
+		return nil, err
 	}
 
 	// Encode the outer CertificationRequest.
@@ -128,10 +138,14 @@ type ParsedRequest struct {
 	PublicKey       *dstu4145.PublicKey
 	SignatureAlgOID asn1.ObjectIdentifier
 	SignatureBytes  []byte
+	national        bool
 }
 
 // Parse parses a DER-encoded PKCS#10 CertificationRequest.
 func Parse(der []byte) (*ParsedRequest, error) {
+	if len(der) == 0 || len(der) > 1<<20 {
+		return nil, errors.New("csr: invalid request size")
+	}
 	var cr certificationRequest
 	rest, err := asn1.Unmarshal(der, &cr)
 	if err != nil {
@@ -140,19 +154,39 @@ func Parse(der []byte) (*ParsedRequest, error) {
 	if len(rest) != 0 {
 		return nil, errors.New("csr: parse: trailing data")
 	}
+	canonical, err := asn1.Marshal(cr)
+	if err != nil || !bytes.Equal(canonical, der) || cr.Signature.BitLength != len(cr.Signature.Bytes)*8 {
+		return nil, errors.New("csr: malformed request encoding")
+	}
 
 	criRaw := cr.CertificationRequestInfo.FullBytes
 
 	var cri certificationRequestInfo
-	if _, err = asn1.Unmarshal(criRaw, &cri); err != nil {
-		return nil, errors.New("csr: parse CRI: " + err.Error())
+	if rest, parseErr := asn1.Unmarshal(criRaw, &cri); parseErr != nil || len(rest) != 0 {
+		return nil, errors.New("csr: malformed request information")
+	}
+	canonical, err = asn1.Marshal(cri)
+	if err != nil || !bytes.Equal(canonical, criRaw) || cri.Version != 0 {
+		return nil, errors.New("csr: unsupported or malformed request information")
+	}
+	if err = validateRequestInfo(cri); err != nil {
+		return nil, err
 	}
 
 	subject := parseSubject(cri.Subject)
 
-	pub, err := parsePublicKeyFromSPKI(cri.PublicKey)
+	pub, national, err := parseNationalOrLegacySPKI(cri.PublicKey)
 	if err != nil {
 		return nil, errors.New("csr: parse public key: " + err.Error())
+	}
+	if err = checkSignatureProfile(cr.SignatureAlgorithm.Algorithm, pub.Curve); err != nil {
+		return nil, err
+	}
+	if len(cr.SignatureAlgorithm.Parameters.FullBytes) != 0 && !bytes.Equal(cr.SignatureAlgorithm.Parameters.FullBytes, []byte{5, 0}) {
+		return nil, errors.New("csr: unsupported signature parameters")
+	}
+	if national && (!cr.SignatureAlgorithm.Algorithm.Equal(cri.PublicKey.Algorithm.Algorithm) || cri.Attributes.Class != 2 || cri.Attributes.Tag != 0 || !cri.Attributes.IsCompound) {
+		return nil, errors.New("csr: inconsistent national request profile")
 	}
 
 	return &ParsedRequest{
@@ -162,21 +196,41 @@ func Parse(der []byte) (*ParsedRequest, error) {
 		PublicKey:       pub,
 		SignatureAlgOID: cr.SignatureAlgorithm.Algorithm,
 		SignatureBytes:  cr.Signature.Bytes,
+		national:        national,
 	}, nil
 }
 
 // Verify checks the self-signature on the parsed CSR.
 func (r *ParsedRequest) Verify() error {
-	if r.PublicKey == nil {
+	if r == nil || r.PublicKey == nil || r.PublicKey.Curve == nil {
 		return errors.New("csr: verify: no public key")
 	}
 
-	digest, err := hashData(r.CRIRaw, r.SignatureAlgOID)
+	if err := checkSignatureProfile(r.SignatureAlgOID, r.PublicKey.Curve); err != nil {
+		return err
+	}
+	hasher := hashData
+	if r.national {
+		hasher = hashNational
+	}
+	digest, err := hasher(r.CRIRaw, r.SignatureAlgOID)
 	if err != nil {
 		return errors.New("csr: verify: hash: " + err.Error())
 	}
 
-	sig, err := dstu4145.UnmarshalSignature(r.SignatureBytes, r.PublicKey.Curve.Words)
+	var sig *dstu4145.Signature
+	if r.national {
+		var raw []byte
+		var rest []byte
+		rest, err = asn1.Unmarshal(r.SignatureBytes, &raw)
+		if err == nil && len(rest) == 0 {
+			sig, err = dstu4145.UnmarshalSignatureRaw(raw, r.PublicKey.Curve)
+		} else {
+			return errors.New("csr: invalid national signature wrapper")
+		}
+	} else {
+		sig, err = dstu4145.UnmarshalSignature(r.SignatureBytes, r.PublicKey.Curve.Words)
+	}
 	if err != nil {
 		return errors.New("csr: verify: unmarshal signature: " + err.Error())
 	}
@@ -228,56 +282,13 @@ func buildSubjectDER(attrs []AttributeTypeAndValue) ([]byte, error) {
 	})
 }
 
-// buildSPKI builds a SubjectPublicKeyInfo for a DSTU 4145 public key.
-// Encoding: algorithm = DSTU4145WithGOST34311 + curve OID parameter;
-// public key = compressed point (x-coordinate, big-endian, zero-padded to ceil(m/8)).
-func buildSPKI(priv *dstu4145.PrivateKey) (subjectPublicKeyInfo, error) {
-	pub := priv.Public()
-	curveOID := curveOIDForKey(priv)
-	if curveOID == nil {
-		return subjectPublicKeyInfo{}, errors.New("csr: unknown curve OID")
-	}
-
-	byteLen := (priv.Curve.M + 7) / 8
-	// Encode as uncompressed x||y (each padded BE) so Verify can recover exact point.
-	xBytes := pub.Q.X.Bytes()
-	yBytes := pub.Q.Y.Bytes()
-	keyBytes := make([]byte, 2*byteLen)
-	if len(xBytes) >= byteLen {
-		copy(keyBytes[:byteLen], xBytes[len(xBytes)-byteLen:])
-	} else {
-		copy(keyBytes[byteLen-len(xBytes):byteLen], xBytes)
-	}
-	if len(yBytes) >= byteLen {
-		copy(keyBytes[byteLen:], yBytes[len(yBytes)-byteLen:])
-	} else {
-		copy(keyBytes[2*byteLen-len(yBytes):], yBytes)
-	}
-
-	curveOIDRaw, err := asn1.Marshal(curveOID)
-	if err != nil {
-		return subjectPublicKeyInfo{}, err
-	}
-
-	return subjectPublicKeyInfo{
-		Algorithm: algorithmIdentifier{
-			Algorithm:  oid.DSTU4145WithGOST34311,
-			Parameters: asn1.RawValue{FullBytes: curveOIDRaw},
-		},
-		PublicKey: asn1.BitString{Bytes: keyBytes, BitLength: len(keyBytes) * 8},
-	}, nil
-}
-
 // buildCRI builds the DER-encoded CertificationRequestInfo.
 func buildCRI(subjectDER []byte, spki subjectPublicKeyInfo) ([]byte, error) {
-	cri := struct {
-		Version   int
-		Subject   asn1.RawValue
-		PublicKey subjectPublicKeyInfo
-	}{
-		Version:   0,
-		Subject:   asn1.RawValue{FullBytes: subjectDER},
-		PublicKey: spki,
+	cri := certificationRequestInfo{
+		Version:    0,
+		Subject:    asn1.RawValue{FullBytes: subjectDER},
+		PublicKey:  spki,
+		Attributes: asn1.RawValue{Class: 2, Tag: 0, IsCompound: true},
 	}
 	return asn1.Marshal(cri)
 }
@@ -285,7 +296,7 @@ func buildCRI(subjectDER []byte, spki subjectPublicKeyInfo) ([]byte, error) {
 // hashData hashes data using the algorithm indicated by sigAlgOID.
 func hashData(data []byte, sigAlgOID asn1.ObjectIdentifier) ([]byte, error) {
 	switch {
-	case sigAlgOID.Equal(oid.DSTU4145WithGOST34311):
+	case sigAlgOID.Equal(oid.DSTU4145WithGOST34311), sigAlgOID.Equal(oid.DSTU4145ONBWithGOST34311):
 		h := gost34311.New()
 		_, _ = h.Write(data)
 		return h.Sum(nil), nil
@@ -356,55 +367,4 @@ func extractStringRaw(rv asn1.RawValue) string {
 		return s
 	}
 	return string(rv.Bytes)
-}
-
-// parsePublicKeyFromSPKI extracts a DSTU 4145 public key from SubjectPublicKeyInfo.
-// Supports uncompressed encoding (2*byteLen bytes = x||y) and compressed (byteLen bytes).
-func parsePublicKeyFromSPKI(spki subjectPublicKeyInfo) (*dstu4145.PublicKey, error) {
-	algOID := spki.Algorithm.Algorithm
-
-	// Try algorithm OID as curve OID directly.
-	params := dstu4145.ParamsByOID(algOID)
-	if params == nil {
-		// Try parameters as bare curve OID.
-		var curveOID asn1.ObjectIdentifier
-		if _, err := asn1.Unmarshal(spki.Algorithm.Parameters.FullBytes, &curveOID); err == nil {
-			params = dstu4145.ParamsByOID(curveOID)
-		}
-	}
-	if params == nil {
-		return nil, errors.New("csr: unknown public key algorithm/curve")
-	}
-
-	keyBytes := spki.PublicKey.Bytes
-	if len(keyBytes) == 0 {
-		return nil, errors.New("csr: empty public key")
-	}
-
-	byteLen := (params.Curve.M + 7) / 8
-	words := params.Curve.Words
-
-	// Uncompressed: exactly 2*byteLen bytes → x (BE) || y (BE).
-	if len(keyBytes) >= 2*byteLen {
-		x := gf2m.FromBytes(keyBytes[:byteLen], words)
-		y := gf2m.FromBytes(keyBytes[byteLen:2*byteLen], words)
-		pt := &ec.Point{X: x, Y: y, Curve: params.Curve}
-		if !params.Curve.Contains(pt) {
-			return nil, errors.New("csr: uncompressed public key not on curve")
-		}
-		return &dstu4145.PublicKey{Q: pt, Curve: params.Curve}, nil
-	}
-
-	// Compressed: byteLen bytes → recover y via Expand.
-	padded := make([]byte, byteLen)
-	if len(keyBytes) < byteLen {
-		copy(padded[byteLen-len(keyBytes):], keyBytes)
-	} else {
-		copy(padded, keyBytes[:byteLen])
-	}
-	pt, err := params.Curve.Expand(padded)
-	if err != nil {
-		return nil, errors.New("csr: expand public key: " + err.Error())
-	}
-	return &dstu4145.PublicKey{Q: pt, Curve: params.Curve}, nil
 }

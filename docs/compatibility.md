@@ -67,6 +67,7 @@ PB/ONB algorithm mismatches fail, and complete domain comparisons distinguish
 domains that share field degree and subgroup order.
 
 The synthetic ONB certificate/CMS profiles were rejected by the pinned IIT SDK;
-IIT interoperability remains unresolved. Modern ONB Kupyna/Kalyna profiles and
-ONB CSR generation remain explicitly disabled. See [ONB coverage](onb.md) for
+IIT interoperability remains unresolved. Modern ONB Kupyna/Kalyna profiles remain
+explicitly disabled. GOST ONB CSR generation is independently checked; see
+[CSR encoding](csr.md). See [ONB coverage](onb.md) for
 the exact evidence, retained public fixtures, reproduction commands and limits.

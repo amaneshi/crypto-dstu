@@ -16,7 +16,13 @@ import (
 )
 
 func TestONBCryptoniteOperations(t *testing.T) {
-	data, err := os.ReadFile("testdata/onb-operations-cryptonite.json")
+	for _, name := range []string{"onb-operations-cryptonite.json", "onb-zero-digest-cryptonite.json"} {
+		t.Run(name, func(t *testing.T) { checkONBCryptoniteOperations(t, "testdata/"+name) })
+	}
+}
+
+func checkONBCryptoniteOperations(t *testing.T, path string) {
+	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	var fixture struct {
 		Producer, SourceCommit string

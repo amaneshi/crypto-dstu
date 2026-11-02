@@ -22,12 +22,14 @@ field degree and order can silently serialize ONB as PB: some domains share both
 
 Supported application paths include named/complete explicit parameters,
 little-endian GOST ONB PKCS#8, Key-6/PFX protection and import, certificate key
-association, GOST CMS signing/verification and GOST agreement/encryption.
+association, GOST CMS signing/verification, GOST CSR generation/verification and
+GOST agreement/encryption. The zero-digest substitute is polynomial-basis one:
+conversion occurs before the zero check, covered by independent zero-digest vectors.
 PKCS#8 and certificate loaders reject an algorithm/basis mismatch. Embedded
 certificates retain the usual discovery-only trust policy.
 
-ONB Kupyna/Kalyna application profiles and ONB CSR generation currently return
-explicit errors. Their wire profiles require separate validation. Passing the
+ONB Kupyna/Kalyna application profiles currently return explicit errors.
+Their wire profiles require separate validation. Passing the
 primitive tests does not enable arbitrary ONB degrees or nonstandard domains.
 These routines do not claim constant-time operation or a completed security review.
 
@@ -48,10 +50,14 @@ The retained license is in [licenses/cryptonite.txt](licenses/cryptonite.txt).
   `d=2` and peer `d=7`; the public deterministic seed is bytes `00..27`.
 - `TestONBCryptoniteOperations` verifies those signatures and reproduces them in
   Go with their recovered public nonce, as well as checking the independent
-  points and shared secrets. These keys must never be used operationally.
+  points and shared secrets. `onb-zero-digest-cryptonite.json` covers the zero-digest
+  fallback with the same public keys and source revision. These keys must never
+  be used operationally.
 - `TestONBApplicationRoundtrip` covers GOST CMS, dynamic/static encryption, PFX,
   explicit trust and rejection of unverified modern profiles. This is local
   integration evidence, separate from provider interoperability.
+- GOST CSR checks use independent Cryptonite hashing/signature verification and
+  OpenSSL request parsing; see [CSR evidence and limits](csr.md).
 
 The attempted native check used IIT x86 `1.3.1.224`, SHA256
 `475539dd6b01015e73cf3d143783c3f164c3f9db1e92e724c6f6493f086d9f4f`.
@@ -74,6 +80,7 @@ cc -O2 -DCRYPTONITE_EXPORT=extern \
   "$ref"/src/cryptonite/c/*.c "$ref"/src/pthread/c/pthread_impl.c \
   pkg/dstu4145/testdata/generate-onb-vectors.c -pthread -lm -o /tmp/onb-vectors
 /tmp/onb-vectors > /tmp/onb-operations.json
+/tmp/onb-vectors zero > /tmp/onb-zero-digest.json
 go test ./pkg/ec ./pkg/dstu4145 ./ua -run 'TestONB' -v
 ```
 
