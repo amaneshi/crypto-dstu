@@ -70,9 +70,13 @@ func run(sdk string, input io.Reader) response {
 		return result
 	}
 	switch req.Operation {
-	case "hash", "verify", "sign", "generate", "encrypt", "decrypt", "key-info":
+	case "hash", "verify", "sign", "generate", "encrypt", "decrypt", "key-info", "cert-parse":
 	default:
-		result.Error = "supported operations: hash, verify, sign, generate, encrypt, decrypt, key-info"
+		result.Error = "supported operations: hash, verify, sign, generate, encrypt, decrypt, key-info, cert-parse"
+		return result
+	}
+	if req.Operation == "cert-parse" && len(req.Data) == 0 {
+		result.Error = "cert-parse requires certificate data"
 		return result
 	}
 	if req.RequireTimestamp && req.Operation != "verify" {

@@ -20,12 +20,13 @@ int main(int argc, char **argv) {
     const int degrees[] = {173, 179, 191, 233, 431};
     unsigned char seed_bytes[40], hash_bytes[32];
     int i, j;
+	int pb173 = argc==2 && !strcmp(argv[1],"pb173");
     for (i = 0; i < 40; i++) seed_bytes[i] = (unsigned char)i;
     for (i = 0; i < 32; i++) hash_bytes[i] = (unsigned char)i;
     if (argc==2 && !strcmp(argv[1],"zero")) memset(hash_bytes,0,sizeof(hash_bytes));
     printf("{\"sourceCommit\":\"3618d340d22e27a6becf97d89c453f8e64068a39\",\"producer\":\"Cryptonite dstu4145 public API; public d=2, peer d=7; seed bytes 00..27\",\"vectors\":[");
-    for (j = 0; j < 5; j++) {
-        Dstu4145Ctx *ctx = dstu4145_alloc((Dstu4145ParamsId)(11+j));
+    for (j = 0; j < (pb173 ? 1 : 5); j++) {
+        Dstu4145Ctx *ctx = dstu4145_alloc((Dstu4145ParamsId)(pb173 ? 3 : 11+j));
         ByteArray *d = ba_alloc_from_le_hex_string("02");
         ByteArray *peer = ba_alloc_from_le_hex_string("07");
         ByteArray *seed = ba_alloc_from_uint8(seed_bytes, sizeof(seed_bytes));

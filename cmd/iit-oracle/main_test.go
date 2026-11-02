@@ -46,6 +46,8 @@ func TestDigestAndKeySelectorsFailBeforeSDKLoad(t *testing.T) {
 		{"unsupported digest", `{"operation":"hash","digest":"unknown"}`, "supported digest profiles"},
 		{"digest in verify", `{"operation":"verify","digest":"kupyna256"}`, "digest is only valid"},
 		{"digest in key-info", `{"operation":"key-info","digest":"gost34311"}`, "digest is only valid"},
+		{"empty cert-parse", `{"operation":"cert-parse"}`, "requires certificate data"},
+		{"digest in cert-parse", `{"operation":"cert-parse","data":"MAA=","digest":"gost34311"}`, "digest is only valid"},
 		{"empty attached Kupyna512", `{"operation":"sign","digest":"kupyna512"}`, "requires nonempty content"},
 		{"ambiguous Kupyna512 certificate", `{"operation":"sign","digest":"kupyna512","data":"eA=="}`, "requires exactly one signer certificate"},
 		{"generation size", `{"operation":"generate","key_family":"kupyna","key_bits":431}`, "supported generated signing key sizes"},

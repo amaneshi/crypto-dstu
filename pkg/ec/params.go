@@ -106,7 +106,9 @@ func DSTU_PB_173() *Curve {
 
 	n := mustDecodeHex("0800000000000000000000189B4E67606E3825BB2831")
 
-	return NewCurve(173, gf2m.ModBits173, a, b, gx, gy, n, 2)
+	// The standard subgroup has cofactor 4; independent agreement vectors
+	// and the group-cardinality bound cover this value.
+	return NewCurve(173, gf2m.ModBits173, a, b, gx, gy, n, 4)
 }
 
 // DSTU_PB_179 returns the DSTU curve over GF(2^179)

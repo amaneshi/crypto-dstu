@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "3618d340d22e27a6becf97d89c453f8e64068a39",
+  "producer": "Cryptonite dstu4145 public API; public d=2, peer d=7; seed bytes 00..27",
+  "vectors": [
+    {
+      "degree": 173,
+      "digest": "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100",
+      "qx": "06b9baee3e93d39935ac3cf2ce4bee5da904f87f3e2f",
+      "qy": "0d9dda41ccef6c4aa41f5e96eedd964e3e56ac745d3e",
+      "compressed": "06b9baee3e93d39935ac3cf2ce4bee5da904f87f3e2f",
+      "peerCompressed": "09afb9984bc99ef8238cb30f4c6ca0de7531601fae35",
+      "sharedX": "0e133e0eac877371fe53c58f83c5815e848c38f03eb5",
+      "r": "056f85cc12563ec571ef9c3560a9096f7384d0beb548",
+      "s": "053d5b0cbd0268a87169180d3cbae17be161b3c30178"
+    }
+  ]
+}

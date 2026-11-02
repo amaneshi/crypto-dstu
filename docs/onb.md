@@ -67,6 +67,18 @@ not establish whether the remaining difference is the certificate encoding,
 CMS profile or SDK coverage. IIT ONB compatibility is unresolved; it is not part
 of the passing PB interoperability matrix. No real credentials were involved.
 
+Further isolated diagnostics compare explicit/named parameters and separate
+container inspection, certificate parsing, signing and verification. Key-info
+and `EUParseCertificateEx` succeed for the tested ONB cases, while cryptographic
+operations are not consistently successful and report native errors 50/51.
+Using named parameters alone has not established reproducible interoperability.
+
+`TestIITONBDiagnostic` is opt-in with `IIT_ONB_DIAGNOSTIC=1`. Its PB257 positive
+control must pass, and parser/key-info failures or unrecognized native failures
+fail the test. Known ONB rejections are recorded as diagnostic results; successful
+native signatures must verify in Go. A completed diagnostic is not an ONB
+interoperability pass. It uses an intentionally public full-width fixture scalar.
+
 ## Reproducing operation vectors
 
 With a separate Cryptonite checkout at the pinned revision and a C compiler on

@@ -2,7 +2,8 @@
 
 ## Kalyna CMS beyond PB257
 
-`TestIITKalynaAdditionalCurves` independently checks PB307, PB367 and PB431 with
+`TestIITKalynaAdditionalCurves` independently checks PB163, PB167, PB173, PB179,
+PB191, PB233, PB307, PB367 and PB431 with
 the pinned IIT Windows SDK (SHA256
 `475539dd6b01015e73cf3d143783c3f164c3f9db1e92e724c6f6493f086d9f4f`).
 
@@ -16,14 +17,28 @@ For each curve, Kalyna-256 CFB and OFB cover 1-, 33- and 65-byte payloads:
 - Wrong recipient private keys and modified wrapped keys release no plaintext.
 
 The tests assert the actual content-cipher/agreement OIDs and wrapped-key size.
-PB307/PB367 test certificates use Kupyna-256; PB431 uses Kupyna-512 certificate
+All additional curves except PB431 use Kupyna-256 test certificates; PB431 uses Kupyna-512 certificate
 signatures. Certificate signatures, CMS agreement KDF and content cipher remain
 separate choices. The encryption profile still uses Kupyna-256 derivation and
-national Kalyna CMAC/CFB wrapping. Smaller PB curves and other modern combinations
-are not established by this matrix; see [the full limits](iit-interoperability.md#limits).
+national Kalyna CMAC/CFB wrapping. Together with the existing PB257 profile test,
+this covers Kalyna CFB/OFB on all ten standard PB curves. Other combinations
+remain limited to [the documented matrix](iit-interoperability.md#limits).
 
-No cryptographic implementation change was needed for these additional curves.
-The new tests are included by the existing `^TestIIT` CMS native runner.
+The PB173 checks exposed its incorrectly configured cofactor of 2. The standard
+cofactor is 4; correcting it resolved native-to-Go wrapped-key integrity failures.
+The independent public-key/cofactor shared-secret fixture in
+`pkg/dstu15946/testdata/pb173-cryptonite.json` comes from the pinned Cryptonite
+revision and intentionally public scalars 2 and 7. `TestPB173CryptoniteSharedSecret`
+checks the result, and `TestStandardDomainCofactors` checks all fifteen domains'
+order/cofactor products against the group-cardinality bound.
+
+This changes PB173 agreement output, including the legacy GOST envelope path.
+Old envelopes produced with the incorrect cofactor cannot be recovered by the
+corrected profile; there is no silent fallback to cofactor 2. Key scalars and
+signature arithmetic do not change. The extended matrix is part of the existing
+`^TestIIT` CMS native runner. To reproduce the PB173 fixture, build the generator
+described in [ONB vector reproduction](onb.md#reproducing-operation-vectors) and
+invoke it with `pb173`.
 
 ## Windows non-ASCII password boundary
 

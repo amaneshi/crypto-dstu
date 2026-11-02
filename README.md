@@ -662,8 +662,8 @@ untested profiles.
 
 - [ ] **Additional provider profiles:** resolve ONB certificate/CMS interoperability
   with the pinned IIT SDK and validate modern ONB Kupyna/Kalyna encodings
-  before enabling them. Smaller PB modern encryption combinations and arbitrary
-  Unicode/provider password compatibility remain unverified. ONB arithmetic and
+  before enabling them. Arbitrary Unicode/provider password compatibility
+  remains unverified. ONB arithmetic and
   GOST paths now have independent Cryptonite vectors; see [ONB coverage](docs/onb.md).
 - [ ] **Release validation:** obtain an independent security review, broaden
   parser/primitive fuzzing and external known-answer coverage, and automate the

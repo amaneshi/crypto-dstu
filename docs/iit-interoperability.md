@@ -10,6 +10,9 @@ CMS signing and verification, disposable PB191/PB257/PB307 key generation, and
 CMS encryption/decryption with dynamic or certificate-referenced static originators.
 The `key-info` operation returns IIT's opaque public key-information blob without
 requiring a signing certificate; tests compare this blob without treating it as DER.
+`cert-parse` takes certificate DER in `data` and checks `EUParseCertificateEx`
+success. It returns no certificate contents and does not establish cryptographic
+validity or trust.
 It verifies every signer and returns data only on success. The optional verify
 request field `require_timestamp: true` additionally requires a recognized
 signature timestamp for every signer. This field is rejected for other operations.
@@ -224,14 +227,17 @@ dynamic and static envelopes. Both profiles cover 1, 31, 32, 33, 63, 64, 65 and
 plaintext. The native modern producer uses the documented explicit cipher
 selector in `EUEnvelopDataToRecipientsWithSettingsEx`, in an isolated store.
 
-`TestIITKalynaAdditionalCurves` extends both modern content modes to PB307,
-PB367 and PB431 with 1-, 33- and 65-byte payloads. IIT produces static envelopes
+`TestIITKalynaAdditionalCurves` extends both modern content modes to PB163,
+PB167, PB173, PB179, PB191, PB233, PB307, PB367 and PB431 with 1-, 33- and
+65-byte payloads. IIT produces static envelopes
 that Go decrypts, and decrypts Go dynamic, static-reference and embedded-static
 envelopes. The embedded form is checked without preloading the sender certificate.
-Wrong-key and wrapped-key mutation controls release no plaintext. PB307/PB367
-certificates use Kupyna-256 and PB431 uses Kupyna-512 signatures; agreement
-derivation still uses the Kalyna profile's Kupyna-256 KDF. Smaller modern PB
-combinations and ONB remain unsupported/unverified by this matrix.
+Wrong-key and wrapped-key mutation controls release no plaintext. The additional
+curves use Kupyna-256 certificates except PB431, which uses Kupyna-512 signatures;
+agreement derivation still uses the Kalyna profile's Kupyna-256 KDF. Together with
+PB257, both content modes now cover all ten standard PB domains. PB173 requires
+the corrected cofactor 4; see [the compatibility change](compatibility.md).
+ONB interoperability remains unresolved and is not established by this matrix.
 
 The profile follows the [national CMS technical specification](https://zakon.rada.gov.ua/laws/show/z1273-20),
 including Kupyna KDF with fixed-width shared-secret encoding and the

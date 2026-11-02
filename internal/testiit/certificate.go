@@ -42,15 +42,20 @@ func Certificate(t testing.TB, key *dstu4145.PrivateKey, timestamping bool) *cer
 // CertificateForDigest builds an isolated certificate with explicit standard
 // domain parameters and the chosen national certificate signature profile.
 func CertificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping bool, digest asn1.ObjectIdentifier) *cert.Certificate {
-	return certificateForDigest(t, key, timestamping, digest, 0xc8)
+	return certificateForDigest(t, key, timestamping, digest, 0xc8, false)
 }
 
 // AgreementCertificateForDigest creates a key-agreement-only identity.
 func AgreementCertificateForDigest(t testing.TB, key *dstu4145.PrivateKey, digest asn1.ObjectIdentifier) *cert.Certificate {
-	return certificateForDigest(t, key, false, digest, 0x08)
+	return certificateForDigest(t, key, false, digest, 0x08, false)
 }
 
-func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping bool, digest asn1.ObjectIdentifier, usage byte) *cert.Certificate {
+// NamedCertificate uses a standard named domain instead of explicit parameters.
+func NamedCertificate(t testing.TB, key *dstu4145.PrivateKey) *cert.Certificate {
+	return certificateForDigest(t, key, false, oid.GOST34311, 0xc8, true)
+}
+
+func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping bool, digest asn1.ObjectIdentifier, usage byte, named bool) *cert.Certificate {
 	t.Helper()
 	type extension struct {
 		ID       asn1.ObjectIdentifier
@@ -86,6 +91,21 @@ func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping b
 	_, err = asn1.Unmarshal(outer.TBS.FullBytes, &tbs)
 	require.NoError(t, err)
 	parameters := explicitParameters(t, key, digest.Equal(oid.GOST34311))
+	if named {
+		var curveOID asn1.ObjectIdentifier
+		for _, params := range dstu4145.AllParams() {
+			if params.Curve.EqualDomain(key.Curve) {
+				curveOID = params.OID
+				break
+			}
+		}
+		require.NotEmpty(t, curveOID)
+		parameters, err = asn1.Marshal(struct {
+			Curve asn1.ObjectIdentifier
+			DKE   []byte
+		}{curveOID, gost28147.SboxDSTU.Packed()})
+		require.NoError(t, err)
+	}
 	tbs.PublicKey.Algorithm.Parameters = asn1.RawValue{FullBytes: parameters}
 	var signatureOID asn1.ObjectIdentifier
 	var h hash.Hash

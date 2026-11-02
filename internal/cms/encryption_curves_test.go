@@ -22,6 +22,12 @@ func TestIITKalynaAdditionalCurves(t *testing.T) {
 		name   string
 		digest asn1.ObjectIdentifier
 	}{
+		{"DSTU_PB_163", oid.Kupyna256},
+		{"DSTU_PB_167", oid.Kupyna256},
+		{"DSTU_PB_173", oid.Kupyna256},
+		{"DSTU_PB_179", oid.Kupyna256},
+		{"DSTU_PB_191", oid.Kupyna256},
+		{"DSTU_PB_233", oid.Kupyna256},
 		{"DSTU_PB_307", oid.Kupyna256},
 		{"DSTU_PB_367", oid.Kupyna256},
 		{"DSTU_PB_431", oid.Kupyna512},

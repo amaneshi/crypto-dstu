@@ -17,7 +17,7 @@ verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
 Remaining pending areas are additional provider profiles, arbitrary Unicode
 password interoperability, security review, fuzzing, and CI.
-PB307/PB367/PB431 Kalyna CFB/OFB and tested Cyrillic/Ukrainian Windows password
+All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
 basis conversions, with Cryptonite point/signature/shared-secret vectors. IIT
 certificate/CMS interoperability and modern ONB profiles remain pending. GOST
@@ -76,6 +76,9 @@ from a local round-trip alone.
   national compressed points, raw-signature OCTET STRING wrapping and little-endian
   digest interpretation; legacy PB requests remain import-only. Do not infer IIT ONB support
   from a local roundtrip; the recorded synthetic-profile check was rejected.
+- PB173's standard cofactor is 4. Preserve the independent cofactor-agreement
+  vector and group-cardinality checks; the previous value 2 produced incompatible
+  shared secrets. Do not add an implicit legacy-cofactor fallback.
 - Java JKS loading verifies store integrity and the SHA-1 KeyProtector checksum.
   Preserve IIT's separate agreement key from PKCS#8 KEP attributes, including
   its distinct parameter/scalar encoding. A single signing identity plus a

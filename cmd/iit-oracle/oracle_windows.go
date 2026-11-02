@@ -209,7 +209,15 @@ func execute(sdk, config string, req request) ([]byte, error) {
 			s.release("EUFreeMemory", uintptr(unsafe.Pointer(output)))
 		}
 	}()
-	if req.Operation == "key-info" {
+	if req.Operation == "cert-parse" {
+		var info uintptr
+		err = s.call("EUParseCertificateEx", ptr(req.Data), uintptr(len(req.Data)), uintptr(unsafe.Pointer(&info)))
+		if info != 0 {
+			s.release("EUFreeCertificateInfoEx", info)
+		}
+		runtime.KeepAlive(req.Data)
+		return nil, err
+	} else if req.Operation == "key-info" {
 		if len(req.PrivateKey) == 0 {
 			return nil, errors.New("disposable test key is required")
 		}
