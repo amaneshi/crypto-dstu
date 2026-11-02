@@ -17,6 +17,9 @@ verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
 Remaining pending areas are broader modern-profile coverage, ONB curves,
 non-ASCII password interoperability, PFX export, security review, fuzzing, and CI.
+PB307/PB367/PB431 Kalyna CFB/OFB and tested Cyrillic/Ukrainian Windows password
+profiles now have independent checks. ONB was evaluated but remains unsupported;
+its implementation requires basis conversions. See `docs/compatibility.md`.
 Update the backlog when work actually completes; do not mark a profile supported
 from a local round-trip alone.
 
@@ -82,8 +85,10 @@ from a local round-trip alone.
 - Modern Key-6 protection uses PBKDF2 with Kupyna MAC-256, not HMAC-Kupyna,
   zero-padded password bytes, Kalyna-256 CBC and strict PKCS#7 padding.
   `ua.ProtectKey` generates fresh salt/IV; it writes Key-6, not PFX. Its 1–32-byte
-  password API rejects trailing NUL. IIT password compatibility is established
-  for tested ASCII cases; non-ASCII compatibility remains unresolved.
+  password API rejects trailing NUL. IIT Windows compatibility now includes the
+  tested Cyrillic/Ukrainian passwords: the isolated adapter must convert logical
+  UTF-8 to the documented CP1251 native string boundary, rejecting lossy input.
+  This is test-adapter behavior, not a new consumer-library encoding policy.
 - PKCS#12 import verifies SHA-1/SHA-2 HMAC, GOST HMAC, and independently tested
   IIT Kupyna-256 KMAC before releasing keys. Missing MACs, SignedData integrity,
   unsupported profiles, duplicate keys and ambiguous distinct certificates are

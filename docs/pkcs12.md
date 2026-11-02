@@ -28,9 +28,11 @@ MAC passwords use terminated UTF-16BE/BMP encoding. Invalid UTF-8, supplementary
 Unicode characters, and passwords over 4096 UTF-8 bytes are explicitly rejected.
 An empty caller password supports both the standard terminator and the historical
 zero-byte password representation, but only if the corresponding MAC verifies.
-OpenSSL vectors cover empty, ASCII, Cyrillic BMP and long passwords. This does
-not establish non-ASCII password compatibility for IIT's encrypted-key profiles;
-the existing Key-6 password limits/policies still apply to privacy protection.
+OpenSSL vectors cover empty, ASCII, Cyrillic BMP and long passwords. Separate
+native GOST/Kupyna PFX checks now cover Cyrillic/Ukrainian passwords with the
+corrected Windows CP1251 adapter boundary; this is limited to the tested profiles.
+The existing Key-6 password limits/policies still apply to privacy protection.
+See [password compatibility](compatibility.md).
 
 The parser accepts absent or NULL digest parameters, iteration counts from 1 to
 1,000,000 (omitted means 1), and salt lengths from 1 to 1024 bytes. PFX input is
@@ -67,6 +69,9 @@ describes the independent derivation interface used by the fixture generator.
 `TestIITPKCS12Integrity` is tagged `integration` and is included in the pinned,
 isolated `scripts/test-iit.ps1` runner. It generates disposable GOST/Kupyna keys,
 verifies the real provider MACs, and checks password/content-mutation rejection.
+`TestIITPKCS12NonASCII` additionally imports native GOST/Kupyna containers with
+Cyrillic/Ukrainian passwords and verifies signatures from the original and
+reprotected key against the public key derived in Go.
 The new modern PFX test also exposed and now covers a Kupyna KMAC message-padding
 buffer bug where a two-block suffix previously panicked. Boundary regressions
 exercise every message length through two blocks for KMAC-256/384/512.

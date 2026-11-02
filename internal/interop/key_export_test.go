@@ -4,6 +4,7 @@ package interop_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
@@ -20,6 +21,9 @@ func TestIITKalynaKeyExport(t *testing.T) {
 	for _, tc := range []struct{ name, curve, password, digest string }{
 		{"PB257 short password", "DSTU_PB_257", "test-export", "kupyna256"},
 		{"PB257 full password", "DSTU_PB_257", string(bytes.Repeat([]byte{'K'}, 32)), "kupyna256"},
+		{"PB257 Cyrillic password", "DSTU_PB_257", "пароль", "kupyna256"},
+		{"PB257 UTF8 byte limit", "DSTU_PB_257", strings.Repeat("ї", 16), "kupyna256"},
+		{"PB431 Ukrainian password", "DSTU_PB_431", "ЇїЄєҐґ", "kupyna512"},
 		{"PB431", "DSTU_PB_431", "test-export-pb431", "kupyna512"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -145,10 +145,15 @@ func execute(sdk, config string, req request) ([]byte, error) {
 			Type, Device uint32
 			Password     [65]byte
 		}
-		if len(req.Password) == 0 || len(req.Password) > 64 {
+		encodedPassword, err := nativePasswordBytes(req.Password)
+		if err != nil {
+			return nil, err
+		}
+		defer clear(encodedPassword)
+		if len(encodedPassword) == 1 {
 			return nil, errors.New("test password must be 1..64 bytes")
 		}
-		copy(media.Password[:], req.Password)
+		copy(media.Password[:], encodedPassword)
 		defer clear(media.Password[:])
 		var outputs [3]*byte
 		var lengths [3]uint32
@@ -182,10 +187,11 @@ func execute(sdk, config string, req request) ([]byte, error) {
 		if len(req.PrivateKey) == 0 {
 			return nil, errors.New("disposable test key is required")
 		}
-		password, err := syscall.ByteSliceFromString(req.Password)
+		password, err := nativePasswordBytes(req.Password)
 		if err != nil {
 			return nil, err
 		}
+		defer clear(password)
 		var owner ownerInfo
 		err = s.call("EUReadPrivateKeyBinary", ptr(req.PrivateKey), uintptr(len(req.PrivateKey)), ptr(password), uintptr(unsafe.Pointer(&owner)))
 		runtime.KeepAlive(req.PrivateKey)
@@ -207,7 +213,7 @@ func execute(sdk, config string, req request) ([]byte, error) {
 		if len(req.PrivateKey) == 0 {
 			return nil, errors.New("disposable test key is required")
 		}
-		password, passwordErr := syscall.ByteSliceFromString(req.Password)
+		password, passwordErr := nativePasswordBytes(req.Password)
 		if passwordErr != nil {
 			return nil, passwordErr
 		}
@@ -359,7 +365,7 @@ func (s sdkLibrary) executeDigestProfile(req request) ([]byte, error) {
 		if len(req.PrivateKey) == 0 {
 			return nil, errors.New("disposable test key is required")
 		}
-		password, err := syscall.ByteSliceFromString(req.Password)
+		password, err := nativePasswordBytes(req.Password)
 		if err != nil {
 			return nil, err
 		}

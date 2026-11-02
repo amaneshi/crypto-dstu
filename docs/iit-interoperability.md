@@ -188,9 +188,14 @@ The internal deterministic writer is `keystore.MarshalKey6Kalyna`.
 `TestIITKalynaKeyExport` checks the public API against IIT on PB257 and PB431:
 native public-key information matches the same scalar in a GOST-protected
 Key-6 container; attached and detached Kupyna-256 / Kupyna-512 signatures verify
-in Go; wrong passwords fail. The native checks cover short and 32-byte ASCII
-passwords. UTF-8 passwords round-trip in Go, but a non-ASCII native import failed,
-so cross-provider non-ASCII password compatibility is not established.
+in Go; wrong passwords fail. Native checks cover short and 32-byte ASCII passwords,
+Cyrillic PB257 and Ukrainian PB431 passwords, and a password at the 32 UTF-8-byte
+limit. The earlier non-ASCII failure was caused by passing UTF-8 bytes to IIT's
+CP1251 Windows string API. The isolated adapter now converts that boundary and
+rejects unrepresentable input. The Go consumer API remains UTF-8. Native-produced
+GOST/Kupyna PFX with Cyrillic/Ukrainian passwords also import and re-export with
+independently verified key/signature correspondence; arbitrary Unicode and other
+provider/platform combinations remain unverified. See [compatibility details](compatibility.md).
 No PFX writer or certificate embedding is added. This PBES2 format encrypts the
 private key without adding a container MAC.
 
@@ -207,6 +212,15 @@ dynamic and static envelopes. Both profiles cover 1, 31, 32, 33, 63, 64, 65 and
 129-byte payloads. Wrong recipient keys and wrapped-key corruption return no
 plaintext. The native modern producer uses the documented explicit cipher
 selector in `EUEnvelopDataToRecipientsWithSettingsEx`, in an isolated store.
+
+`TestIITKalynaAdditionalCurves` extends both modern content modes to PB307,
+PB367 and PB431 with 1-, 33- and 65-byte payloads. IIT produces static envelopes
+that Go decrypts, and decrypts Go dynamic, static-reference and embedded-static
+envelopes. The embedded form is checked without preloading the sender certificate.
+Wrong-key and wrapped-key mutation controls release no plaintext. PB307/PB367
+certificates use Kupyna-256 and PB431 uses Kupyna-512 signatures; agreement
+derivation still uses the Kalyna profile's Kupyna-256 KDF. Smaller modern PB
+combinations and ONB remain unsupported/unverified by this matrix.
 
 The profile follows the [national CMS technical specification](https://zakon.rada.gov.ua/laws/show/z1273-20),
 including Kupyna KDF with fixed-width shared-secret encoding and the

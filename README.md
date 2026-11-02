@@ -325,8 +325,10 @@ return os.WriteFile("Key-6.dat", protected, 0600)
 
 This writes Kupyna MAC-256 / Kalyna-256 CBC with 10,000 PBKDF2 iterations
 and fresh random 32-byte salt and IV. Passwords must contain 1–32 UTF-8 bytes
-and cannot end in NUL. For IIT interoperability, use ASCII passwords; non-ASCII
-compatibility is not established. Certificates are supplied separately.
+and cannot end in NUL. IIT Windows interoperability now includes tested ASCII,
+Cyrillic and Ukrainian passwords through its documented CP1251 API boundary;
+arbitrary Unicode/provider compatibility remains unverified. Certificates are
+supplied separately. See [password compatibility](docs/compatibility.md).
 
 ---
 
@@ -634,18 +636,13 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [x] **PKCS#12 hardening:** verify supported container MACs before importing keys,
-  reject missing/unsupported integrity, and associate certificates by public key
-  instead of bag position. Tampering, reordered-bag, multiple-key and ambiguous
-  association tests pass, with OpenSSL MAC vectors and disposable GOST/Kupyna IIT
-  containers. This also fixes a two-block Kupyna KMAC message-padding panic.
-  See [PKCS#12 import policy and limits](docs/pkcs12.md).
-- [ ] **Broader compatibility:** extend modern Kalyna encryption coverage beyond
-  PB257, investigate cross-provider non-ASCII passwords, and evaluate ONB curve
-  support. Keep unsupported profiles explicit until independently validated.
 - [ ] **PFX export:** add password-protected PKCS#12 export with certificate
   association and integrity protection. Current modern export through
   `ua.ProtectKey` writes a single Key-6 key without embedded certificates.
+- [ ] **ONB implementation and additional profiles:** implement and independently
+  validate normal-basis conversions before enabling ONB curves. Smaller PB modern
+  encryption combinations and arbitrary Unicode/provider password compatibility
+  remain unverified; keep unsupported profiles explicit.
 - [ ] **Release validation:** obtain an independent security review, broaden
   parser/primitive fuzzing and external known-answer coverage, and automate the
   pinned IIT checks in CI. Include independent raw Kalyna KW vectors exercising
