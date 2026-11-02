@@ -179,3 +179,49 @@ func BenchmarkKupyna256_1K(b *testing.B) {
 		h.Sum(nil)
 	}
 }
+
+// Nonempty single- and multi-block vectors from Cryptonite utest_dstu7564.c.
+func TestKupyna256CryptoniteBlocks(t *testing.T) {
+	for _, tc := range []struct {
+		size     int
+		expected string
+	}{
+		{64, "08f4ee6f1be6903b324c4e27990cb24ef69dd58dbe84813ee0a52f6631239875"},
+		{128, "0a9474e645a7d25e255e9e89fff42ec7eb31349007059284f0b182e452bda882"},
+	} {
+		input := make([]byte, tc.size)
+		for i := range input {
+			input[i] = byte(i)
+		}
+		h := New256()
+		h.Write(input)
+		require.Equal(t, tc.expected, hex.EncodeToString(h.Sum(nil)))
+	}
+}
+
+func TestAllWidthsStreamingBoundaries(t *testing.T) {
+	for _, hashSize := range []int{32, 48, 64} {
+		for _, size := range []int{0, 1, 51, 52, 63, 64, 65, 115, 116, 127, 128, 129, 255, 256, 257, 4096} {
+			input := make([]byte, size)
+			for i := range input {
+				input[i] = byte(i*7 + 3)
+			}
+			oneShot := newDigest(hashSize)
+			oneShot.Write(input)
+			expected := oneShot.Sum(nil)
+			for _, chunkSize := range []int{1, 7, 64, 127, 128, 129} {
+				h := newDigest(hashSize)
+				for offset := 0; offset < len(input); offset += chunkSize {
+					h.Write(input[offset:min(offset+chunkSize, len(input))])
+				}
+				require.Equal(t, expected, h.Sum(nil), "size=%d hash=%d chunk=%d", size, hashSize, chunkSize)
+				// Sum must leave the streaming state usable for later input.
+				h.Write([]byte{0xa5})
+				oneShot.Reset()
+				oneShot.Write(input)
+				oneShot.Write([]byte{0xa5})
+				require.Equal(t, oneShot.Sum(nil), h.Sum(nil))
+			}
+		}
+	}
+}

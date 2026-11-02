@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"crypto-dstu/internal/cert"
 	"crypto-dstu/internal/keystore"
@@ -21,7 +24,9 @@ unless -url is specified.
 
 Options:
   -cert path     Certificate to check (required)
-  -issuer path   Issuer certificate (required)
+  -issuer path   Explicitly trusted issuer certificate (required)
+  -response path Saved DER OCSP response instead of a network request
+  -responder-crl path Full DER CRL for delegated responder (repeatable)
   -url url       Override OCSP responder URL
 `)
 	}
@@ -29,7 +34,10 @@ Options:
 	certPath := fs.String("cert", "", "certificate to check")
 	issuerPath := fs.String("issuer", "", "issuer certificate")
 	urlFlag := fs.String("url", "", "OCSP responder URL override")
+	responsePath := fs.String("response", "", "saved DER OCSP response")
 
+	var crlPaths multiFlag
+	fs.Var(&crlPaths, "responder-crl", "full responder CRL (repeatable)")
 	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
 
 	if *certPath == "" {
@@ -55,40 +63,33 @@ Options:
 		fatalf("ocsp: parse -issuer: %v", err)
 	}
 
-	client := &ocsp.Client{URL: *urlFlag}
-	resp, err := client.Check(subjectCert, issuerCert)
+	var resp *ocsp.Response
+	if *responsePath != "" {
+		resp, err = ocsp.ParseResponse(mustRead(*responsePath))
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		resp, err = (&ocsp.Client{URL: *urlFlag}).CheckContext(ctx, subjectCert, issuerCert)
+	}
 	if err != nil {
 		fatalf("ocsp: %v", err)
 	}
-
-	if resp.Status != 0 {
-		fatalf("ocsp: responder returned non-successful status %d", resp.Status)
+	var crls [][]byte
+	for _, path := range crlPaths {
+		crls = append(crls, mustRead(path))
 	}
-
-	if len(resp.Responses) == 0 {
-		fatalf("ocsp: response contained no SingleResponse entries")
-	}
-
-	sr := resp.Responses[0]
-	switch sr.Status {
-	case ocsp.Good:
-		fmt.Println("status: good") //nolint:forbidigo // CLI output
-	case ocsp.Revoked:
-		if sr.RevocationTime.IsZero() {
-			fmt.Println("status: revoked") //nolint:forbidigo // CLI output
-		} else {
-			ts := sr.RevocationTime.UTC().Format("2006-01-02T15:04:05Z")
-			fmt.Printf("status: revoked (at %s)\n", ts) //nolint:forbidigo // CLI output
-		}
+	status, err := resp.CheckWithPolicy(subjectCert, issuerCert, ocsp.ValidationPolicy{Time: time.Now(), MaxAge: 24 * time.Hour, ClockSkew: 5 * time.Minute, ResponderCRLs: crls})
+	if errors.Is(err, ocsp.ErrRevoked) {
+		fmt.Println("status: revoked")
 		os.Exit(2)
-	case ocsp.Unknown:
-		fmt.Println("status: unknown") //nolint:forbidigo // CLI output
+	}
+	if errors.Is(err, ocsp.ErrUnknown) {
+		fmt.Println("status: unknown")
 		os.Exit(3)
 	}
-
-	fmt.Printf("thisUpdate: %s\n", sr.ThisUpdate.UTC().Format("2006-01-02T15:04:05Z")) //nolint:forbidigo // CLI output
-	if !sr.NextUpdate.IsZero() {
-		nu := sr.NextUpdate.UTC().Format("2006-01-02T15:04:05Z")
-		fmt.Printf("nextUpdate: %s\n", nu) //nolint:forbidigo // CLI output
+	if err != nil || status != ocsp.Good {
+		fatalf("ocsp: status was not authenticated: %v", err)
 	}
+	fmt.Println("status: good")
+	fmt.Printf("producedAt: %s\n", resp.ProducedAt.UTC().Format(time.RFC3339))
 }

@@ -2,10 +2,14 @@ package ocsp
 
 import (
 	"bytes"
+	"context"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"time"
 
 	"crypto-dstu/internal/cert"
 )
@@ -21,18 +25,25 @@ type Client struct {
 // Check fetches and parses the OCSP status for cert issued by issuer.
 // The OCSP URL is taken from c.URL if set, otherwise from the certificate's AIA extension.
 func (c *Client) Check(subject, issuer *cert.Certificate) (*Response, error) {
+	return c.CheckContext(context.Background(), subject, issuer)
+}
+
+// CheckContext fetches and parses evidence. Call Response.Check before using
+// its certificate status; an HTTP success does not authenticate that status.
+func (c *Client) CheckContext(ctx context.Context, subject, issuer *cert.Certificate) (*Response, error) {
+	if ctx == nil {
+		return nil, errors.New("ocsp: request context is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if subject == nil || issuer == nil {
 		return nil, errors.New("ocsp: Check: nil certificate")
 	}
 
-	// Build CertID with Kupyna-256.
-	cid, err := NewCertID(subject, issuer, oidKupyna256)
+	cid, err := NewCertID(subject, issuer, asn1.ObjectIdentifier{1, 3, 14, 3, 2, 26})
 	if err != nil {
-		// Fall back to GOST34311 if Kupyna fails (legacy UA PKI).
-		cid, err = NewCertID(subject, issuer, oidGOST34311)
-		if err != nil {
-			return nil, errors.New("ocsp: Check: build CertID: " + err.Error())
-		}
+		return nil, err
 	}
 
 	req, err := NewRequest([]*CertID{cid})
@@ -45,30 +56,47 @@ func (c *Client) Check(subject, issuer *cert.Certificate) (*Response, error) {
 	}
 
 	// Determine URL.
-	url := c.URL
-	if url == "" {
+	endpoint := c.URL
+	if endpoint == "" {
 		urls := AIAOCSPURLs(subject)
 		if len(urls) == 0 {
 			return nil, errors.New("ocsp: Check: no OCSP URL in certificate AIA and none configured")
 		}
-		url = urls[0]
+		endpoint = urls[0]
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Host == "" || parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, errors.New("ocsp: invalid responder URL")
 	}
 
 	// Post request.
 	hc := c.HTTP
 	if hc == nil {
-		hc = http.DefaultClient
+		hc = &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("ocsp: responder redirect rejected") }}
 	}
-	//nolint:noctx // context not available at this call site
-	httpResp, err := hc.Post(url, "application/ocsp-request", bytes.NewReader(der))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(der))
 	if err != nil {
-		return nil, errors.New("ocsp: Check: HTTP post: " + err.Error())
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/ocsp-request")
+	httpResp, err := hc.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("ocsp: Check: HTTP post: %w", err)
 	}
 	defer func() { _ = httpResp.Body.Close() }()
+	if httpResp.StatusCode != http.StatusOK {
+		return nil, errors.New("ocsp: responder returned an HTTP error")
+	}
 
-	body, err := io.ReadAll(httpResp.Body)
+	body, err := io.ReadAll(io.LimitReader(httpResp.Body, (4<<20)+1))
 	if err != nil {
-		return nil, errors.New("ocsp: Check: read response: " + err.Error())
+		return nil, fmt.Errorf("ocsp: Check: read response: %w", err)
+	}
+	if len(body) > 4<<20 {
+		return nil, errors.New("ocsp: response exceeds size limit")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	return ParseResponse(body)
@@ -98,6 +126,9 @@ func oidFromInts(arcs ...int) asn1.ObjectIdentifier {
 
 // extractAIAOCSPURLs parses the AIA extension of a certificate and returns all OCSP URLs.
 func extractAIAOCSPURLs(c *cert.Certificate) []string {
+	if c == nil {
+		return nil
+	}
 	for _, ext := range c.Extensions {
 		if !ext.Id.Equal(oidAuthorityInfoAccess) {
 			continue
@@ -132,7 +163,7 @@ func parseAIAOCSPURLs(der []byte) []string {
 		if err != nil {
 			break
 		}
-		if ad.Method.Equal(oidAccessMethodOCSP) && ad.Location.Tag == 6 {
+		if ad.Method.Equal(oidAccessMethodOCSP) && ad.Location.Class == 2 && ad.Location.Tag == 6 && !ad.Location.IsCompound {
 			urls = append(urls, string(ad.Location.Bytes))
 		}
 	}

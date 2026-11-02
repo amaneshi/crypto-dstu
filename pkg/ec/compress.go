@@ -8,32 +8,48 @@ import (
 )
 
 // Compress returns the compressed representation of the point.
-// Returns x-coordinate bytes with trace bit encoded separately.
+// The low bit encodes Tr(y/x); the other bits encode x. Bytes are big-endian.
 func (p *Point) Compress() []byte {
 	if p.Inf {
 		// Return zero bytes for point at infinity
 		return make([]byte, (p.Curve.M+7)/8)
 	}
 
-	// Return x-coordinate as-is
-	// The trace bit will be computed during expansion
-	return p.X.Bytes()
+	out := make([]byte, (p.Curve.M+7)/8)
+	x := p.X.Bytes()
+	copy(out[len(out)-len(x):], x)
+	if !p.X.IsZero() {
+		z := gf2m.ModMul(p.Y, gf2m.Inv(p.X, p.Curve.ModBits), p.Curve.ModBits)
+		out[len(out)-1] = out[len(out)-1]&0xfe | byte(fieldTrace(z, p.Curve.ModBits))
+	}
+	return out
 }
 
 // Expand decompresses a point from its compressed representation.
-// Since we only store x, we compute y and return the canonical point.
+// Expand recovers both coordinates, including the encoded choice of y.
 func (c *Curve) Expand(compressed []byte) (*Point, error) {
-	if len(compressed) == 0 {
-		return nil, errors.New("compressed point is empty")
+	if len(compressed) == 0 || len(compressed) > (c.M+7)/8 {
+		return nil, errors.New("invalid compressed point length")
 	}
 
 	x := gf2m.FromBytes(compressed, c.Words)
+	if x.BitLen() > c.M {
+		return nil, errors.New("compressed point is outside the field")
+	}
 
-	// Handle point at infinity
+	// The all-zero encoding represents the finite point x=0, y=sqrt(b).
 	if x.IsZero() {
 		// Special case: x = 0, compute y from curve equation
 		y := computeYForZeroX(c)
 		return &Point{X: x, Y: y, Curve: c, Inf: false}, nil
+	}
+	selector := x.TestBit(0)
+	if fieldTrace(x, c.ModBits) != int(c.A.Words()[0]&1) {
+		if x.TestBit(0) {
+			x.ClearBit(0)
+		} else {
+			x.SetBit(0)
+		}
 	}
 
 	// Compute y from x using the curve equation
@@ -53,6 +69,13 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 	if err != nil {
 		return nil, fmt.Errorf("point expansion failed: %w", err)
 	}
+	if (fieldTrace(z, c.ModBits) != 0) != selector {
+		if z.TestBit(0) {
+			z.ClearBit(0)
+		} else {
+			z.SetBit(0)
+		}
+	}
 
 	// y = z * x
 	y := gf2m.ModMul(z, x, c.ModBits)
@@ -65,6 +88,19 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 	}
 
 	return point, nil
+}
+
+func fieldTrace(x gf2m.Element, modBits gf2m.ModBits) int {
+	sum := x.Clone()
+	power := x.Clone()
+	for i := 1; i < modBits.M(); i++ {
+		power = gf2m.ModSqr(power, modBits)
+		sum = gf2m.Add(sum, power)
+	}
+	if sum.TestBit(0) {
+		return 1
+	}
+	return 0
 }
 
 // fsquad solves z² + z = w in GF(2^m) using the half-trace algorithm.

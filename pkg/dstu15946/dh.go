@@ -4,8 +4,10 @@
 package dstu15946
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
+	"slices"
 
 	"crypto-dstu/pkg/dstu4145"
 	"crypto-dstu/pkg/gf2m"
@@ -20,10 +22,17 @@ import (
 //
 // Returns the x-coordinate of S as exactly ceil(m/8) big-endian bytes.
 func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, error) {
-	if priv.Curve != peer.Curve {
+	if priv == nil || priv.Curve == nil || priv.D == nil || peer == nil || peer.Curve == nil || peer.Q == nil {
+		return nil, errors.New("dstu15946: missing key")
+	}
+	a, b := priv.Curve, peer.Curve
+	if a.M != b.M || !slices.Equal(a.ModBits, b.ModBits) || !a.A.Equal(b.A) || !a.B.Equal(b.B) || !bytes.Equal(a.N, b.N) || a.Cofactor != b.Cofactor {
 		return nil, errors.New("dstu15946: keys are on different curves")
 	}
 	curve := priv.Curve
+	if priv.D.Sign() <= 0 || priv.D.Cmp(new(big.Int).SetBytes(curve.N)) >= 0 {
+		return nil, errors.New("dstu15946: private scalar out of range")
+	}
 	if !curve.Contains(peer.Q) {
 		return nil, errors.New("dstu15946: peer public key is not on the curve")
 	}

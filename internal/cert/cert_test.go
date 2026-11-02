@@ -18,8 +18,8 @@ import (
 
 func TestOIDConstants(t *testing.T) {
 	require.Equal(t, "1.2.804.2.1.1.1.1.3.1.1", oid.DSTU4145WithGOST34311.String())
-	require.Equal(t, "1.2.804.2.1.1.1.1.3.1.2", oid.DSTU4145WithKupyna256.String())
-	require.Equal(t, "1.2.804.2.1.1.1.1.3.1.3", oid.DSTU4145WithKupyna512.String())
+	require.Equal(t, "1.2.804.2.1.1.1.1.3.6.1.1", oid.DSTU4145WithKupyna256.String())
+	require.Equal(t, "1.2.804.2.1.1.1.1.3.6.3.1", oid.DSTU4145WithKupyna512.String())
 	require.Equal(t, "1.2.804.2.1.1.1.1.3.1.1.2.6", oid.CurvePB257.String())
 }
 
@@ -49,6 +49,8 @@ func TestOIDIsDSTU4145SigAlg(t *testing.T) {
 	require.True(t, oid.IsDSTU4145SigAlg(oid.DSTU4145WithKupyna256))
 	require.True(t, oid.IsDSTU4145SigAlg(oid.DSTU4145WithKupyna512))
 	require.False(t, oid.IsDSTU4145SigAlg(oid.CurvePB257))
+	// The ONB GOST identifier must not be interpreted as PB Kupyna.
+	require.False(t, oid.IsDSTU4145SigAlg(asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}))
 }
 
 // ---- Role detection tests ----

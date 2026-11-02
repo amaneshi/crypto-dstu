@@ -1,0 +1,41 @@
+{
+  "certificateArchive": "https://czo.gov.ua/download/certificates_test/CA-FULL.zip",
+  "description": "Public content, disposable IIT key, Go CMS and live CZO signature timestamp; private key not retained; offline-no-revocation native verification only",
+  "endpoint": "http://ca-test.czo.gov.ua/services/tsp/",
+  "sdkSHA256": "475539dd6b01015e73cf3d143783c3f164c3f9db1e92e724c6f6493f086d9f4f",
+  "validatedAt": "2026-11-01T18:53:56Z",
+  "files": {
+    "content.bin": {
+      "sha256": "abadb2237f0704fdec358ebc869fe01b622c253d9652b342bd0d2e06fc98e6df",
+      "bytes": 55
+    },
+    "control.cms": {
+      "sha256": "282ab6c06fcae47c3f04235fbf0fbea309d4659fd90d411fa4182a83e0fcb6ec",
+      "bytes": 1187
+    },
+    "document.cms": {
+      "sha256": "6e3e91322dfcb9360bf23a322b1f267d8e43fa2d3a6cf7fa6edb566bd333530c",
+      "bytes": 4002
+    },
+    "request.der": {
+      "sha256": "2b7229f6b41dd707bfbffa43b486d3ae11b181e45494a78c175250cc91573100",
+      "bytes": 77
+    },
+    "signer.cer": {
+      "sha256": "15db9223255ba223d76daab422103e45b79090bb0c2c02b62a2d261b2c601bf0",
+      "bytes": 633
+    },
+    "token.der": {
+      "sha256": "d03c988d03a2c8f81c3ac207f16ab2e9a595fe1268f3bb43c06a5e489c19f954",
+      "bytes": 2790
+    },
+    "tsa-root.cer": {
+      "sha256": "a9feaae7a84ee2e6fff07d68a8627a75e6031ce8bec1b09196880665fbe20482",
+      "bytes": 1724
+    },
+    "tsa.cer": {
+      "sha256": "6ab4ec4d2b16e94e95f6e7337072dba4ca58cbbc70eb27087058fe5cfbe7c69c",
+      "bytes": 1574
+    }
+  }
+}

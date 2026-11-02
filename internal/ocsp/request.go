@@ -4,6 +4,8 @@
 package ocsp
 
 import (
+	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/asn1"
 	"errors"
 	"hash"
@@ -61,8 +63,11 @@ func NewCertID(subject, issuer *cert.Certificate, hashAlgOID asn1.ObjectIdentifi
 	if subject == nil || issuer == nil {
 		return nil, errors.New("ocsp: nil certificate")
 	}
-	if subject.SerialNumber == nil {
+	if subject.SerialNumber == nil || subject.SerialNumber.Sign() <= 0 {
 		return nil, errors.New("ocsp: subject has no serial number")
+	}
+	if len(issuer.SubjectPublicKeyBytes) == 0 || len(issuer.Subject.FullBytes) == 0 {
+		return nil, errors.New("ocsp: issuer encoding is unavailable")
 	}
 
 	h, err := newHashByOID(hashAlgOID)
@@ -77,9 +82,7 @@ func NewCertID(subject, issuer *cert.Certificate, hashAlgOID asn1.ObjectIdentifi
 
 	// IssuerKeyHash = Hash(issuer public key bytes)
 	h.Reset()
-	if issuer.PublicKey != nil {
-		_, _ = h.Write(issuer.PublicKey.Q.X.Bytes())
-	}
+	_, _ = h.Write(issuer.SubjectPublicKeyBytes)
 	issuerKeyHash := h.Sum(nil)
 
 	return &CertID{
@@ -129,6 +132,10 @@ func (r *Request) Marshal() ([]byte, error) {
 // newHashByOID returns a [hash.Hash] for the given algorithm OID.
 func newHashByOID(algOID asn1.ObjectIdentifier) (hash.Hash, error) {
 	switch {
+	case algOID.Equal(asn1.ObjectIdentifier{1, 3, 14, 3, 2, 26}):
+		return sha1.New(), nil
+	case algOID.Equal(asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}):
+		return sha256.New(), nil
 	case algOID.Equal(oid.Kupyna256):
 		return kupyna.New256(), nil
 	case algOID.Equal(oid.Kupyna384):

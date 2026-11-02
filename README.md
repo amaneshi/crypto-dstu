@@ -50,7 +50,7 @@ go get github.com/your-org/crypto-dstu
 
 > **Note:** The module is currently named `crypto-dstu` (local). Replace `github.com/your-org/crypto-dstu` with the actual published module path.
 
-Requires Go 1.21 or later.
+Requires Go 1.27 or later (see `go.mod`).
 
 ---
 
@@ -65,7 +65,6 @@ dstu sign \
   -key Key-6.dat:password \
   -cert cert.sign.der -cert cert.cryp.der \
   -crypt otrimano.cer \
-  -tsp https://tsp.gov.ua/ -tsp-level all \
   -email me@example.com \
   -input zvit.xml \
   -output zvit.xml.sign.enc
@@ -78,7 +77,6 @@ dstu sign \
   -key Key-6.dat:password \
   -cert cert.sign.der \
   -no-tax \
-  -tsp https://tsp.gov.ua/ -tsp-level all \
   -input text.pdf \
   -output text.pdf.p7s
 ```
@@ -105,19 +103,8 @@ dstu sign \
   -output zvit.xml.sign
 ```
 
-**Include full certificate chain (CAdES-X-Long):**
-
-```bash
-dstu sign \
-  -key Key-6.dat:password \
-  -cert cert.sign.der \
-  -no-tax \
-  -include-chain full \
-  -input text.pdf \
-  -output text.pdf.p7s
-```
-
-> **Note:** `-tsp-level` and `-include-chain` flags are accepted by the CLI but TSP stamping and CAdES-C/X chain embedding are not yet wired into the output — they are reserved for a future release.
+Timestamp and extended-chain embedding are not implemented. The CLI rejects
+`-tsp`, non-`none` `-tsp-level`, and non-`none` `-include-chain`.
 
 #### `dstu sign` flags
 
@@ -131,12 +118,12 @@ dstu sign \
 | `-no-tax` | false | Raw CMS output; omit transport header and UA_SIGN1 prefix |
 | `-detached` | false | Produce detached signature (content not embedded) |
 | `-crypt path` | | Recipient certificate: sign then encrypt |
-| `-tsp url` | | TSP server URL (repeatable) |
-| `-tsp-level value` | none | Timestamp level: `none` \| `signature` \| `content` \| `all` |
+| `-tsp url` | | Unsupported; returns an error |
+| `-tsp-level value` | none | Only `none` is currently supported |
 | `-role value` | | Key role for multi-key stores: `personal` \| `fop` \| `director` \| `stamp` \| `other` |
 | `-email addr` | | Sender email for transport header |
 | `-filename name` | | Attachment filename for transport header |
-| `-include-chain value` | none | Certificate chain inclusion: `none` \| `ref` \| `full` |
+| `-include-chain value` | none | Only `none` is currently supported |
 
 ---
 
@@ -159,6 +146,9 @@ Automatically detects transport container, raw CMS, and encrypted formats. With 
 |------|---------|-------------|
 | `-key path[:password]` | required | Key container |
 | `-ca path` | | CA bundle for chain verification |
+| `-cert path` | | Recipient or sender discovery certificate (repeatable) |
+| `-require-ocsp` | false | Require authenticated current OCSP for the certificate path |
+| `-ocsp-response path` | | Saved DER OCSP evidence (repeatable; enables required OCSP) |
 | `-input path` | stdin | Input file |
 | `-output path` | stdout | Output file |
 | `-role value` | | Key role |
@@ -285,6 +275,7 @@ Exit codes: `0` = good, `2` = revoked, `3` = unknown.
 |------|---------|-------------|
 | `-cert path` | required | Certificate to check |
 | `-issuer path` | required | Issuer certificate |
+| `-response path` | | Validate saved DER OCSP evidence instead of fetching |
 | `-url url` | | Override OCSP responder URL (default: from AIA extension) |
 
 ---
@@ -316,13 +307,28 @@ dstu unprotect -key Key-6.dat:password > key.pem
 
 | Format | Extension | Notes |
 |--------|-----------|-------|
-| Key-6.dat | `.dat` | PBES2 + PBKDF2-GOST + GOST28147-CFB; Ukrainian tax office standard |
+| Key-6.dat | `.dat` | PBES2: HMAC-GOST34311 / GOST28147-CFB or Kupyna MAC-256 / Kalyna-256 CBC |
 | JKS | `.jks` | Java KeyStore; PrivatBank Privat24, may contain multiple keys |
-| PKCS#12 / PFX | `.p12`, `.pfx` | GOST-encrypted container |
+| PKCS#12 / PFX | `.p12`, `.pfx` | Reads supported GOST and Kupyna/Kalyna PBES2 containers |
 | Raw PKCS#8 | `.der`, `.raw` | Unencrypted DER-encoded private key |
 | PEM | `.pem` | PEM-wrapped DER |
 
 Format is auto-detected when loading via `box.LoadKeyFile` / `box.LoadKey`.
+
+To protect a single unencrypted PKCS#8 DER or PEM key:
+
+```go
+protected, err := ua.ProtectKey(rawPKCS8, password)
+if err != nil {
+    return err
+}
+return os.WriteFile("Key-6.dat", protected, 0600)
+```
+
+This writes Kupyna MAC-256 / Kalyna-256 CBC with 10,000 PBKDF2 iterations
+and fresh random 32-byte salt and IV. Passwords must contain 1–32 UTF-8 bytes
+and cannot end in NUL. For IIT interoperability, use ASCII passwords; non-ASCII
+compatibility is not established. Certificates are supplied separately.
 
 ---
 
@@ -396,6 +402,11 @@ box.LoadKeyFile("Key-6.dat", "password")
 
 plain, err := box.DecryptDocument(encrypted)
 ```
+
+For a static-originator envelope, load the sender's certificate with `box.AddCert`
+when it is not embedded in the envelope. The decrypt CLI accepts `-cert sender.cer`.
+These certificates supply agreement keys without becoming trusted roots;
+verify the decrypted signed content separately before using it.
 
 ### Sign and encrypt in one step (tax office workflow)
 
@@ -530,17 +541,18 @@ err = parsed.Verify()
 ### OCSP certificate status check
 
 ```go
-import "crypto-dstu/internal/ocsp"
-
-client := &ocsp.Client{} // URL taken from cert AIA extension
-resp, err := client.Check(subjectCert, issuerCert)
-if resp.Responses[0].Status == ocsp.Good {
-    // certificate is valid
+result, err := box.UnsignDocumentWithOptions(ctx, signedDER, originalContent, ua.VerificationOptions{
+    Revocation:    ua.RevocationRequireOCSP,
+    OCSPResponses: savedResponses,
+})
+if err != nil {
+    return err // no verified content is released
 }
-
-// Or extract AIA OCSP URLs manually
-urls := ocsp.AIAOCSPURLs(cert)
+// result.Content is verified; signer results include the revocation outcome.
 ```
+
+Saved responses must cover each non-anchor certificate on the validated path.
+For application-owned fetching and policy limits, see [revocation verification](docs/revocation.md).
 
 ---
 
@@ -602,13 +614,117 @@ Pass it to the CLI with `-ca CACertificates.p7b` or to the library with `box.Loa
 
 ## Compatibility
 
-- Cryptographic correctness aligned with **[cryptonite](https://github.com/privat-it/cryptonite)** (PrivatBank C library) — the authoritative Ukrainian PKI reference.
+Optional independent tests verify DSTU 4145/GOST signatures and dynamic-key
+encryption in both directions with IIT, including generated test key containers.
+See [IIT interoperability tests](docs/iit-interoperability.md) for setup, the tested
+SDK version, results, and remaining profile coverage.
+
+See [revocation verification](docs/revocation.md) for explicit OCSP policy,
+offline evidence, application-owned fetching and failure behavior.
+
+- Format and algorithm reference: **[cryptonite](https://github.com/privat-it/cryptonite)**. This does not establish complete conformance.
 - Test suite includes real CZO test samples for CAdES/XAdES/PAdES formats (DSTU and DSTU-7564 algorithm variants), downloaded from [czo.gov.ua/testexamples](https://czo.gov.ua/testexamples).
-- Interoperable with documents produced by ME.DOC software.
+- ME.DOC and DPS interoperability require independent fixture validation.
 - **Not** API-compatible with `jkurwa` (JavaScript) — different byte ordering conventions.
 
 ---
 
+## Pending changes
+
+The core signing, encryption, timestamp and modern Key-6 import/export paths
+have independent interoperability checks. The following work remains; passing
+the current matrix does not establish production readiness or support for
+untested profiles.
+
+- [ ] **Next priority — PKCS#12 hardening:** verify container MACs, define explicit
+  handling for missing or unsupported integrity protection, and match certificates
+  to private keys by public key instead of the parser's current index pairing.
+  Add tampering, reordered-bag, multiple-key and ambiguous-association tests.
+- [ ] **Broader compatibility:** extend modern Kalyna encryption coverage beyond
+  PB257, investigate cross-provider non-ASCII passwords, and evaluate ONB curve
+  support. Keep unsupported profiles explicit until independently validated.
+- [ ] **PFX export:** add password-protected PKCS#12 export with certificate
+  association and integrity protection. Current modern export through
+  `ua.ProtectKey` writes a single Key-6 key without embedded certificates.
+- [ ] **Release validation:** obtain an independent security review, broaden
+  parser/primitive fuzzing and external known-answer coverage, and automate the
+  pinned IIT checks in CI. Include independent raw Kalyna KW vectors exercising
+  round counters above 255.
+
+Tax-report submission, receipt polling and report-status handling are deferred
+to the separate `tax-reporting` project. They are outside this library's current
+work scope. See [IIT interoperability](docs/iit-interoperability.md) for the exact
+tested profiles and [AGENTS.md](AGENTS.md) for contributor/agent instructions.
+
 ## License
 
 MIT
+
+## Verification and trust
+
+`ua.Box.UnsignDocument` verifies signatures and requires explicitly configured
+trust anchors through `LoadCABundle`. `AddCert` supplies certificate discovery
+and key association only; imported keystore certificates are never implicitly trusted.
+Detached signatures require `UnsignDocumentWithContent` and the original bytes.
+Verification failures return an error and no authenticated content. The decrypt CLI
+does not write content unless every signer is verified.
+
+The internal CMS API permits mathematical verification without chain trust only
+when its roots argument is nil. This is appropriate for archived test vectors,
+not for accepting government receipts. Path validation checks supported critical
+extensions, validity, CA constraints and key usages; online revocation is a separate
+policy step and is not automatically performed.
+
+Load separate signing/agreement certificates with `AddCert`. Use
+`SelectKeyByRole` (CLI `-role`) when multiple signing keys are loaded;
+ambiguous roles fail rather than selecting an arbitrary key. Windows drive-letter
+paths are supported by the `-key path[:password]` parser.
+
+Signed-and-encrypted tax containers expose only the encrypted signed payload,
+never an unencrypted sibling copy of the report. CMS signed attributes are emitted
+with DER ordering and the implicit field tag. Digest profiles can be selected using
+`ua.SignOptions.DigestAlgorithm` or the signing CLI:
+
+```sh
+dstu sign -key Key-6.dat:password -cert signer.cer -input document.xml -output document.p7s -no-tax -digest kupyna256
+```
+
+`-digest` accepts `auto` (the default), `gost34311`, `kupyna256` and `kupyna512`.
+It selects the CMS document-signature digest for attached, detached, transport,
+timestamped and signed-and-encrypted output. Unknown values fail before reading
+keys or writing output. The choice does not change the key's curve, encryption
+algorithm or timestamp-imprint algorithm.
+
+`auto` follows supported certificate **public-key** algorithm identifiers. A
+Kupyna-signed certificate can still declare a GOST public-key identifier, so
+use an explicit digest when the required document profile is Kupyna. This
+preserves the existing default; the issuer's certificate-signature algorithm
+does not select the document digest. See the independently checked
+[IIT profile matrix](docs/iit-interoperability.md#limits) for curve/profile coverage.
+
+`dstu encrypt` and `dstu sign -crypt` accept `-cipher gost28147-cfb` (default),
+`kalyna256-cfb` or `kalyna256-ofb`. The Kalyna profiles select Kupyna-256 key
+derivation and the national Kalyna CMAC/CFB key wrapper together. Decryption
+selects the profile from the envelope's declared algorithms.
+
+```sh
+dstu sign -key Key-6.dat:password -cert signer.cer -crypt recipient.cer -input document.xml -output encrypted.bin -digest kupyna256 -cipher kalyna256-cfb
+```
+
+Go callers can use `EncryptDocumentWithOptions(content, recipientDER,
+ua.EncryptionOptions{Algorithm: ua.EncryptionKalyna256CFB})`. For
+`SignAndEncrypt`, set `SignOptions.Encryption` to those options. The OFB constant
+is `ua.EncryptionKalyna256OFB`; zero options preserve GOST CFB. Unknown cipher
+names fail explicitly. Select encryption independently from the signature digest.
+
+For raw `pkg/kalyna.KW`, `Wrap` and `Unwrap` now require whole cipher blocks
+and check the full integrity block before releasing plaintext. Non-aligned keys
+use `WrapPadded` and `UnwrapPadded(wrapped, originalByteLength)`; migrate callers
+that previously relied on implicit padding. Trailing zero bytes are preserved.
+
+This is an experimental cryptographic implementation: these fixes are not an
+independent timing-resistance audit or proof of DPS production interoperability.
+Validate emitted containers and the selected profile against an independent provider
+before using real taxpayer keys or submitting reports.
+
+Signature timestamp creation and verification are opt-in; see [timestamp policy and CAdES-T interoperability](docs/timestamps.md).

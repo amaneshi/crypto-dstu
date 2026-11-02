@@ -1,13 +1,16 @@
 package keystore
 
 import (
+	"bytes"
 	"crypto/sha1"
+
 	"encoding/asn1"
 	"errors"
 
 	"crypto-dstu/pkg/dstu4145"
 	"crypto-dstu/pkg/gost28147"
 	"crypto-dstu/pkg/gost34311"
+	"crypto-dstu/pkg/kupyna"
 )
 
 // OIDs used in Key-6.dat / PKCS#8 encrypted containers (Ukrainian PKI profile).
@@ -19,13 +22,12 @@ var (
 	// PBKDF2 (RFC 2898).
 	oidPBKDF2 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
 
-	// HMAC-GOST34311 PRF OID used in Ukrainian PBKDF2
-	// cryptonite: OID_PKI_HMAC_GOST3411_ID → 1.2.804.2.1.1.1.1.1.1.4
-	oidHMACGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 4}
+	// Kupyna MAC-256 and HMAC-GOST34311 PBKDF2 PRF identifiers.
+	oidKupynaKMAC256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 2, 4}
+	oidHMACGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 2}
 
-	// GOST 28147-89 CFB (Ukrainian variant) — parent OID for all CFB mode variants
-	// cryptonite: OID_GOST28147_DSTU_ID → 1.2.804.2.1.1.1.1.1.1.1
-	oidGost28147CFB = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 1}
+	// cryptonite OID_GOST28147_CFB_ID (the mode-specific identifier).
+	oidGost28147CFB = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3}
 )
 
 // EncryptedPrivateKeyInfo is the outer PKCS#8 encrypted container structure.
@@ -65,16 +67,14 @@ type pbes2Params struct {
 type pbkdf2Params struct {
 	Salt       []byte
 	Iterations int
+	KeyLength  int                 `asn1:"optional"`
 	PRF        algorithmIdentifier `asn1:"optional"`
 }
 
 // ParseKey6 parses and decrypts a Key-6.dat (PBES2-encrypted PKCS#8) container.
-// Matches cryptonite pkcs5_decrypt_dstu():
-//  1. Parse outer EncryptedPrivateKeyInfo — verify algorithm = PBES2
-//  2. Parse PBES2-params → extract PBKDF2 KDF params + GOST28147 encryption params
-//  3. Derive 32-byte key: PBKDF2(HMAC-GOST34311, password, salt, iterations)
-//  4. Decrypt with GOST28147 CFB
-//  5. Parse decrypted bytes as unencrypted PKCS#8 PrivateKeyInfo
+// Supports the legacy HMAC-GOST34311/GOST28147-CFB profile and the IIT
+// Kupyna MAC-256/Kalyna-256-CBC profile. The latter uses a zero-padded
+// password of at most 32 bytes and strict PKCS#7 padding.
 func ParseKey6(data []byte, password string) (*dstu4145.PrivateKey, error) {
 	// Strip PEM / base64 if needed
 	data = MaybePEM(data)
@@ -89,58 +89,16 @@ func ParseKey6(data []byte, password string) (*dstu4145.PrivateKey, error) {
 		return nil, errors.New("keystore: Key6: trailing data in container")
 	}
 
-	if !epki.Algorithm.Algorithm.Equal(oidPBES2) {
-		return nil, errors.New(
-			"keystore: Key6: unsupported encryption algorithm (expected PBES2): " + epki.Algorithm.Algorithm.String(),
-		)
-	}
-
-	// Parse PBES2-params from AlgorithmIdentifier.parameters
-	var p2 pbes2Params
-	_, err = asn1.Unmarshal(epki.Algorithm.Parameters.FullBytes, &p2)
+	p2, kdfP, err := parsePBES2Parameters(epki.Algorithm)
 	if err != nil {
-		return nil, errors.New("keystore: Key6: PBES2-params: " + err.Error())
+		return nil, err
 	}
 
-	if !p2.KDF.Algorithm.Equal(oidPBKDF2) {
-		return nil, errors.New("keystore: Key6: unsupported KDF (expected PBKDF2): " + p2.KDF.Algorithm.String())
-	}
-
-	// Parse PBKDF2-params
-	var kdfP pbkdf2Params
-	_, err = asn1.Unmarshal(p2.KDF.Parameters.FullBytes, &kdfP)
+	plaintext, err := decryptPBES2Data(p2, kdfP, epki.EncryptedData, []byte(password))
 	if err != nil {
-		return nil, errors.New("keystore: Key6: PBKDF2-params: " + err.Error())
+		return nil, err
 	}
-	if kdfP.Iterations < 1 {
-		return nil, errors.New("keystore: Key6: invalid iteration count")
-	}
-
-	// Determine PRF: HMAC-GOST34311 (Ukrainian) or default SHA1
-	useGOST := kdfP.PRF.Algorithm.Equal(oidHMACGost34311)
-	if !useGOST && len(kdfP.PRF.Algorithm) > 0 {
-		// Unsupported PRF
-		return nil, errors.New("keystore: Key6: unsupported PBKDF2 PRF: " + kdfP.PRF.Algorithm.String())
-	}
-
-	// Derive 32-byte key
-	dk, err := pbkdf2GOST([]byte(password), kdfP.Salt, kdfP.Iterations, 32, useGOST)
-	if err != nil {
-		return nil, errors.New("keystore: Key6: PBKDF2: " + err.Error())
-	}
-
-	// Extract IV from encryption scheme parameters.
-	// GOST28147 CFB parameters carry the IV as an OCTET STRING (8 bytes).
-	iv, err := extractGOSTCFBIV(p2.EncScheme)
-	if err != nil {
-		return nil, errors.New("keystore: Key6: IV: " + err.Error())
-	}
-
-	// Decrypt with GOST28147 CFB
-	plaintext, err := gost28147.DecryptCFB(dk, iv, epki.EncryptedData)
-	if err != nil {
-		return nil, errors.New("keystore: Key6: decrypt: " + err.Error())
-	}
+	defer clear(plaintext)
 
 	// Parse decrypted bytes as unencrypted PrivateKeyInfo
 	priv, err := ParseRawKey(plaintext)
@@ -154,35 +112,29 @@ func ParseKey6(data []byte, password string) (*dstu4145.PrivateKey, error) {
 // The parameters field is typically an OCTET STRING containing the IV directly,
 // or a SEQUENCE { OCTET STRING iv }.
 func extractGOSTCFBIV(aid algorithmIdentifier) ([]byte, error) {
+	if !aid.Algorithm.Equal(oidGost28147CFB) {
+		return nil, errors.New("unsupported GOST cipher mode")
+	}
 	if len(aid.Parameters.FullBytes) == 0 {
 		return nil, errors.New("missing GOST CFB parameters")
 	}
 
 	// Try: raw OCTET STRING
 	var iv []byte
-	if _, err := asn1.Unmarshal(aid.Parameters.FullBytes, &iv); err == nil && len(iv) == 8 {
+	if rest, err := asn1.Unmarshal(aid.Parameters.FullBytes, &iv); err == nil && len(rest) == 0 && len(iv) == 8 {
 		return iv, nil
 	}
 
 	// Try: SEQUENCE { OCTET STRING }
 	var seq struct {
-		IV []byte
+		IV  []byte
+		DKE []byte `asn1:"optional"`
 	}
-	if _, err := asn1.Unmarshal(aid.Parameters.FullBytes, &seq); err == nil && len(seq.IV) == 8 {
-		return seq.IV, nil
-	}
-
-	// Try: parameters bytes directly (some encodings embed IV as raw bytes)
-	raw := aid.Parameters.Bytes
-	if len(raw) == 8 {
-		return raw, nil
-	}
-	// Try nested SEQUENCE inside the tag
-	if len(raw) > 2 && raw[0] == 0x04 {
-		ivLen := int(raw[1])
-		if ivLen == 8 && len(raw) >= 10 {
-			return raw[2:10], nil
+	if rest, err := asn1.Unmarshal(aid.Parameters.FullBytes, &seq); err == nil && len(rest) == 0 && len(seq.IV) == 8 {
+		if len(seq.DKE) != 0 && !bytes.Equal(seq.DKE, gost28147.SboxDSTU.Packed()) {
+			return nil, errors.New("unsupported GOST cipher DKE")
 		}
+		return seq.IV, nil
 	}
 
 	return nil, errors.New("cannot extract 8-byte IV from GOST CFB params")
@@ -208,13 +160,18 @@ func pbkdf2WithHMAC(
 	iterations, keyLen int,
 	hmacFn func(key, data []byte) []byte,
 ) ([]byte, error) {
-	hashLen := len(hmacFn(password, salt))
+	if iterations < 1 || keyLen < 1 {
+		return nil, errors.New("keystore: invalid PBKDF2 parameters")
+	}
 	dk := make([]byte, 0, keyLen)
+	salted := make([]byte, len(salt)+4)
+	copy(salted, salt)
 	block := 1
 	for len(dk) < keyLen {
 		// U1 = HMAC(password, salt || block_counter_BE)
 		counter := []byte{byte(block >> 24), byte(block >> 16), byte(block >> 8), byte(block)}
-		u := hmacFn(password, append(salt, counter...))
+		copy(salted[len(salt):], counter)
+		u := hmacFn(password, salted)
 		t := make([]byte, len(u))
 		copy(t, u)
 
@@ -226,7 +183,6 @@ func pbkdf2WithHMAC(
 		}
 		dk = append(dk, t...)
 		block++
-		_ = hashLen
 	}
 	return dk[:keyLen], nil
 }
@@ -271,7 +227,7 @@ func hmacGost34311(key, data []byte) []byte {
 
 // MarshalKey6 encrypts a raw PKCS#8 DER private key into a Key-6.dat
 // (PBES2 EncryptedPrivateKeyInfo) container using PBKDF2-HMAC-GOST34311 + GOST28147-CFB.
-// salt must be 8 bytes, iv must be 8 bytes (GOST 28147 block size).
+// salt must be nonempty; iv must be 8 bytes (GOST 28147 block size).
 func MarshalKey6(rawKeyDER []byte, password string, salt []byte, iterations int, iv []byte) ([]byte, error) {
 	if len(salt) == 0 {
 		return nil, errors.New("keystore: MarshalKey6: salt is empty")
@@ -292,14 +248,14 @@ func MarshalKey6(rawKeyDER []byte, password string, salt []byte, iterations int,
 		return nil, err
 	}
 
-	// Build GOST28147 CFB AlgorithmIdentifier: parameters = OCTET STRING(iv)
-	ivDER, err := asn1.Marshal(iv)
+	// Ukrainian GOST28147Params carries both IV and the packed S-box (DKE).
+	ivDER, err := asn1.Marshal(struct{ IV, DKE []byte }{iv, gost28147.SboxDSTU.Packed()})
 	if err != nil {
 		return nil, err
 	}
 
 	// Build PBKDF2-params
-	prfAID := algorithmIdentifier{Algorithm: oidHMACGost34311}
+	prfAID := algorithmIdentifier{Algorithm: oidHMACGost34311, Parameters: asn1.RawValue{Tag: asn1.TagNull}}
 	prfDER, err := asn1.Marshal(prfAID)
 	if err != nil {
 		return nil, err
@@ -361,4 +317,41 @@ func hmacSHA1(key, data []byte) []byte {
 	innerArr := sha1.Sum(append(append([]byte(nil), ipad...), data...))
 	outerArr := sha1.Sum(append(append([]byte(nil), opad...), innerArr[:]...))
 	return outerArr[:]
+}
+
+// pbkdf2ForPRF dispatches the declared PRF. Kupyna MAC is the DSTU 7564
+// keyed construction with a zero-padded 32-byte password, not HMAC.
+func pbkdf2ForPRF(password []byte, parameters pbkdf2Params, length int) ([]byte, error) {
+	if parameters.Iterations < 1 || parameters.Iterations > 1_000_000 || len(parameters.Salt) == 0 {
+		return nil, errors.New("keystore: unsupported PBKDF2 work factor or salt")
+	}
+	if parameters.KeyLength != 0 && parameters.KeyLength != length {
+		return nil, errors.New("keystore: PBKDF2 key length does not match cipher")
+	}
+	p := parameters.PRF
+	if len(p.Parameters.FullBytes) > 0 && !bytes.Equal(p.Parameters.FullBytes, []byte{5, 0}) {
+		return nil, errors.New("keystore: unsupported PBKDF2 PRF parameters")
+	}
+	var prf func([]byte, []byte) []byte
+	switch {
+	case p.Algorithm.Equal(oidHMACGost34311):
+		prf = hmacGost34311
+	case p.Algorithm.Equal(oidKupynaKMAC256):
+		if len(password) > 32 {
+			return nil, errors.New("keystore: KMAC256 password exceeds supported 32-byte profile")
+		}
+		prf = func(key, data []byte) []byte {
+			padded := make([]byte, 32)
+			copy(padded, key)
+			defer clear(padded)
+			h := kupyna.NewKMAC256(padded)
+			h.Write(data)
+			return h.Sum(nil)
+		}
+	case len(p.Algorithm) == 0 || p.Algorithm.Equal(asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}):
+		prf = hmacSHA1
+	default:
+		return nil, errors.New("keystore: unsupported PBKDF2 PRF: " + p.Algorithm.String())
+	}
+	return pbkdf2WithHMAC(password, parameters.Salt, parameters.Iterations, length, prf)
 }

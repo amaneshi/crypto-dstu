@@ -1,0 +1,20 @@
+{
+  "validatedAt": "2026-11-01T16:34:50Z",
+  "endpoint": "http://ca-test.czo.gov.ua/services/tsp/",
+  "certificateArchive": "https://czo.gov.ua/download/certificates_test/CA-FULL.zip",
+  "description": "GOST message imprint, Kupyna-256 PB-LE TSA signature; public fixed test bytes only; no revocation/historical-validity claim",
+  "files": {
+    "request.der": {
+      "sha256": "63f4cc3f0def9703ee8d84e70cddc66ec3d39b7c9c0a2d566fea401ddb11bfc9",
+      "bytes": 77
+    },
+    "root.cer": {
+      "sha256": "a9feaae7a84ee2e6fff07d68a8627a75e6031ce8bec1b09196880665fbe20482",
+      "bytes": 1724
+    },
+    "token.der": {
+      "sha256": "34ef6f955a08a07290e38ff2c943b19726d328f8b0d79a6a9d497a9156b230f1",
+      "bytes": 2790
+    }
+  }
+}

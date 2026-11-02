@@ -1,7 +1,9 @@
 package dstu15946
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/asn1"
 	"testing"
 
 	"crypto-dstu/pkg/dstu4145"
@@ -12,6 +14,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestKDFBindsWrapAndPreservesKupynaFieldWidth(t *testing.T) {
+	secret := bytes.Repeat([]byte{0x53}, 32)
+	padded := append([]byte{0}, secret...)
+	ukm := bytes.Repeat([]byte{0x49}, 64)
+	first, err := DeriveKeyForWrap(secret, ukm, gost34311.New, OIDGost28147CfbWrap)
+	require.NoError(t, err)
+	second, err := DeriveKeyForWrap(padded, ukm, gost34311.New, OIDGost28147CfbWrap)
+	require.NoError(t, err)
+	require.Equal(t, first, second)
+	first, err = DeriveKeyForWrap(secret, ukm, kupyna.New256, OIDKalynaWrap)
+	require.NoError(t, err)
+	second, err = DeriveKeyForWrap(padded, ukm, kupyna.New256, OIDKalynaWrap)
+	require.NoError(t, err)
+	require.NotEqual(t, first, second)
+	other, err := DeriveKeyForWrap(secret, ukm, kupyna.New256, OIDGost28147CfbWrap)
+	require.NoError(t, err)
+	require.NotEqual(t, first, other)
+	_, err = DeriveKeyForWrap(secret, ukm, kupyna.New256, asn1.ObjectIdentifier{1, 2, 3})
+	require.Error(t, err)
+	_, err = DeriveKeyForWrap(make([]byte, 33), ukm, kupyna.New256, OIDKalynaWrap)
+	require.Error(t, err)
+}
 
 // TestSharedSecretSymmetry verifies Alice and Bob derive the same ZZ.
 // Matches cryptonite dstu4145_dh with_cofactor=true.

@@ -6,6 +6,17 @@ package gost28147
 // This layout matches PrivatBank cryptonite GOST28147_SBOX_* and gogost Sbox.
 type Sbox [8][16]byte
 
+// Packed returns the 64-byte DKE encoding used by Ukrainian algorithm parameters.
+func (s *Sbox) Packed() []byte {
+	dke := make([]byte, 64)
+	for row := range 8 {
+		for col := 0; col < 16; col += 2 {
+			dke[row*8+col/2] = s[row][col]<<4 | s[row][col+1]
+		}
+	}
+	return dke
+}
+
 // SboxDSTU is the Ukrainian DSTU S-box (cryptonite GOST28147_SBOX_1).
 // Source: privat-it/cryptonite src/cryptonite/c/gost28147.c GOST28147_SBOX_1.
 var SboxDSTU = &Sbox{

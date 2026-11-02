@@ -1,8 +1,11 @@
 package tsp
 
 import (
+	"bytes"
 	"encoding/asn1"
 	"errors"
+
+	"crypto-dstu/internal/cms"
 )
 
 // Response is an RFC 3161 TimeStampResp.
@@ -13,17 +16,27 @@ type Response struct {
 
 // ParseResponse decodes a DER-encoded TimeStampResp.
 func ParseResponse(der []byte) (*Response, error) {
+	if len(der) == 0 || len(der) > 4<<20 {
+		return nil, errors.New("tsp: invalid response size")
+	}
 	var resp Response
 	if rest, err := asn1.Unmarshal(der, &resp); err != nil {
 		return nil, errors.New("tsp: parse response: " + err.Error())
 	} else if len(rest) > 0 {
 		return nil, errors.New("tsp: parse response: trailing data")
 	}
+	hasToken := len(resp.TimeStampToken.FullBytes) > 0
+	if resp.Status.Status < 0 || resp.Status.Status > 5 || ((resp.Status.Status == 0 || resp.Status.Status == 1) != hasToken) {
+		return nil, errors.New("tsp: inconsistent response status/token")
+	}
 	return &resp, nil
 }
 
 // Err returns a non-nil error if the response status indicates failure.
 func (r *Response) Err() error {
+	if r == nil {
+		return errors.New("tsp: missing response")
+	}
 	switch r.Status.Status {
 	case StatusGranted, StatusGrantedWithMods:
 		return nil
@@ -81,86 +94,25 @@ func ParseTSTInfo(tokenDER []byte) (*TSTInfo, error) {
 	if len(rest) > 0 {
 		return nil, errors.New("tsp: parse TSTInfo: trailing data")
 	}
+	canonical, err := asn1.Marshal(info)
+	if err != nil || !bytes.Equal(canonical, tstInfoBytes) {
+		return nil, errors.New("tsp: noncanonical TSTInfo fields")
+	}
 	return &info, nil
 }
 
 // extractTSTInfoBytes walks the CMS ContentInfo → SignedData → EContent
 // to return the raw DER bytes of the TSTInfo SEQUENCE.
 func extractTSTInfoBytes(tokenDER []byte) ([]byte, error) {
-	// ContentInfo = SEQUENCE { OID, [0] EXPLICIT content }
-	var ciSeq asn1.RawValue
-	var err error
-	_, err = asn1.Unmarshal(tokenDER, &ciSeq)
+	if len(tokenDER) == 0 || len(tokenDER) > 4<<20 {
+		return nil, errors.New("tsp: invalid token size")
+	}
+	msg, err := cms.ParseSigned(tokenDER)
 	if err != nil {
-		return nil, errors.New("tsp: parse ContentInfo: " + err.Error())
+		return nil, err
 	}
-	inner := ciSeq.Bytes
-
-	// OID
-	var oid asn1.ObjectIdentifier
-	rest, err := asn1.Unmarshal(inner, &oid)
-	if err != nil {
-		return nil, errors.New("tsp: parse ContentInfo OID: " + err.Error())
+	if !msg.ContentType().Equal(OIDTSTInfo) || msg.Content == nil {
+		return nil, errors.New("tsp: token must encapsulate id-ct-TSTInfo")
 	}
-
-	// [0] EXPLICIT { SignedData SEQUENCE }
-	var ctx0 asn1.RawValue
-	_, err = asn1.Unmarshal(rest, &ctx0)
-	if err != nil {
-		return nil, errors.New("tsp: parse ContentInfo content: " + err.Error())
-	}
-	sdBytes := ctx0.Bytes
-
-	// SignedData SEQUENCE — unwrap
-	var sdSeq asn1.RawValue
-	_, err = asn1.Unmarshal(sdBytes, &sdSeq)
-	if err != nil {
-		return nil, errors.New("tsp: parse SignedData: " + err.Error())
-	}
-	data := sdSeq.Bytes
-
-	// Version
-	var version int
-	data, err = asn1.Unmarshal(data, &version)
-	if err != nil {
-		return nil, errors.New("tsp: parse SignedData version: " + err.Error())
-	}
-
-	// DigestAlgorithms SET
-	var digAlgs asn1.RawValue
-	data, err = asn1.Unmarshal(data, &digAlgs)
-	if err != nil {
-		return nil, errors.New("tsp: parse DigestAlgorithms: " + err.Error())
-	}
-
-	// EncapsulatedContentInfo SEQUENCE
-	var eciSeq asn1.RawValue
-	_, err = asn1.Unmarshal(data, &eciSeq)
-	if err != nil {
-		return nil, errors.New("tsp: parse ECI: " + err.Error())
-	}
-	eciInner := eciSeq.Bytes
-
-	// EContentType OID
-	var econtentType asn1.ObjectIdentifier
-	eciRest, err := asn1.Unmarshal(eciInner, &econtentType)
-	if err != nil {
-		return nil, errors.New("tsp: parse EContentType: " + err.Error())
-	}
-
-	// [0] EXPLICIT { OCTET STRING { TSTInfo } }
-	if len(eciRest) == 0 || eciRest[0] != 0xa0 {
-		return nil, errors.New("tsp: ECI has no encapsulated content")
-	}
-	var ctx asn1.RawValue
-	_, err = asn1.Unmarshal(eciRest, &ctx)
-	if err != nil {
-		return nil, errors.New("tsp: parse ECI content wrapper: " + err.Error())
-	}
-	var tstInfoDER []byte
-	_, err = asn1.Unmarshal(ctx.Bytes, &tstInfoDER)
-	if err != nil {
-		return nil, errors.New("tsp: parse TSTInfo OCTET STRING: " + err.Error())
-	}
-	return tstInfoDER, nil
+	return msg.Content, nil
 }

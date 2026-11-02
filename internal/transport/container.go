@@ -43,6 +43,9 @@ func Decode(data []byte) (*Container, error) {
 
 	// PACKED_XML detection
 	if bytes.HasPrefix(data, []byte("PACKED_XML")) {
+		if len(data) <= len("PACKED_XML") || data[len("PACKED_XML")] != 0 {
+			return nil, errors.New("transport: invalid PACKED_XML separator")
+		}
 		return &Container{
 			Sections: []Section{{Label: "PACKED_XML", Contents: data[len("PACKED_XML")+1:]}},
 		}, nil
@@ -53,6 +56,9 @@ func Decode(data []byte) (*Container, error) {
 		return nil, err
 	}
 
+	if len(raw) == 0 {
+		return nil, errors.New("transport: no sections")
+	}
 	c := &Container{}
 	var h *Header
 	var sub []Section

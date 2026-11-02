@@ -1,0 +1,7 @@
+{
+  "private_key_retained": false,
+  "producer": "IIT EUSignCP.dll",
+  "profile": "DSTU4145 PB431 / Kupyna-512",
+  "purpose": "public disposable-key interoperability vector; no trust or revocation assertion",
+  "sdk_sha256": "475539dd6b01015e73cf3d143783c3f164c3f9db1e92e724c6f6493f086d9f4f"
+}

@@ -148,7 +148,7 @@ func TestKupyna256SigAlg(t *testing.T) {
 		Subject: []csr.AttributeTypeAndValue{
 			{Type: oid.OIDCommonName, Value: "Kupyna256 CSR"},
 		},
-		SignatureAlgorithmOID: asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2},
+		SignatureAlgorithmOID: asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1},
 	}
 
 	der, err := csr.Create(req, priv)

@@ -9,8 +9,8 @@ import "encoding/asn1"
 // Signature algorithm OIDs.
 var (
 	DSTU4145WithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	DSTU4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
-	DSTU4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
+	DSTU4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
+	DSTU4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
 )
 
 // Named curve OIDs (index 0..9 → PB_163..PB_431).

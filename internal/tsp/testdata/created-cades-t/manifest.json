@@ -1,0 +1,23 @@
+{
+  "description": "Public test bytes and disposable document key. No private key retained; timestamp creation and roundtrip verification; revocation not checked.",
+  "endpoint": "http://ca-test.czo.gov.ua/services/tsp/",
+  "validatedAt": "2026-11-01T18:37:47Z",
+  "files": {
+    "content.txt": {
+      "sha256": "49e2636023c3e54a2f582684eb2970baafa53c1cc8d5dc29eb9c65be406f35b0",
+      "bytes": 57
+    },
+    "document-root.cer": {
+      "sha256": "a8679fa8933f70ba4387a8c150d9ec67e552ac2b1db9380c7e1e3f0660265c34",
+      "bytes": 353
+    },
+    "document.cms": {
+      "sha256": "725238cdc19fbf9c54bfcff348eba5af14e76a9bc81fc2ca6d091daa158c9379",
+      "bytes": 3644
+    },
+    "tsa-root.cer": {
+      "sha256": "a9feaae7a84ee2e6fff07d68a8627a75e6031ce8bec1b09196880665fbe20482",
+      "bytes": 1724
+    }
+  }
+}

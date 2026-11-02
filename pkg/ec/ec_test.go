@@ -172,7 +172,7 @@ func TestCompressExpand(t *testing.T) {
 	require.NoError(t, err, "Expand must not fail")
 
 	// Should get a valid point with the same x-coordinate
-	require.True(t, expanded.X.Equal(g.X), "Expanded point must have same x-coordinate")
+	require.True(t, expanded.Equal(g), "Expanded point must retain both coordinates")
 	require.True(t, curve.Contains(expanded), "Expanded point must be on curve")
 }
 
@@ -189,7 +189,7 @@ func TestCompressExpandMultiplePoints(t *testing.T) {
 		compressed := p.Compress()
 		expanded, err := curve.Expand(compressed)
 		require.NoError(t, err, "Expand must not fail for %d*G", i)
-		require.True(t, expanded.X.Equal(p.X), "Expanded %d*G must have same x-coordinate", i)
+		require.True(t, expanded.Equal(p), "Expanded %d*G must retain both coordinates", i)
 		require.True(t, curve.Contains(expanded), "Expanded %d*G must be on curve", i)
 	}
 }

@@ -1,24 +1,12 @@
 package kupyna
 
+import (
+	"encoding/binary"
+	"math/bits"
+)
+
 // state is stored as [columns][rows]byte, i.e. column-major order matching the reference impl.
 // state[col][row]
-
-// multiplyGF multiplies two bytes in GF(2^8) with reduction polynomial 0x11d.
-func multiplyGF(x, y byte) byte {
-	var r byte
-	for range 8 {
-		if y&1 == 1 {
-			r ^= x
-		}
-		hbit := x & 0x80
-		x <<= 1
-		if hbit != 0 {
-			x ^= 0x1d // low byte of reductionPoly 0x011d
-		}
-		y >>= 1
-	}
-	return r
-}
 
 // subBytes applies S-box substitution: column j uses sbox[row % 4].
 func subBytes(state [][rows]byte) {
@@ -34,14 +22,16 @@ func subBytes(state [][rows]byte) {
 // For 16 columns (1024-bit state): shifts = [0,1,2,3,4,5,6,11].
 func shiftBytes(state [][rows]byte) {
 	cols := len(state)
-	temp := make([]byte, cols)
+	var temp [nb1024]byte
+	// State widths are the powers of two 8 and 16, so masking wraps columns.
+	mask := cols - 1
 	for i := range rows {
 		shift := i
 		if cols == nb1024 && i == rows-1 {
 			shift = 11
 		}
 		for j := range cols {
-			temp[(j+shift)%cols] = state[j][i]
+			temp[(j+shift)&mask] = state[j][i]
 		}
 		for j := range cols {
 			state[j][i] = temp[j]
@@ -49,18 +39,28 @@ func shiftBytes(state [][rows]byte) {
 	}
 }
 
-// mixColumns multiplies each column by the MDS matrix in GF(2^8).
+// doubleBytes multiplies all eight byte lanes by x in GF(2^8), modulo 0x11d.
+// Mask before shifting to keep adjacent lanes independent. Each high-bit flag
+// contributes 0x1d in its own lane; the multiplication cannot carry across lanes.
+func doubleBytes(x uint64) uint64 {
+	return ((x & 0x7f7f7f7f7f7f7f7f) << 1) ^ (((x >> 7) & 0x0101010101010101) * 0x1d)
+}
+
+// mixColumns applies the circulant MDS row [1,1,5,1,8,6,7,4].
+// Packing a column into a word evaluates all eight output rows together.
+// Rotations select the corresponding input byte for each row, without adding
+// data-dependent lookup tables or branches to this transformation.
 func mixColumns(state [][rows]byte) {
-	var result [rows]byte
 	for col := range state {
-		for row := range rows {
-			var product byte
-			for b := range rows {
-				product ^= multiplyGF(state[col][b], mdsMatrix[row][b])
-			}
-			result[row] = product
-		}
-		state[col] = result
+		x := binary.LittleEndian.Uint64(state[col][:])
+		x2 := doubleBytes(x)
+		x4 := doubleBytes(x2)
+		x8 := doubleBytes(x4)
+		result := x ^ bits.RotateLeft64(x, -8) ^ bits.RotateLeft64(x4^x, -16) ^
+			bits.RotateLeft64(x, -24) ^ bits.RotateLeft64(x8, -32) ^
+			bits.RotateLeft64(x4^x2, -40) ^ bits.RotateLeft64(x4^x2^x, -48) ^
+			bits.RotateLeft64(x4, -56)
+		binary.LittleEndian.PutUint64(state[col][:], result)
 	}
 }
 

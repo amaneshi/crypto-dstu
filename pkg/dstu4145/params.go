@@ -18,8 +18,8 @@ type DomainParams struct {
 var (
 	// OIDDstu4145WithGost34311 and related are signature+hash algorithm OIDs.
 	OIDDstu4145WithGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	OIDDstu4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
-	OIDDstu4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
+	OIDDstu4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
+	OIDDstu4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
 
 	// OIDCurvePB163 and related are curve parameter OIDs (index 0..9 maps to PB_163..PB_431).
 	OIDCurvePB163 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 0}

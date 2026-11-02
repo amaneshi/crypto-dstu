@@ -1,0 +1,24 @@
+{
+  "documentURL": "https://czo.gov.ua/download/test_sign/CAdES/DSTU-7564/enveloped/CAdES-T/test.txt.p7s",
+  "certificateArchive": "https://czo.gov.ua/download/certificates_test/CA-FULL.zip",
+  "validatedAt": "2024-03-04T09:59:31Z",
+  "description": "Fixed-time timestamp signature/imprint and TSA-path interoperability; not historical or current revocation evidence",
+  "files": {
+    "discovery.der": {
+      "sha256": "bd1aa6d2e99f06b387eacd8578795df379a1352f320b29ad57b9d9a9084a7fd1",
+      "bytes": 3430
+    },
+    "document.cms": {
+      "sha256": "1bd6dbb6e80ee0f7e5016f02ac305ffa693ee1f09ed269aa5c3089925acc254e",
+      "bytes": 4756
+    },
+    "root.cer": {
+      "sha256": "7b09a37f4e3dc61340b74050b51d3bba301c6f465de0fc15de3307e5a28d901c",
+      "bytes": 1787
+    },
+    "tsa.cer": {
+      "sha256": "57512aceaf0cbe14daaf544ee6afcdd8d512dd0a9519f053c0536302b4d0ad4d",
+      "bytes": 1639
+    }
+  }
+}

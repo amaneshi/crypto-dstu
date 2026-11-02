@@ -21,7 +21,7 @@ type PrivateKey struct {
 
 // PublicKey holds a DSTU 4145 public key.
 type PublicKey struct {
-	Q     *ec.Point // public point Q = d·G
+	Q     *ec.Point // public point Q = -d·G (DSTU 4145 convention)
 	Curve *ec.Curve
 }
 
@@ -33,7 +33,7 @@ type Signature struct {
 
 // Public derives the public key from the private key.
 func (priv *PrivateKey) Public() *PublicKey {
-	q := priv.Curve.ScalarBaseMul(priv.D)
+	q := priv.Curve.ScalarBaseMul(priv.D).Neg()
 	return &PublicKey{Q: q, Curve: priv.Curve}
 }
 
@@ -42,7 +42,8 @@ func (priv *PrivateKey) PublicKey() crypto.PublicKey {
 	return priv.Public()
 }
 
-// GenerateKey generates a random DSTU 4145 private key for the given curve.
+// GenerateKey generates a nonzero DSTU 4145 private scalar with bit length
+// strictly smaller than the subgroup order's bit length (section 6.3).
 func GenerateKey(curve *ec.Curve) (*PrivateKey, error) {
 	n := new(big.Int).SetBytes(curve.N)
 	for {
@@ -71,14 +72,20 @@ func (priv *PrivateKey) Sign(rng io.Reader, digest []byte, _ crypto.SignerOpts) 
 // Sign produces a DSTU 4145 signature over a pre-hashed message digest.
 // digest should already be the output of a hash function (e.g. GOST 34.311 or Kupyna-256).
 func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
+	if priv == nil || priv.Curve == nil || priv.D == nil {
+		return nil, errors.New("dstu4145: missing private key")
+	}
 	if rng == nil {
 		rng = rand.Reader
 	}
 	curve := priv.Curve
 	n := new(big.Int).SetBytes(curve.N)
+	if priv.D.Sign() <= 0 || priv.D.Cmp(n) >= 0 {
+		return nil, errors.New("dstu4145: private scalar out of range")
+	}
 
-	// Truncate hash to curve order bit length
-	h := truncate(digest, n.BitLen(), curve.Words)
+	// Convert the digest to a field element (m bits), not an order-sized integer.
+	h := truncate(digest, curve.M, curve.Words)
 	if h.IsZero() {
 		// h = 1 per jkurwa spec
 		one, _ := gf2m.FromHex("1", curve.Words)
@@ -100,13 +107,13 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 
 		// r = (xR * h) mod f(x)  — field multiplication
 		r := gf2m.ModMul(R.X, h, curve.ModBits)
+		r = truncate(r.Bytes(), n.BitLen()-1, curve.Words)
 		if r.IsZero() {
 			continue
 		}
 
-		// r_int = fieldElement → integer, then mod n
+		// The truncated r is an integer strictly below the curve order.
 		rInt := fieldElemToInt(r)
-		rInt.Mod(rInt, n)
 		if rInt.Sign() == 0 {
 			continue
 		}
@@ -125,11 +132,14 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 
 // Verify verifies a DSTU 4145 signature against the public key and digest.
 func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
-	if sig == nil || sig.S == nil {
+	if pub == nil || pub.Curve == nil || pub.Q == nil || sig == nil || sig.S == nil {
 		return false
 	}
 	curve := pub.Curve
 	n := new(big.Int).SetBytes(curve.N)
+	if pub.Q.IsInfinity() || !curve.Contains(pub.Q) {
+		return false
+	}
 
 	// Validate s ∈ [1, n-1]
 	if sig.S.Sign() <= 0 || sig.S.Cmp(n) >= 0 {
@@ -137,7 +147,7 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 	}
 
 	// Truncate hash
-	h := truncate(digest, n.BitLen(), curve.Words)
+	h := truncate(digest, curve.M, curve.Words)
 	if h.IsZero() {
 		one, _ := gf2m.FromHex("1", curve.Words)
 		h = one
@@ -145,15 +155,14 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 
 	// r_int from signature field element
 	rInt := fieldElemToInt(sig.R)
-	rInt.Mod(rInt, n)
-	if rInt.Sign() == 0 {
+	if rInt.Sign() == 0 || rInt.Cmp(n) >= 0 {
 		return false
 	}
 
-	// R' = s·G + r_int·(-Q)  (equivalent to s·G - r_int·Q)
+	// R' = s·G + r·Q, where Q = -d·G.
 	sG := curve.ScalarBaseMul(sig.S)
 	rQ := pub.Q.ScalarMul(rInt)
-	Rprime := sG.Add(rQ.Neg()) //nolint:gocritic // Rprime is standard DSTU 4145 spec notation
+	Rprime := sG.Add(rQ) //nolint:gocritic // Rprime is standard DSTU 4145 spec notation
 
 	if Rprime.IsInfinity() {
 		return false
@@ -161,6 +170,7 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 
 	// r' = (xR' * h) mod f(x)
 	rprime := gf2m.ModMul(Rprime.X, h, curve.ModBits)
+	rprime = truncate(rprime.Bytes(), n.BitLen()-1, curve.Words)
 
 	return rprime.Equal(sig.R)
 }
@@ -195,16 +205,21 @@ func fieldElemToInt(e gf2m.Element) *big.Int {
 	return new(big.Int).SetBytes(b)
 }
 
-// randFieldElement returns a random integer in [1, max-1].
+// randFieldElement samples a nonzero scalar with L(k) < L(n), as required by
+// DSTU 4145 section 6.3 for both private keys and signature nonces.
 func randFieldElement(rng io.Reader, bound *big.Int) (*big.Int, error) {
+	if bound == nil || bound.Sign() <= 0 || bound.BitLen() < 2 {
+		return nil, errors.New("dstu4145: invalid scalar order")
+	}
 	b := make([]byte, (bound.BitLen()+7)/8)
+	defer clear(b)
 	for {
 		if _, err := io.ReadFull(rng, b); err != nil {
 			return nil, errors.New("dstu4145: rand read failed: " + err.Error())
 		}
-		// Mask top bits to avoid bias
-		if excess := uint(len(b)*8) - uint(bound.BitLen()); excess > 0 {
-			b[0] >>= excess
+		// Mask to L(n)-1 bits rather than accepting every integer below n.
+		if excess := uint(len(b)*8) - uint(bound.BitLen()-1); excess > 0 {
+			b[0] &= byte(0xff >> excess)
 		}
 		k := new(big.Int).SetBytes(b)
 		if k.Sign() > 0 && k.Cmp(bound) < 0 {

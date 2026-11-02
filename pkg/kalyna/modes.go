@@ -127,11 +127,13 @@ type cfbStream struct {
 }
 
 // NewCFBEncrypter returns a CFB mode stream encrypter.
+// Use EncryptCFB for complete DSTU messages with a short final segment.
 func NewCFBEncrypter(block cipher.Block, iv []byte) (cipher.Stream, error) {
 	return newCFB(block, iv, false)
 }
 
 // NewCFBDecrypter returns a CFB mode stream decrypter.
+// Use DecryptCFB for complete DSTU messages with a short final segment.
 func NewCFBDecrypter(block cipher.Block, iv []byte) (cipher.Stream, error) {
 	return newCFB(block, iv, true)
 }
@@ -152,7 +154,6 @@ func (c *cfbStream) XORKeyStream(dst, src []byte) {
 	bs := c.block.BlockSize()
 	for i := range src {
 		if c.offset == bs {
-			copy(c.feed, c.gamma)
 			c.block.Encrypt(c.gamma, c.feed)
 			c.offset = 0
 		}
@@ -354,160 +355,4 @@ func xtsGF2MMul(out, a, b []byte, blockSize int) {
 		}
 	}
 	copy(out, result)
-}
-
-// KW implements the Kalyna key wrapping mode.
-type KW struct {
-	block   cipher.Block
-	encrypt bool
-}
-
-// NewKWEncrypter returns a KW key-wrap encrypter following the cryptonite
-// dstu7624 KW construction (a custom Feistel-like key wrapping scheme).
-func NewKWEncrypter(block cipher.Block) *KW {
-	return &KW{block: block, encrypt: true}
-}
-
-// NewKWDecrypter returns a KW key-wrap decrypter.
-func NewKWDecrypter(block cipher.Block) *KW {
-	return &KW{block: block, encrypt: false}
-}
-
-// Wrap encrypts (wraps) src and returns the wrapped ciphertext.
-// The input data length must be a multiple of the block size.
-func (kw *KW) Wrap(src []byte) ([]byte, error) {
-	bs := kw.block.BlockSize()
-	halfBS := bs >> 1
-
-	data := make([]byte, len(src))
-	copy(data, src)
-
-	// If not block-aligned, apply KW padding (LE bit-length + 0x80 padding)
-	if len(data)%bs != 0 {
-		data = kwPad(data, bs)
-	}
-
-	r := len(data) / bs
-	n := 2 * (r + 1)
-	v := (n - 1) * 6
-
-	regB := make([]byte, halfBS)
-
-	// regB = first halfBS bytes of data, bSlice = rest
-	copy(regB, data[:halfBS])
-	bSlice := make([]byte, (n-1)*halfBS)
-	copy(bSlice, data[halfBS:])
-
-	swap := make([]byte, bs)
-	bLastEl := (n - 2) * halfBS
-
-	for i := 1; i <= v; i++ {
-		copy(swap[:halfBS], regB)
-		copy(swap[halfBS:], bSlice[:halfBS])
-		kw.block.Encrypt(swap, swap)
-		swap[halfBS] ^= byte(i)
-		copy(regB, swap[halfBS:halfBS+halfBS])
-		// shift bSlice left by halfBS
-		shift := make([]byte, (n-1)*halfBS)
-		copy(shift, bSlice[halfBS:])
-		copy(bSlice, shift[:(n-1)*halfBS-halfBS])
-		copy(bSlice[bLastEl:], swap[:halfBS])
-	}
-
-	result := make([]byte, halfBS+len(bSlice))
-	copy(result, regB)
-	copy(result[halfBS:], bSlice)
-	return result, nil
-}
-
-// Unwrap decrypts (unwraps) src and returns the original plaintext.
-func (kw *KW) Unwrap(src []byte) ([]byte, error) {
-	bs := kw.block.BlockSize()
-	halfBS := bs >> 1
-
-	data := make([]byte, len(src))
-	copy(data, src)
-
-	r := (len(data) / bs) - 1
-	n := 2 * (r + 1)
-	v := (n - 1) * 6
-
-	regB := make([]byte, halfBS)
-	copy(regB, data[:halfBS])
-	bSlice := make([]byte, len(data)-halfBS)
-	copy(bSlice, data[halfBS:])
-
-	bLastEl := (n - 2) * halfBS
-	swap := make([]byte, bs)
-
-	for i := v; i >= 1; i-- {
-		copy(swap, bSlice[bLastEl:bLastEl+halfBS])
-		regB[0] ^= byte(i)
-		copy(swap[halfBS:], regB)
-		kw.block.Decrypt(swap, swap)
-		copy(regB, swap[:halfBS])
-		shift := make([]byte, len(bSlice))
-		copy(shift, bSlice)
-		copy(bSlice[halfBS:], shift[:bLastEl])
-		copy(bSlice[:halfBS], swap[halfBS:halfBS+halfBS])
-	}
-
-	result := make([]byte, halfBS+len(bSlice))
-	copy(result, regB)
-	copy(result[halfBS:], bSlice)
-
-	// Unpad
-	result = kwUnpad(result, bs)
-	return result, nil
-}
-
-// kwPad pads data for KW mode, mirroring the C encrypt_kw branch:
-//  1. Append LE byte-encoding of bitLen (while bitLen != 0)
-//  2. plain_data_size_byte += halfBS
-//  3. Call ISO7816 padding to next blockSize multiple
-func kwPad(data []byte, blockSize int) []byte {
-	halfBS := blockSize >> 1
-	orig := len(data)
-	bitLen := orig * 8
-	buf := make([]byte, orig+halfBS+blockSize) // large enough
-	copy(buf, data)
-	i := orig
-	for bitLen != 0 {
-		buf[i] = byte(bitLen & 0xFF)
-		i++
-		bitLen >>= 8
-	}
-	// plain_data_size_byte += halfBS (i now points to i, advance by remaining halfBS bytes)
-	size := orig + halfBS
-	// ISO7816-4 padding: append 0x80 then zeros to multiple of blockSize
-	if size%blockSize != 0 {
-		buf[size] = 0x80
-		// zeros already zeroed
-		padBytes := blockSize - (size % blockSize)
-		size += padBytes
-	}
-	return buf[:size]
-}
-
-// kwUnpad reverses KW padding, mirroring the C decrypt_kw logic:
-//  1. unpadding(): strip trailing zeros, find 0x80, return size = index_of_0x80 + 1
-//  2. if size % blockSize != 0: size -= halfBS + 1
-func kwUnpad(data []byte, blockSize int) []byte {
-	halfBS := blockSize >> 1
-
-	// unpadding(): walk backwards past zeros, find 0x80
-	i := len(data) - 1
-	for i > 0 && data[i] == 0 {
-		i--
-	}
-	// i now points to 0x80 (or last non-zero byte if no padding)
-	size := i + 1 // C: *data_size_byte = i + 1
-
-	if size%blockSize != 0 {
-		size -= halfBS + 1
-	}
-	if size < 0 {
-		size = 0
-	}
-	return data[:size]
 }

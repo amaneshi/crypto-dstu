@@ -11,7 +11,6 @@ import (
 	"crypto-dstu/internal/cert"
 	"crypto-dstu/internal/oid"
 	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/kupyna"
 )
 
 // IssuerAndSerialNumber identifies a certificate by its issuer DN and serial number.
@@ -72,7 +71,9 @@ func marshalSignerInfo(si SignerInfo) ([]byte, error) {
 	inner = append(inner, sidDER...)
 	inner = append(inner, digAlgDER...)
 	if len(si.SignedAttrs.FullBytes) > 0 {
-		inner = append(inner, si.SignedAttrs.FullBytes...)
+		attrs := append([]byte(nil), si.SignedAttrs.FullBytes...)
+		attrs[0] = 0xa0 // [0] IMPLICIT; the digest uses the SET tag instead.
+		inner = append(inner, attrs...)
 	}
 	inner = append(inner, sigAlgDER...)
 	inner = append(inner, sigDER...)
@@ -180,7 +181,9 @@ func parseOneSignerInfo(data []byte) (SignerInfo, error) {
 			rest = r
 		}
 	}
-	_ = rest
+	if len(rest) != 0 {
+		return si, errors.New("cms: trailing SignerInfo fields")
+	}
 	return si, nil
 }
 
@@ -258,7 +261,7 @@ func marshalECI(eci EncapsulatedContentInfo) ([]byte, error) {
 		return nil, err
 	}
 	inner := oidDER
-	if len(eci.EContent) > 0 {
+	if eci.EContent != nil {
 		// OCTET STRING wrapped in EXPLICIT [0]
 		var contentDER []byte
 		contentDER, err = asn1.Marshal(eci.EContent)
@@ -382,8 +385,9 @@ type ContentInfo struct {
 
 // SignOptions controls SignedData creation.
 type SignOptions struct {
-	Detached    bool                  // omit content from SignedData
-	ContentType asn1.ObjectIdentifier // default: OIDData
+	Detached        bool                  // omit content from SignedData
+	ContentType     asn1.ObjectIdentifier // default: OIDData
+	DigestAlgorithm asn1.ObjectIdentifier // default: supported certificate public-key profile
 }
 
 // SignedMessage is the result of parsing a SignedData.
@@ -391,6 +395,8 @@ type SignedMessage struct {
 	Content      []byte // nil if detached
 	Signers      []SignerResult
 	Certificates []*cert.Certificate
+	rawSigners   []SignerInfo
+	contentType  asn1.ObjectIdentifier
 }
 
 // SignerResult is the verification result for one signer.
@@ -409,8 +415,36 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 		opts.ContentType = OIDData
 	}
 
-	// 1. Compute digest of content (Kupyna-256)
-	h := kupyna.New256()
+	if key == nil || signerCert == nil {
+		return nil, errors.New("cms: signing key and certificate are required")
+	}
+	if err := cert.VerifyCertPKMatch(signerCert, key); err != nil {
+		return nil, err
+	}
+	digestAlgOID := opts.DigestAlgorithm
+	if len(digestAlgOID) == 0 {
+		switch {
+		case len(signerCert.PublicKeyAlgorithm) == 0:
+			digestAlgOID = oid.Kupyna256
+		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithGOST34311), oid.IsCurveOID(signerCert.PublicKeyAlgorithm):
+			digestAlgOID = oid.GOST34311
+		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithKupyna256):
+			digestAlgOID = oid.Kupyna256
+		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithKupyna512):
+			digestAlgOID = oid.Kupyna512
+		default:
+			return nil, errors.New("cms: unsupported signing public-key algorithm")
+		}
+	}
+	if err := cert.CheckSigningUsage(signerCert); err != nil {
+		return nil, err
+	}
+	sigAlgOID, err := signatureAlgorithmForDigest(digestAlgOID)
+	if err != nil {
+		return nil, err
+	}
+	// 1. Compute the content digest using the selected profile.
+	h := newHashForOID(digestAlgOID)
 	h.Write(content)
 	digest := h.Sum(nil)
 
@@ -420,6 +454,11 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 	if err != nil {
 		return nil, err
 	}
+	certificateAttribute, err := signingCertificateAttribute(signerCert, digestAlgOID)
+	if err != nil {
+		return nil, err
+	}
+	attrs = append(attrs, certificateAttribute)
 
 	// 3. DER-encode signed attrs as SET OF (this is what gets signed)
 	signedAttrsDER, err := MarshalSignedAttrs(attrs)
@@ -428,20 +467,22 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 	}
 
 	// 4. Hash the signed attrs and sign
-	h2 := kupyna.New256()
+	h2 := newHashForOID(digestAlgOID)
 	h2.Write(signedAttrsDER)
 	attrDigest := h2.Sum(nil)
 
-	sigDER, err := key.Sign(rand.Reader, attrDigest, nil)
+	if isLEHashOID(digestAlgOID) {
+		attrDigest = reverseBytes(attrDigest)
+	}
+	sig, err := dstu4145.Sign(rand.Reader, key, attrDigest)
 	if err != nil {
 		return nil, errors.New("cms: Sign: " + err.Error())
 	}
 
-	// 5. Digest algorithm OID (Kupyna-256: 1.2.804.2.1.1.1.1.2.2.1)
-	digestAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 2, 1}
-	// Signature algorithm OID (DSTU4145 with Kupyna-256: 1.2.804.2.1.1.1.1.3.1.2)
-	sigAlgOID := asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
-
+	sigDER, err := dstu4145.MarshalSignatureRaw(sig, key.Curve)
+	if err != nil {
+		return nil, err
+	}
 	si := SignerInfo{
 		Version: 1,
 		SID: IssuerAndSerialNumber{
@@ -457,7 +498,7 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 	// 7. Build EncapContentInfo
 	eci := EncapsulatedContentInfo{EContentType: opts.ContentType}
 	if !opts.Detached {
-		eci.EContent = content
+		eci.EContent = append([]byte{}, content...)
 	}
 
 	sdDER, err := marshalSignedData(1, digestAlgOID, eci, []SignerInfo{si}, signerCert.Raw)
@@ -491,8 +532,8 @@ func ParseSigned(der []byte) (*SignedMessage, error) {
 		return nil, errors.New("cms: parse SignedData: " + err.Error())
 	}
 
-	msg := &SignedMessage{}
-	if len(sd.EContent) > 0 {
+	msg := &SignedMessage{rawSigners: sd.SignerInfos, contentType: sd.EContentType}
+	if sd.EContent != nil {
 		msg.Content = sd.EContent
 	}
 
@@ -534,180 +575,6 @@ func ResolveCertificates(msg *SignedMessage) {
 			}
 		}
 	}
-}
-
-// VerifySigned verifies signatures in a parsed SignedMessage.
-// For detached signatures, pass the original content; for attached, pass nil (uses msg.Content).
-// roots is the set of trusted root certificates for chain validation (may be nil to skip chain check).
-func VerifySigned(msg *SignedMessage, content []byte, roots []*cert.Certificate) error {
-	if content == nil {
-		content = msg.Content
-	}
-	if content == nil {
-		return errors.New("cms: VerifySigned: no content available")
-	}
-
-	if len(msg.Signers) == 0 {
-		return errors.New("cms: VerifySigned: no signers")
-	}
-
-	// Re-parse signers from original — we need to re-parse the DER to get SignedAttrs.
-	// Since we stored signedAttrsDER in SignerInfo.SignedAttrs, we can work with msg.Signers.
-	for i := range msg.Signers {
-		sr := &msg.Signers[i]
-		if sr.Certificate == nil {
-			sr.Error = errors.New("cms: signer certificate not found")
-			sr.Valid = false
-			continue
-		}
-		if sr.Certificate.PublicKey == nil {
-			sr.Error = errors.New("cms: signer certificate has no public key")
-			sr.Valid = false
-			continue
-		}
-		// If trusted roots are provided, verify the signer certificate chain.
-		if len(roots) > 0 {
-			if err := cert.VerifyCertChain(sr.Certificate, roots); err != nil {
-				sr.Error = errors.New("cms: certificate chain verification failed: " + err.Error())
-				sr.Valid = false
-				continue
-			}
-		}
-		// We cannot re-verify without the raw SignerInfo — mark as structurally valid
-		// when certificate is present. Full sig verification requires raw SignedAttrs bytes.
-		sr.Valid = true
-	}
-
-	return nil
-}
-
-// VerifySignedRaw verifies a raw DER-encoded SignedData against the given content.
-// This is the full verification path including signature math.
-func VerifySignedRaw(der []byte, content []byte, roots []*cert.Certificate) (*SignedMessage, error) { //nolint:funlen
-	sdBytes, err := parseContentInfo(der, OIDSignedData)
-	if err != nil {
-		return nil, err
-	}
-
-	sd, err := parseSignedDataBytes(sdBytes)
-	if err != nil {
-		return nil, errors.New("cms: parse SignedData: " + err.Error())
-	}
-
-	if content == nil && len(sd.EContent) > 0 {
-		content = sd.EContent
-	}
-	if content == nil {
-		return nil, errors.New("cms: no content for verification")
-	}
-
-	var embeddedCerts []*cert.Certificate
-	if len(sd.CertBytes) > 0 {
-		embeddedCerts, _ = cert.ParseCertificates(sd.CertBytes)
-	}
-
-	msg := &SignedMessage{Content: content, Certificates: embeddedCerts}
-
-	for _, si := range sd.SignerInfos {
-		sr := SignerResult{}
-
-		// Find certificate
-		for _, c := range embeddedCerts {
-			if matchesSID(c, si.SID) {
-				sr.Certificate = c
-				break
-			}
-		}
-		if sr.Certificate == nil && roots != nil {
-			for _, c := range roots {
-				if matchesSID(c, si.SID) {
-					sr.Certificate = c
-					break
-				}
-			}
-		}
-
-		sr.SigningTime = extractSigningTime(si.SignedAttrs.FullBytes)
-
-		if sr.Certificate == nil {
-			sr.Error = errors.New("cms: signer certificate not found")
-			msg.Signers = append(msg.Signers, sr)
-			continue
-		}
-		if sr.Certificate.PublicKey == nil {
-			sr.Error = errors.New("cms: signer has no public key")
-			msg.Signers = append(msg.Signers, sr)
-			continue
-		}
-
-		// Verify message digest attribute
-		if len(si.SignedAttrs.FullBytes) > 0 {
-			// Extract claimed digest from signed attrs
-			var claimedDigest []byte
-			claimedDigest, err = extractMessageDigest(si.SignedAttrs.FullBytes)
-			if err != nil {
-				sr.Error = err
-				msg.Signers = append(msg.Signers, sr)
-				continue
-			}
-
-			// Compute actual digest using the algorithm from digestAlgorithm OID
-			h := newHashForOID(si.DigestAlgorithm.Algorithm)
-			h.Write(content)
-			actualDigest := h.Sum(nil)
-
-			if !bytesEqual(claimedDigest, actualDigest) {
-				sr.Error = errors.New("cms: message digest mismatch")
-				msg.Signers = append(msg.Signers, sr)
-				continue
-			}
-
-			// Only verify sig-alg OIDs we know how to handle.
-			if !oid.IsDSTU4145SigAlg(si.SignatureAlgorithm.Algorithm) {
-				sr.Error = errors.New(
-					"cms: unsupported signature algorithm: " + si.SignatureAlgorithm.Algorithm.String(),
-				)
-				msg.Signers = append(msg.Signers, sr)
-				continue
-			}
-
-			// Hash the signed attrs and verify signature
-			// RFC 5652 §5.4: hash the signedAttrs with tag rewritten to SET (0x31)
-			h2 := newHashForOID(si.DigestAlgorithm.Algorithm)
-			h2.Write(signedAttrsForHashing(si.SignedAttrs.FullBytes))
-			attrDigest := h2.Sum(nil)
-			// GOST34311 outputs LE bytes; dstu4145.Verify (via truncate) expects BE.
-			if isLEHashOID(si.DigestAlgorithm.Algorithm) {
-				attrDigest = reverseBytes(attrDigest)
-			}
-
-			words := sr.Certificate.PublicKey.Curve.Words
-			var sig *dstu4145.Signature
-			sig, err = unmarshalSignatureCMS(si.Signature, words)
-			if err != nil {
-				sr.Error = errors.New("cms: unmarshal signature: " + err.Error())
-				msg.Signers = append(msg.Signers, sr)
-				continue
-			}
-
-			if !dstu4145.Verify(sr.Certificate.PublicKey, attrDigest, sig) {
-				sr.Error = errors.New("cms: signature verification failed")
-				msg.Signers = append(msg.Signers, sr)
-				continue
-			}
-		}
-
-		sr.Valid = true
-		msg.Signers = append(msg.Signers, sr)
-	}
-
-	// Return error if any signer failed with a hard error (not unsupported algorithm).
-	for _, sr := range msg.Signers {
-		if sr.Error != nil && !isUnsupportedAlgError(sr.Error) {
-			return msg, sr.Error
-		}
-	}
-	return msg, nil
 }
 
 // matchesSID checks if a certificate matches an IssuerAndSerialNumber.
@@ -805,6 +672,9 @@ func parseRawAttributes(setDER []byte) ([]rawAttribute, error) {
 			return "trailing bytes"
 		}())
 	}
+	if !outer.IsCompound || !(outer.Class == 0 && outer.Tag == 17 || outer.Class == 2 && (outer.Tag == 0 || outer.Tag == 1)) {
+		return nil, errors.New("cms: malformed attribute set")
+	}
 	inner := outer.Bytes
 
 	var attrs []rawAttribute
@@ -815,12 +685,19 @@ func parseRawAttributes(setDER []byte) ([]rawAttribute, error) {
 	for len(inner) > 0 {
 		inner, loopErr = asn1.Unmarshal(inner, &seq)
 		if loopErr != nil {
-			break
+			return nil, loopErr
+		}
+		if seq.Class != 0 || seq.Tag != 16 || !seq.IsCompound {
+			return nil, errors.New("cms: malformed attribute sequence")
 		}
 		// seq.Bytes = OID || SET
 		valRest, loopErr = asn1.Unmarshal(seq.Bytes, &loopOID)
 		if loopErr != nil {
-			continue
+			return nil, loopErr
+		}
+		var values asn1.RawValue
+		if rest, err := asn1.Unmarshal(valRest, &values); err != nil || len(rest) != 0 || values.Class != 0 || values.Tag != 17 || !values.IsCompound || len(values.Bytes) == 0 {
+			return nil, errors.New("cms: malformed attribute values")
 		}
 		// valRest = SET { value }
 		attrs = append(attrs, rawAttribute{
@@ -828,7 +705,7 @@ func parseRawAttributes(setDER []byte) ([]rawAttribute, error) {
 			Values: asn1.RawValue{FullBytes: valRest},
 		})
 	}
-	return attrs, nil //nolint:nilerr // best-effort: return successfully parsed attributes even if last entry was malformed
+	return attrs, nil
 }
 
 type rawAttribute struct {

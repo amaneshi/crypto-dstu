@@ -1,6 +1,7 @@
 package dstu4145
 
 import (
+	"bytes"
 	"crypto/rand"
 	"math/big"
 	"testing"
@@ -162,4 +163,46 @@ func TestParamsByName(t *testing.T) {
 	p2 := ParamsByOID(OIDCurvePB257)
 	require.NotNil(t, p2, "ParamsByOID")
 	require.Equal(t, "DSTU_PB_257", p2.Name, "wrong name from OID")
+}
+
+func TestRandomScalarUsesDSTUBitLength(t *testing.T) {
+	for _, parameters := range AllParams() {
+		t.Run(parameters.Name, func(t *testing.T) {
+			order := new(big.Int).SetBytes(parameters.Curve.N)
+			size := (order.BitLen() + 7) / 8
+			// All-one entropy must produce the largest permitted scalar, even
+			// when n itself would allow additional values with L(k) = L(n).
+			scalar, err := randFieldElement(bytes.NewReader(bytes.Repeat([]byte{0xff}, size)), order)
+			require.NoError(t, err)
+			maximum := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(order.BitLen()-1)), big.NewInt(1))
+			require.Zero(t, scalar.Cmp(maximum))
+			require.Less(t, scalar.BitLen(), order.BitLen())
+			// A zero draw is retried; the next draw can select the minimum.
+			entropy := make([]byte, 2*size)
+			entropy[len(entropy)-1] = 1
+			scalar, err = randFieldElement(bytes.NewReader(entropy), order)
+			require.NoError(t, err)
+			require.Equal(t, int64(1), scalar.Int64())
+			_, err = randFieldElement(bytes.NewReader(nil), order)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestSignatureNonceUsesDSTUBitLength(t *testing.T) {
+	for _, parameters := range AllParams() {
+		t.Run(parameters.Name, func(t *testing.T) {
+			order := new(big.Int).SetBytes(parameters.Curve.N)
+			maximum := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(order.BitLen()-1)), big.NewInt(1))
+			key := &PrivateKey{D: big.NewInt(1), Curve: parameters.Curve}
+			digest := []byte{1}
+			signature, err := Sign(bytes.NewReader(bytes.Repeat([]byte{0xff}, (order.BitLen()+7)/8)), key, digest)
+			require.NoError(t, err)
+			// s = e + d*r (mod n); recover e independently from the returned signature.
+			nonce := new(big.Int).Sub(signature.S, new(big.Int).SetBytes(signature.R.Bytes()))
+			nonce.Mod(nonce, order)
+			require.Zero(t, nonce.Cmp(maximum))
+			require.True(t, Verify(key.Public(), digest, signature))
+		})
+	}
 }

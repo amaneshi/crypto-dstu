@@ -21,9 +21,12 @@ Options:
   -output path            Output file (default: stdout)
   -no-tax                 Raw CMS output; omit transport header and UA_SIGN1
   -detached               Produce detached signature (content not embedded)
+  -digest value           Digest: auto|gost34311|kupyna256|kupyna512 (default: auto)
   -crypt path             Recipient certificate: sign then encrypt
+  -cipher value           gost28147-cfb|kalyna256-cfb|kalyna256-ofb (requires -crypt)
   -tsp url                TSP server URL (repeatable)
-  -tsp-level value        Timestamp level: none|signature|content|all (default: none)
+  -tsp-level value        Timestamp level: none|signature (default: none)
+  -tsa-root path          Explicit trusted TSA certificate/CA DER (repeatable)
   -role value             Key role: personal|fop|director|stamp|other
   -email addr             Sender email for transport header
   -filename name          Attachment filename for transport header
@@ -39,16 +42,46 @@ Options:
 	output := fs.String("output", "-", "output file")
 	noTax := fs.Bool("no-tax", false, "raw CMS output")
 	detached := fs.Bool("detached", false, "detached signature")
+	digest := fs.String("digest", "auto", "digest: auto|gost34311|kupyna256|kupyna512")
 	cryptCert := fs.String("crypt", "", "recipient cert for sign+encrypt")
+	cipher := fs.String("cipher", "gost28147-cfb", "encryption cipher: gost28147-cfb|kalyna256-cfb|kalyna256-ofb")
 	var tspURLs multiFlag
 	fs.Var(&tspURLs, "tsp", "TSP server URL (repeatable)")
-	tspLevel := fs.String("tsp-level", "none", "TSP level: none|signature|content|all")
+	tspLevel := fs.String("tsp-level", "none", "TSP level: none|signature")
 	role := fs.String("role", "", "key role")
 	email := fs.String("email", "", "sender email")
 	filename := fs.String("filename", "", "attachment filename")
 	includeChain := fs.String("include-chain", "none", "cert chain: none|ref|full")
 
+	var tsaRoots multiFlag
+	fs.Var(&tsaRoots, "tsa-root", "explicit TSA trust certificate DER (repeatable)")
 	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
+
+	digestAlgorithm, err := parseSigningDigest(*digest)
+	if err != nil {
+		fatalf("sign: %v", err)
+	}
+	encryption, err := parseEncryptionOptions(*cipher)
+	if err != nil {
+		fatalf("sign: %v", err)
+	}
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "cipher" && *cryptCert == "" {
+			fatalf("-cipher requires -crypt")
+		}
+	})
+	if *tspLevel != "none" && *tspLevel != "signature" {
+		fatalf("requested timestamp level is not implemented; use none or signature")
+	}
+	if *tspLevel == "none" && (len(tspURLs) > 0 || len(tsaRoots) > 0) {
+		fatalf("timestamp options require -tsp-level signature")
+	}
+	if *tspLevel == "signature" && (len(tspURLs) == 0 || len(tsaRoots) == 0) {
+		fatalf("signature timestamp requires -tsp and -tsa-root")
+	}
+	if *includeChain != "none" {
+		fatalf("certificate-chain embedding is not implemented; omit -include-chain")
+	}
 
 	if *key == "" {
 		fmt.Fprintln(os.Stderr, "dstu sign: -key is required")
@@ -67,14 +100,20 @@ Options:
 	content := mustRead(*input)
 
 	opts := ua.SignOptions{
-		NoTax:    *noTax,
-		Detached: *detached,
-		Email:    *email,
-		Filename: *filename,
+		Encryption:      encryption,
+		DigestAlgorithm: digestAlgorithm,
+		NoTax:           *noTax,
+		Detached:        *detached,
+		Email:           *email,
+		Filename:        *filename,
 	}
-	_ = *tspLevel     // TSP stamping is a future extension on top of existing ua.SignOptions
-	_ = *includeChain // CAdES-C/X chain embedding is a future extension
 
+	if *tspLevel == "signature" {
+		opts.Timestamp = &ua.TimestampSignOptions{}
+		for _, path := range tsaRoots {
+			opts.Timestamp.TSARoots = append(opts.Timestamp.TSARoots, mustRead(path))
+		}
+	}
 	var result []byte
 	if *cryptCert != "" {
 		recipientDER := mustRead(*cryptCert)

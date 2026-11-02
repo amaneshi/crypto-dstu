@@ -1,7 +1,9 @@
 package cert
 
 import (
+	"bytes"
 	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"math/big"
 	"time"
@@ -26,9 +28,11 @@ type Certificate struct {
 	NotBefore    time.Time
 	NotAfter     time.Time
 
-	PublicKey *dstu4145.PublicKey
-	SigAlgOID asn1.ObjectIdentifier
-	Signature []byte // raw BIT STRING bytes (no tag)
+	PublicKey             *dstu4145.PublicKey
+	PublicKeyAlgorithm    asn1.ObjectIdentifier
+	SigAlgOID             asn1.ObjectIdentifier
+	Signature             []byte // raw BIT STRING bytes (no tag)
+	SubjectPublicKeyBytes []byte // exact subjectPublicKey BIT STRING contents, excluding its tag/length/unused-bits byte
 
 	Extensions []Extension
 
@@ -117,16 +121,18 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	}
 
 	c := &Certificate{
-		Raw:          der,
-		TBSRaw:       outer.TBSCertificate.FullBytes,
-		Version:      tbs.Version + 1,
-		SerialNumber: tbs.SerialNumber,
-		Issuer:       tbs.Issuer,
-		Subject:      tbs.Subject,
-		NotBefore:    tbs.Validity.NotBefore,
-		NotAfter:     tbs.Validity.NotAfter,
-		SigAlgOID:    outer.SignatureAlgorithm.Algorithm,
-		Signature:    outer.Signature.Bytes,
+		Raw:                   der,
+		TBSRaw:                outer.TBSCertificate.FullBytes,
+		Version:               tbs.Version + 1,
+		SerialNumber:          tbs.SerialNumber,
+		Issuer:                tbs.Issuer,
+		Subject:               tbs.Subject,
+		NotBefore:             tbs.Validity.NotBefore,
+		NotAfter:              tbs.Validity.NotAfter,
+		SigAlgOID:             outer.SignatureAlgorithm.Algorithm,
+		PublicKeyAlgorithm:    tbs.PublicKeyInfo.Algorithm.Algorithm,
+		Signature:             outer.Signature.Bytes,
+		SubjectPublicKeyBytes: tbs.PublicKeyInfo.PublicKey.Bytes,
 	}
 
 	for _, ext := range tbs.Extensions {
@@ -143,17 +149,73 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 }
 
 // ParseCertificates parses one or more concatenated DER certificates.
-func ParseCertificates(der []byte) ([]*Certificate, error) {
-	var certs []*Certificate
-	for len(der) > 0 {
-		c, err := ParseCertificate(der)
+func ParseCertificates(data []byte) ([]*Certificate, error) {
+	if bytes.HasPrefix(bytes.TrimSpace(data), []byte("-----BEGIN")) {
+		var all []*Certificate
+		for len(bytes.TrimSpace(data)) > 0 {
+			block, rest := pem.Decode(data)
+			if block == nil {
+				return nil, errors.New("cert: invalid PEM bundle")
+			}
+			parsed, err := ParseCertificates(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			all = append(all, parsed...)
+			data = rest
+		}
+		return all, nil
+	}
+	var all []*Certificate
+	for len(data) > 0 {
+		var raw asn1.RawValue
+		rest, err := asn1.Unmarshal(data, &raw)
 		if err != nil {
 			return nil, err
 		}
-		certs = append(certs, c)
-		der = der[len(c.Raw):]
+		c, err := ParseCertificate(raw.FullBytes)
+		if err == nil {
+			all = append(all, c)
+			data = rest
+			continue
+		}
+		// A PKCS#7 certs-only bundle contains SignedData's [0] certificates.
+		var ci struct {
+			Type    asn1.ObjectIdentifier
+			Content asn1.RawValue `asn1:"explicit,tag:0"`
+		}
+		signedOID := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+		if _, bundleErr := asn1.Unmarshal(raw.FullBytes, &ci); bundleErr != nil || !ci.Type.Equal(signedOID) {
+			return nil, err
+		}
+		var sequence asn1.RawValue
+		if _, err = asn1.Unmarshal(ci.Content.Bytes, &sequence); err != nil {
+			return nil, err
+		}
+		remaining := sequence.Bytes
+		// Skip version, digest algorithms and encapsulated content info.
+		for range 3 {
+			var field asn1.RawValue
+			remaining, err = asn1.Unmarshal(remaining, &field)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var certSet asn1.RawValue
+		if _, err = asn1.Unmarshal(remaining, &certSet); err != nil || certSet.Class != 2 || certSet.Tag != 0 {
+			return nil, errors.New("cert: bundle has no certificates")
+		}
+		parsed, err := ParseCertificates(certSet.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, parsed...)
+		data = rest
 	}
-	return certs, nil
+	if len(all) == 0 {
+		return nil, errors.New("cert: empty certificate bundle")
+	}
+	return all, nil
 }
 
 // parseSubjectDN extracts standard and Ukrainian-specific attributes from Subject DN.
@@ -258,7 +320,7 @@ func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 		}
 	}
 	if params == nil {
-		// Try parameters as DSTU domain-params SEQUENCE: extract field size m to find curve.
+		// Match named parameters or the complete explicit domain parameters.
 		params = paramsFromDSTUDomainParams(spki.Algorithm.Parameters.FullBytes)
 	}
 	if params == nil {
@@ -271,12 +333,15 @@ func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 		return errors.New("cert: empty public key bytes")
 	}
 	// Real CZO certs wrap the key as OCTET STRING inside the BIT STRING.
-	if keyBytes[0] == 0x04 && len(keyBytes) >= 2 {
-		inner := keyBytes[1:]
-		expectedLen := (params.Curve.M + 7) / 8
-		if len(inner) >= 1 && int(inner[0]) == expectedLen {
-			// Looks like OCTET STRING { LE key }
-			keyBytes = inner[1:]
+	if keyBytes[0] == 0x04 {
+		var compressed []byte
+		if rest, err := asn1.Unmarshal(keyBytes, &compressed); err == nil && len(rest) == 0 && len(compressed) == (params.Curve.M+7)/8 {
+			point, err := params.Curve.Expand(leReverse(compressed))
+			if err != nil {
+				return errors.New("cert: invalid compressed public key: " + err.Error())
+			}
+			c.PublicKey = &dstu4145.PublicKey{Q: point, Curve: params.Curve}
+			return nil
 		}
 	}
 
@@ -288,52 +353,10 @@ func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 	return nil
 }
 
-// paramsFromDSTUDomainParams extracts the DSTU curve parameters from a DSTU
-// domain-parameters SEQUENCE by reading the field size m (first INTEGER in the
-// inner EC_PARAMS SEQUENCE) and looking up the matching named curve.
-//
-// DSTU domain params DER layout (abbreviated):
-//
-//	SEQUENCE {          ← outer wrapper (may be present)
-//	  SEQUENCE {        ← EC_PARAMS
-//	    INTEGER m       ← GF(2^m) field degree, e.g. 257
-//	    INTEGER ks      ← reduction polynomial
-//	    ...
-//	  }
-//	  ...
-//	}
+// paramsFromDSTUDomainParams matches named or complete explicit parameters
+// against the built-in DSTU curves.
 func paramsFromDSTUDomainParams(b []byte) *dstu4145.DomainParams {
-	if len(b) < 4 {
-		return nil
-	}
-	// DSTU domain params have nested SEQUENCE wrappers. Unwrap SEQUENCE layers
-	// until we find the first INTEGER (field degree m).
-	// Typical layout: SEQUENCE { SEQUENCE { SEQUENCE { INTEGER m, ... }, ... }, ... }
-	rest := b
-	for len(rest) >= 2 {
-		switch rest[0] {
-		case 0x30: // SEQUENCE — unwrap and descend
-			var seq asn1.RawValue
-			if _, err := asn1.Unmarshal(rest, &seq); err != nil {
-				return nil
-			}
-			rest = seq.Bytes
-		case 0x02: // INTEGER — this is m
-			var m int
-			if _, err := asn1.Unmarshal(rest, &m); err != nil {
-				return nil
-			}
-			for _, p := range dstu4145.AllParams() {
-				if p.Curve.M == m {
-					return &p
-				}
-			}
-			return nil
-		default:
-			return nil
-		}
-	}
-	return nil
+	return dstu4145.ParamsFromDER(b)
 }
 
 // expandPublicKey parses a DSTU public key from compressed (≤ ceil(m/8) bytes)

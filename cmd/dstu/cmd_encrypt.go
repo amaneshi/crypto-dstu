@@ -15,6 +15,7 @@ Options:
   -key path[:password]    Sender key container
   -cert path              Sender certificate (repeatable)
   -crypt path             Recipient certificate (required)
+  -cipher value           Cipher: gost28147-cfb|kalyna256-cfb|kalyna256-ofb
   -input path             Input file (default: stdin)
   -output path            Output file (default: stdout)
 `)
@@ -24,10 +25,15 @@ Options:
 	var certs multiFlag
 	fs.Var(&certs, "cert", "sender certificate (repeatable)")
 	cryptCert := fs.String("crypt", "", "recipient certificate")
+	cipher := fs.String("cipher", "gost28147-cfb", "content encryption profile")
 	input := fs.String("input", "-", "input file")
 	output := fs.String("output", "-", "output file")
 
 	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
+	options, err := parseEncryptionOptions(*cipher)
+	if err != nil {
+		fatalf("encrypt: %v", err)
+	}
 
 	if *key == "" {
 		fmt.Fprintln(os.Stderr, "dstu encrypt: -key is required")
@@ -48,7 +54,7 @@ Options:
 	recipientDER := mustRead(*cryptCert)
 	content := mustRead(*input)
 
-	result, err := box.EncryptDocument(content, recipientDER)
+	result, err := box.EncryptDocumentWithOptions(content, recipientDER, options)
 	if err != nil {
 		fatalf("encrypt: %v", err)
 	}

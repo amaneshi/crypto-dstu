@@ -1,11 +1,46 @@
 package kalyna
 
 import (
+	"bytes"
 	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// Fixed full-block CFB-256 vector from Cryptonite atest_dstu7624.c.
+// Round trips alone miss a feedback error shared by encryption and decryption.
+func TestCFB256CryptoniteFullBlocks(t *testing.T) {
+	key := mustHex("1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100")
+	iv := mustHex("3F3E3D3C3B3A393837363534333231302F2E2D2C2B2A29282726252423222120")
+	input := mustHex("7758A939DD6BD00CAF9153E5A5D5A66129105CA1EA54A97C06FA4A40960A068F61C3E424DE950151AC46879D84A3BCC2" +
+		"4EC8FB69008DAF016EF9832FFD3DB39D02185FDB782DC28EAC27B35179FCA40640")
+	expected := mustHex("9F9E9D9C9B9A999897969594939291908F8E8D8C8B8A898887868584838281807F7E7D7C7B7A79787776757473727170" +
+		"6F6E6D6C6B6A696867666564636261605F5E5D5C5B5A595857565554535251504F")
+	// Cryptonite right-aligns a short final segment; this streaming API
+	// tests the two complete CFB-256 blocks from that vector.
+	input, expected = input[:64], expected[:64]
+	for _, decrypt := range []bool{false, true} {
+		t.Run(map[bool]string{false: "encrypt", true: "decrypt"}[decrypt], func(t *testing.T) {
+			source, want := input, expected
+			if decrypt {
+				source, want = expected, input
+			}
+			for _, chunk := range []int{1, 7, 31, 32, 33, len(source)} {
+				block, err := NewCipher256_256(key)
+				require.NoError(t, err)
+				stream, err := newCFB(block, iv, decrypt)
+				require.NoError(t, err)
+				got := bytes.Clone(source)
+				for start := 0; start < len(got); start += chunk {
+					end := min(start+chunk, len(got))
+					stream.XORKeyStream(got[start:end], got[start:end])
+				}
+				require.Equal(t, want, got, "chunk=%d", chunk)
+			}
+		})
+	}
+}
 
 func mustHex(s string) []byte {
 	b, err := hex.DecodeString(s)
@@ -388,12 +423,12 @@ func TestKW_16_16_Roundtrip(t *testing.T) {
 	block, err := NewCipher128_128(key)
 	require.NoError(t, err)
 	kw := NewKWEncrypter(block)
-	wrapped, err := kw.Wrap(data)
+	wrapped, err := kw.WrapPadded(data)
 	require.NoError(t, err)
 
 	block2, _ := NewCipher128_128(key)
 	kw2 := NewKWDecrypter(block2)
-	plain, err := kw2.Unwrap(wrapped)
+	plain, err := kw2.UnwrapPadded(wrapped, len(data))
 	require.NoError(t, err)
 	require.Equal(t, data, plain)
 }
@@ -417,12 +452,12 @@ func TestKW_32_32_Roundtrip(t *testing.T) {
 	block, err := NewCipher256_256(key)
 	require.NoError(t, err)
 	kw := NewKWEncrypter(block)
-	wrapped, err := kw.Wrap(data)
+	wrapped, err := kw.WrapPadded(data)
 	require.NoError(t, err)
 
 	block2, _ := NewCipher256_256(key)
 	kw2 := NewKWDecrypter(block2)
-	plain, err := kw2.Unwrap(wrapped)
+	plain, err := kw2.UnwrapPadded(wrapped, len(data))
 	require.NoError(t, err)
 	require.Equal(t, data, plain)
 }

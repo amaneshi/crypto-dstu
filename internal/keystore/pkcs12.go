@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost28147"
 )
 
 // PKCS#12 / PFX OIDs.
@@ -207,35 +206,12 @@ func decryptPKCS12Content(rawContent []byte, password string) ([]byte, error) {
 
 // decryptEPKI decrypts an encryptedPrivateKeyInfo returning raw plaintext bytes.
 func decryptEPKI(epki encryptedPrivateKeyInfo, password string) ([]byte, error) {
-	if !epki.Algorithm.Algorithm.Equal(oidPBES2) {
-		return nil, errors.New("keystore: PKCS12: unsupported encryption: " + epki.Algorithm.Algorithm.String())
-	}
-
-	var p2 pbes2Params
-	if _, err := asn1.Unmarshal(epki.Algorithm.Parameters.FullBytes, &p2); err != nil {
-		return nil, errors.New("keystore: PKCS12: PBES2-params: " + err.Error())
-	}
-	if !p2.KDF.Algorithm.Equal(oidPBKDF2) {
-		return nil, errors.New("keystore: PKCS12: unsupported KDF: " + p2.KDF.Algorithm.String())
-	}
-
-	var kdfP pbkdf2Params
-	if _, err := asn1.Unmarshal(p2.KDF.Parameters.FullBytes, &kdfP); err != nil {
-		return nil, errors.New("keystore: PKCS12: PBKDF2-params: " + err.Error())
-	}
-
-	useGOST := kdfP.PRF.Algorithm.Equal(oidHMACGost34311)
-	dk, err := pbkdf2GOST([]byte(password), kdfP.Salt, kdfP.Iterations, 32, useGOST)
+	p2, kdfP, err := parsePBES2Parameters(epki.Algorithm)
 	if err != nil {
 		return nil, err
 	}
 
-	iv, err := extractGOSTCFBIV(p2.EncScheme)
-	if err != nil {
-		return nil, errors.New("keystore: PKCS12: IV: " + err.Error())
-	}
-
-	return gost28147.DecryptCFB(dk, iv, epki.EncryptedData)
+	return decryptPBES2Data(p2, kdfP, epki.EncryptedData, []byte(password))
 }
 
 // parseSafeBags parses a DER-encoded SafeContents (SEQUENCE OF SafeBag).
@@ -253,16 +229,18 @@ func parseSafeBags(der []byte, password string) ([]*dstu4145.PrivateKey, [][]byt
 		case bag.BagID.Equal(oidKeyBag):
 			// Unencrypted PrivateKeyInfo
 			priv, err := ParseRawKey(bag.BagValue.Bytes)
-			if err == nil {
-				keys = append(keys, priv)
+			if err != nil {
+				return nil, nil, err
 			}
+			keys = append(keys, priv)
 
 		case bag.BagID.Equal(oidPKCS8ShroudedKeyBag):
 			// Encrypted PrivateKeyInfo — parse as Key6 format
 			priv, err := ParseKey6(bag.BagValue.Bytes, password)
-			if err == nil {
-				keys = append(keys, priv)
+			if err != nil {
+				return nil, nil, err
 			}
+			keys = append(keys, priv)
 
 		case bag.BagID.Equal(oidCertBag):
 			cert, err := parseCertBag(bag.BagValue.Bytes)

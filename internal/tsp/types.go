@@ -32,7 +32,7 @@ type TSTInfo struct {
 	Policy         asn1.ObjectIdentifier
 	MessageImprint MessageImprint
 	SerialNumber   *big.Int
-	GenTime        time.Time
+	GenTime        time.Time     `asn1:"generalized"`
 	Accuracy       Accuracy      `asn1:"optional"`
 	Ordering       bool          `asn1:"optional,default:false"`
 	Nonce          *big.Int      `asn1:"optional"`

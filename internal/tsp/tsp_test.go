@@ -54,6 +54,7 @@ func makeCert(t *testing.T, key *dstu4145.PrivateKey) *cert.Certificate {
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
 		PublicKey:    key.Public(),
+		Extensions:   []cert.Extension{{Id: asn1.ObjectIdentifier{2, 5, 29, 37}, Critical: true, Value: []byte{0x30, 0x0a, 0x06, 0x08, 0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x08}}},
 	}
 }
 
@@ -154,10 +155,8 @@ func TestParseResponseGranted(t *testing.T) {
 	der, err := asn1.Marshal(respASN)
 	require.NoError(t, err)
 
-	resp, err := ParseResponse(der)
-	require.NoError(t, err)
-	require.Equal(t, StatusGranted, resp.Status.Status)
-	require.NoError(t, resp.Err())
+	_, err = ParseResponse(der)
+	require.Error(t, err, "granted responses require a token")
 }
 
 func TestParseResponseRejected(t *testing.T) {

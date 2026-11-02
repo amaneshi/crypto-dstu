@@ -24,6 +24,8 @@ func syntheticCert(t *testing.T) *cert.Certificate {
 	priv, err := dstu4145.GenerateKey(ec.DSTU_PB_257())
 	require.NoError(t, err)
 	pub := priv.Public()
+	keyBytes, err := asn1.Marshal(pub.Q.Compress())
+	require.NoError(t, err)
 
 	subjectRaw, err := asn1.Marshal(asn1.RawValue{
 		Class:      asn1.ClassUniversal,
@@ -44,13 +46,14 @@ func syntheticCert(t *testing.T) *cert.Certificate {
 	require.NoError(t, err)
 
 	return &cert.Certificate{
-		SerialNumber: big.NewInt(12345),
-		Subject:      asn1.RawValue{FullBytes: subjectRaw},
-		Issuer:       asn1.RawValue{FullBytes: subjectRaw},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour * 24 * 365),
-		PublicKey:    pub,
-		SigAlgOID:    oid.DSTU4145WithGOST34311,
+		SerialNumber:          big.NewInt(12345),
+		Subject:               asn1.RawValue{FullBytes: subjectRaw},
+		Issuer:                asn1.RawValue{FullBytes: subjectRaw},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365),
+		PublicKey:             pub,
+		SubjectPublicKeyBytes: keyBytes,
+		SigAlgOID:             oid.DSTU4145WithGOST34311,
 	}
 }
 
@@ -152,7 +155,7 @@ func TestClientHTTPMock(t *testing.T) {
 	// DER for ENUMERATED(6): 0a 01 06
 	// OCSPResponse ::= SEQUENCE { responseStatus ENUMERATED }
 	der, err := asn1.Marshal(struct {
-		Status int `asn1:"enumerated"`
+		Status asn1.Enumerated
 	}{Status: 6})
 	require.NoError(t, err)
 

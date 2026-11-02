@@ -6,7 +6,7 @@ const (
 	wrapKeySize    = 44
 	wrapMACBits    = 32
 	wrapIVSize     = 8
-	wrapCEKICVSize = 40
+	wrapCEKICVSize = 36
 )
 
 // wrapIV is the fixed IV used in the outer CFB encryption step of key wrapping.

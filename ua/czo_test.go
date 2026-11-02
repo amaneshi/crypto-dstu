@@ -71,6 +71,7 @@ func czoBox(t *testing.T) (*Box, *cert.Certificate) {
 		cryptCert:  c,
 		role:       cert.RolePersonal,
 	}}
+	b.caCerts = []*cert.Certificate{c} // Explicit test certificate pin.
 	return b, c
 }
 
@@ -136,9 +137,9 @@ func TestCZO_SignUnsign_Detached(t *testing.T) {
 	signed, err := b.SignDocument(content, SignOptions{NoTax: true, Detached: true})
 	require.NoError(t, err)
 
-	result, err := b.UnsignDocument(signed)
+	result, err := b.UnsignDocumentWithContent(signed, content)
 	require.NoError(t, err)
-	require.Nil(t, result.Content)
+	require.Equal(t, content, result.Content)
 	require.Len(t, result.Signers, 1)
 	require.NotNil(t, result.Signers[0].CertInfo)
 }
@@ -286,9 +287,8 @@ func TestCZO_Real_Box_DSTU_BES_Enveloped(t *testing.T) {
 
 	b := NewBox()
 	result, err := b.UnsignDocument(data)
-	require.NoError(t, err)
-	require.NotEmpty(t, result.Signers)
-	require.NotNil(t, result.Content)
+	require.ErrorContains(t, err, "trusted CA bundle")
+	require.Empty(t, result.Content)
 }
 
 func TestCZO_Real_Box_DSTU_BES_Detached(t *testing.T) {
@@ -300,9 +300,8 @@ func TestCZO_Real_Box_DSTU_BES_Detached(t *testing.T) {
 		_ = b.AddCert(certData)
 	}
 	result, err := b.UnsignDocument(sigData)
-	require.NoError(t, err)
-	require.NotEmpty(t, result.Signers)
-	require.Nil(t, result.Content) // detached: no embedded content
+	require.ErrorContains(t, err, "trusted CA bundle")
+	require.Empty(t, result.Content) // detached: no embedded content
 }
 
 func TestCZO_Real_Box_DSTU_T_Enveloped(t *testing.T) {
@@ -311,8 +310,8 @@ func TestCZO_Real_Box_DSTU_T_Enveloped(t *testing.T) {
 
 	b := NewBox()
 	result, err := b.UnsignDocument(data)
-	require.NoError(t, err)
-	require.NotEmpty(t, result.Signers)
+	require.ErrorContains(t, err, "trusted CA bundle")
+	require.Empty(t, result.Content)
 }
 
 func TestCZO_Real_Box_DSTU7564_BES_Enveloped(t *testing.T) {
@@ -321,17 +320,17 @@ func TestCZO_Real_Box_DSTU7564_BES_Enveloped(t *testing.T) {
 
 	b := NewBox()
 	result, err := b.UnsignDocument(data)
-	require.NoError(t, err)
-	require.NotEmpty(t, result.Signers)
-	require.NotNil(t, result.Content)
+	require.ErrorContains(t, err, "trusted CA bundle")
+	require.Empty(t, result.Content)
 }
 
 func TestCZO_Real_Box_LoadSignerCert(t *testing.T) {
 	b := NewBox()
 	err := b.AddCertFile(czo.Path("certs/DSTU/DSTU_sign.cer"))
 	require.NoError(t, err)
-	require.Len(t, b.caCerts, 1)
-	require.NotNil(t, b.caCerts[0].PublicKey)
+	require.Len(t, b.certificates, 1)
+	require.Empty(t, b.caCerts)
+	require.NotNil(t, b.certificates[0].PublicKey)
 }
 
 func TestCZO_Real_Box_AllFormats_DSTU(t *testing.T) {
@@ -342,8 +341,8 @@ func TestCZO_Real_Box_AllFormats_DSTU(t *testing.T) {
 			require.NoError(t, err)
 			b := NewBox()
 			result, err := b.UnsignDocument(data)
-			require.NoError(t, err)
-			require.NotEmpty(t, result.Signers)
+			require.ErrorContains(t, err, "trusted CA bundle")
+			require.Empty(t, result.Content)
 		})
 	}
 }

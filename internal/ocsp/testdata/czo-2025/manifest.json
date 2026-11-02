@@ -1,0 +1,28 @@
+{
+  "validatedAt": "2026-11-01T14:46:19Z",
+  "endpoint": "http://ca-test.czo.gov.ua/services/ocsp/",
+  "certificateArchive": "https://czo.gov.ua/download/certificates_test/CA-FULL.zip",
+  "crlURL": "http://ca-test.czo.gov.ua/download/crls/TestCSK-2026-Full.crl",
+  "files": {
+    "issuer.cer": {
+      "sha256": "7b5ebeaf9903f40952516ce23fe546875fe8d5097c15bf36aa51f44bbc26c0a5",
+      "bytes": 1540
+    },
+    "request.der": {
+      "sha256": "7309b99fe90d1e97d57d00780ca791b87c93b50d6a66c7019387c0cd122bcc8d",
+      "bytes": 85
+    },
+    "responder.crl.gz": {
+      "sha256": "d453317fe62dd348634faaa248a271266dc72fa54a5875cb12802d71116334f0",
+      "bytes": 1247594
+    },
+    "response.der": {
+      "sha256": "9a86dd02407da95900911a6e5645ed96f676e8ae4f3f376a5f98c251e436d9a4",
+      "bytes": 11475
+    },
+    "subject.cer": {
+      "sha256": "dbf2823fab4c10e8d6c0136d9186373262b547a71dc7184cd2b023571e4f6ff3",
+      "bytes": 1511
+    }
+  }
+}

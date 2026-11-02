@@ -1,6 +1,7 @@
 package dstu15946
 
 import (
+	"bytes"
 	"encoding/asn1"
 	"errors"
 	"hash"
@@ -10,7 +11,8 @@ import (
 
 // OIDGost28147CfbWrap is the Ukrainian PKI OID for GOST 28147-89 CFB key-wrap.
 // Used as the keyInfo.algorithm inside the DER-encoded SharedInfo structure.
-var OIDGost28147CfbWrap = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3}
+var OIDGost28147CfbWrap = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 5}
+var OIDKalynaWrap = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 11}
 
 // sharedInfoKeyInfo is the AlgorithmIdentifier embedded in SharedInfo.
 type sharedInfoKeyInfo struct {
@@ -28,16 +30,23 @@ type sharedInfoKeyInfo struct {
 //	}
 type sharedInfo struct {
 	KeyInfo     sharedInfoKeyInfo
-	EntityInfo  []byte `asn1:"optional,tag:0"`
-	SuppPubInfo []byte `asn1:"tag:2"`
+	EntityInfo  []byte `asn1:"optional,explicit,tag:0"`
+	SuppPubInfo []byte `asn1:"explicit,tag:2"`
 }
 
 // sharedInfoDER builds the DER-encoded SharedInfo for a 256-bit KEK.
 // suppPubInfo = 0x00000100 (= 256 bits in big-endian).
 // ukm is placed in entityInfo if non-empty.
 func sharedInfoDER(ukm []byte) ([]byte, error) {
+	return sharedInfoDERForWrap(ukm, OIDGost28147CfbWrap)
+}
+
+func sharedInfoDERForWrap(ukm []byte, wrap asn1.ObjectIdentifier) ([]byte, error) {
+	if !wrap.Equal(OIDGost28147CfbWrap) && !wrap.Equal(OIDKalynaWrap) {
+		return nil, errors.New("dstu15946: unsupported key wrapping algorithm")
+	}
 	info := sharedInfo{
-		KeyInfo:     sharedInfoKeyInfo{Algorithm: OIDGost28147CfbWrap},
+		KeyInfo:     sharedInfoKeyInfo{Algorithm: wrap, Parameters: asn1.RawValue{Tag: asn1.TagNull}},
 		SuppPubInfo: []byte{0x00, 0x00, 0x01, 0x00},
 	}
 	if len(ukm) > 0 {
@@ -60,16 +69,28 @@ func sharedInfoDER(ukm []byte) ([]byte, error) {
 // hashFn is typically gost34311.New (for GOST-based profiles) or kupyna.New256.
 // ukm is the User Keying Material (random, typically 64 bytes); may be nil.
 func DeriveKey(zz []byte, ukm []byte, hashFn func() hash.Hash) ([]byte, error) {
+	return DeriveKeyForWrap(zz, ukm, hashFn, OIDGost28147CfbWrap)
+}
+
+// DeriveKeyForWrap binds the KEK to the wrapping algorithm in SharedInfo.
+// Kupyna/Kalyna keeps the fixed field width of ZZ, including leading zero bytes;
+// the legacy GOST profile normalizes those bytes away.
+func DeriveKeyForWrap(zz, ukm []byte, hashFn func() hash.Hash, wrap asn1.ObjectIdentifier) ([]byte, error) {
 	if len(zz) == 0 {
 		return nil, errors.New("dstu15946: empty shared secret")
 	}
 
-	// Strip leading zero byte (field element may have a leading zero after BE encoding)
-	if zz[0] == 0 {
-		zz = zz[1:]
+	// Preserve the modern profile's fixed-width encoding while retaining legacy
+	// GOST normalization. Both reject an all-zero shared secret.
+	nonzero := bytes.TrimLeft(zz, "\x00")
+	if len(nonzero) == 0 {
+		return nil, errors.New("dstu15946: zero shared secret")
+	}
+	if wrap.Equal(OIDGost28147CfbWrap) {
+		zz = nonzero
 	}
 
-	salt, err := sharedInfoDER(ukm)
+	salt, err := sharedInfoDERForWrap(ukm, wrap)
 	if err != nil {
 		return nil, errors.New("dstu15946: sharedInfoDER: " + err.Error())
 	}

@@ -7,6 +7,7 @@ import (
 
 	"crypto-dstu/pkg/dstu4145"
 	"crypto-dstu/pkg/ec"
+	"crypto-dstu/pkg/gost28147"
 )
 
 // PrivateKeyInfo is the ASN.1 structure for an unencrypted PKCS#8 private key
@@ -54,11 +55,16 @@ func ParseRawKey(der []byte) (*dstu4145.PrivateKey, error) {
 	// The AlgorithmIdentifier.algorithm is the curve OID itself (the "full" sig OID
 	// may also be used; accept both).
 	params := dstu4145.ParamsByOID(ki.Algorithm.Algorithm)
-	if params == nil {
+	if params == nil && ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) {
 		// Try parameters field (some encodings put the curve OID there)
 		var curveOID asn1.ObjectIdentifier
-		if _, err2 := asn1.Unmarshal(ki.Algorithm.Parameters.FullBytes, &curveOID); err2 == nil {
+		if rest, err2 := asn1.Unmarshal(ki.Algorithm.Parameters.FullBytes, &curveOID); err2 == nil && len(rest) == 0 {
 			params = dstu4145.ParamsByOID(curveOID)
+		}
+	}
+	if params == nil {
+		if ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) {
+			params = dstu4145.ParamsFromDER(ki.Algorithm.Parameters.FullBytes)
 		}
 	}
 	if params == nil {
@@ -89,12 +95,18 @@ func ParseRawKey(der []byte) (*dstu4145.PrivateKey, error) {
 }
 
 // MarshalRawKey encodes a DSTU 4145 private key as an unencrypted PKCS#8 DER blob.
-// The curve is identified via its OID in AlgorithmIdentifier.algorithm.
+// AlgorithmIdentifier contains the DSTU PB little-endian algorithm and named curve parameters.
 // The private scalar d is stored in little-endian byte order inside the OCTET STRING.
 func MarshalRawKey(priv *dstu4145.PrivateKey) ([]byte, error) {
+	if priv == nil || priv.Curve == nil || priv.D == nil {
+		return nil, errors.New("keystore: MarshalRawKey: missing private key")
+	}
 	params := paramsByPtr(priv.Curve)
 	if params == nil {
 		return nil, errors.New("keystore: MarshalRawKey: unknown curve")
+	}
+	if priv.D.Sign() <= 0 || priv.D.Cmp(new(big.Int).SetBytes(params.Curve.N)) >= 0 {
+		return nil, errors.New("keystore: MarshalRawKey: private scalar out of range")
 	}
 
 	byteLen := (priv.Curve.M + 7) / 8
@@ -109,10 +121,18 @@ func MarshalRawKey(priv *dstu4145.PrivateKey) ([]byte, error) {
 		le[byteLen-1-i] = b
 	}
 
+	parameters, err := asn1.Marshal(struct {
+		Curve asn1.ObjectIdentifier
+		DKE   []byte
+	}{params.OID, gost28147.SboxDSTU.Packed()})
+	if err != nil {
+		return nil, err
+	}
 	ki := privateKeyInfo{
 		Version: 0,
 		Algorithm: pkcs8AlgorithmIdentifier{
-			Algorithm: params.OID,
+			Algorithm:  dstu4145.OIDDstu4145WithGost34311,
+			Parameters: asn1.RawValue{FullBytes: parameters},
 		},
 		PrivateKey: le,
 	}

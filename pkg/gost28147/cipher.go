@@ -180,6 +180,7 @@ func (g *gostCipher) mac64(buf []byte) {
 	n1 ^= s.pass(n0 + g.k[6])
 	n0 ^= s.pass(n1 + g.k[7])
 
-	binary.LittleEndian.PutUint32(buf[0:], n1)
-	binary.LittleEndian.PutUint32(buf[4:], n0)
+	// The 16-round MAC keeps the word order; only the 32-round cipher swaps it.
+	binary.LittleEndian.PutUint32(buf[0:], n0)
+	binary.LittleEndian.PutUint32(buf[4:], n1)
 }

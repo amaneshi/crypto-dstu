@@ -1,237 +1,193 @@
 package ocsp
 
 import (
+	"bytes"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	"math/big"
+	"fmt"
 	"time"
 
 	"crypto-dstu/internal/cert"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
 )
 
-// CertStatus represents the revocation status of a certificate.
 type CertStatus int
 
 const (
-	// Good means the certificate is not revoked.
-	Good CertStatus = 0
-	// Revoked means the certificate has been revoked.
-	Revoked CertStatus = 1
-	// Unknown means the responder does not know about the certificate.
-	Unknown CertStatus = 2
+	Good CertStatus = iota
+	Revoked
+	Unknown
 )
 
-// SingleResponse holds the status of one certificate in an OCSP response.
 type SingleResponse struct {
 	CertID         CertID
 	Status         CertStatus
-	RevocationTime time.Time // zero if Status != Revoked
+	RevocationTime time.Time
 	ThisUpdate     time.Time
 	NextUpdate     time.Time
 }
 
-// Response holds a parsed OCSP response.
+// Response is parsed evidence. Parsing alone does not authenticate its status.
 type Response struct {
-	Status       int // 0 = successful
-	ProducedAt   time.Time
-	Responses    []SingleResponse
-	Certificates []*cert.Certificate
-
-	// tbsResponseDataRaw holds the signed portion for Verify.
+	Status             int
+	ProducedAt         time.Time
+	Responses          []SingleResponse
+	Certificates       []*cert.Certificate
 	tbsResponseDataRaw []byte
-	// sigAlgOID is the signature algorithm.
-	sigAlgOID asn1.ObjectIdentifier
-	// signature bytes.
-	sigBytes []byte
+	sigAlgOID          asn1.ObjectIdentifier
+	sigBytes           []byte
+	responderID        asn1.RawValue
+	rawDER             []byte
 }
-
-// --- internal ASN.1 structures for OCSPResponse ---
 
 type responseBytes struct {
 	ResponseType asn1.ObjectIdentifier
 	Response     []byte
 }
-
 type ocspResponseASN1 struct {
-	ResponseStatus int
+	ResponseStatus asn1.Enumerated
 	ResponseBytes  responseBytes `asn1:"explicit,tag:0,optional"`
 }
-
 type basicOCSPResponse struct {
 	TBSResponseData    asn1.RawValue
 	SignatureAlgorithm algorithmIdentifier
 	Signature          asn1.BitString
 	Certs              asn1.RawValue `asn1:"explicit,tag:0,optional"`
 }
-
 type responseData struct {
 	Raw                asn1.RawContent
-	Version            int           `asn1:"explicit,tag:0,optional"`
-	ResponderID        asn1.RawValue `asn1:"choice"`
-	ProducedAt         time.Time
+	Version            int `asn1:"explicit,tag:0,optional,default:0"`
+	ResponderID        asn1.RawValue
+	ProducedAt         time.Time `asn1:"generalized"`
 	Responses          []singleResponseASN1
-	ResponseExtensions asn1.RawValue `asn1:"explicit,tag:1,optional"`
+	ResponseExtensions []pkix.Extension `asn1:"explicit,tag:1,optional"`
 }
-
 type singleResponseASN1 struct {
 	CertID           certID
 	CertStatus       asn1.RawValue
-	ThisUpdate       time.Time
-	NextUpdate       time.Time     `asn1:"explicit,tag:0,optional"`
-	SingleExtensions asn1.RawValue `asn1:"explicit,tag:1,optional"`
+	ThisUpdate       time.Time        `asn1:"generalized"`
+	NextUpdate       time.Time        `asn1:"explicit,tag:0,optional,generalized"`
+	SingleExtensions []pkix.Extension `asn1:"explicit,tag:1,optional"`
 }
-
 type revokedInfo struct {
-	RevocationTime   time.Time
-	RevocationReason asn1.RawValue `asn1:"explicit,tag:0,optional"`
+	RevocationTime   time.Time       `asn1:"generalized"`
+	RevocationReason asn1.Enumerated `asn1:"explicit,tag:0,optional"`
 }
 
-// OID for BasicOCSPResponse (RFC 6960).
 var oidBasicOCSPResponse = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1, 1}
 
-// ParseResponse parses a DER-encoded OCSPResponse.
+// ParseResponse decodes bounded DER and rejects malformed status choices.
 func ParseResponse(der []byte) (*Response, error) {
+	if len(der) == 0 || len(der) > 4<<20 {
+		return nil, errors.New("ocsp: response size is invalid")
+	}
+	der = bytes.Clone(der)
 	var outer ocspResponseASN1
-	rest, err := asn1.Unmarshal(der, &outer)
-	if err != nil {
-		return nil, errors.New("ocsp: parse response: " + err.Error())
+	if rest, err := asn1.Unmarshal(der, &outer); err != nil || len(rest) != 0 {
+		return nil, errors.New("ocsp: malformed response")
 	}
-	if len(rest) != 0 {
-		return nil, errors.New("ocsp: parse response: trailing data")
+	r := &Response{Status: int(outer.ResponseStatus), rawDER: der}
+	if r.Status != 0 {
+		return r, nil
 	}
-
-	resp := &Response{Status: outer.ResponseStatus}
-	if outer.ResponseStatus != 0 {
-		// Non-successful (e.g. malformedRequest=1, internalError=2, etc.)
-		return resp, nil
-	}
-
 	if !outer.ResponseBytes.ResponseType.Equal(oidBasicOCSPResponse) {
-		return nil, errors.New("ocsp: unsupported response type: " + outer.ResponseBytes.ResponseType.String())
+		return nil, errors.New("ocsp: unsupported response type")
 	}
-
 	var basic basicOCSPResponse
-	if _, err = asn1.Unmarshal(outer.ResponseBytes.Response, &basic); err != nil {
-		return nil, errors.New("ocsp: parse BasicOCSPResponse: " + err.Error())
+	if rest, err := asn1.Unmarshal(outer.ResponseBytes.Response, &basic); err != nil || len(rest) != 0 || basic.Signature.BitLength != len(basic.Signature.Bytes)*8 || len(basic.Signature.Bytes) == 0 {
+		return nil, errors.New("ocsp: malformed basic response")
 	}
-
-	resp.tbsResponseDataRaw = basic.TBSResponseData.FullBytes
-	resp.sigAlgOID = basic.SignatureAlgorithm.Algorithm
-	resp.sigBytes = basic.Signature.Bytes
-
 	var tbs responseData
-	if _, err = asn1.Unmarshal(basic.TBSResponseData.FullBytes, &tbs); err != nil {
-		return nil, errors.New("ocsp: parse ResponseData: " + err.Error())
+	rest, err := asn1.Unmarshal(basic.TBSResponseData.FullBytes, &tbs)
+	if err != nil {
+		return nil, fmt.Errorf("ocsp: malformed response data: %w", err)
 	}
-
-	resp.ProducedAt = tbs.ProducedAt
-
-	for _, sr := range tbs.Responses {
-		single := parseSingleResponse(sr)
-		resp.Responses = append(resp.Responses, single)
+	if len(rest) != 0 || tbs.Version != 0 || len(tbs.Responses) == 0 || len(tbs.Responses) > 256 {
+		return nil, errors.New("ocsp: malformed response data")
 	}
-
-	// Parse embedded certificates if present.
-	if len(basic.Certs.Bytes) > 0 {
-		if certs, certsErr := cert.ParseCertificates(basic.Certs.Bytes); certsErr == nil {
-			resp.Certificates = certs
+	if err := checkExtensions(tbs.ResponseExtensions); err != nil {
+		return nil, err
+	}
+	r.tbsResponseDataRaw = basic.TBSResponseData.FullBytes
+	r.sigAlgOID, r.sigBytes, r.responderID = basic.SignatureAlgorithm.Algorithm, basic.Signature.Bytes, tbs.ResponderID
+	r.ProducedAt = tbs.ProducedAt
+	for _, encoded := range tbs.Responses {
+		if err := checkExtensions(encoded.SingleExtensions); err != nil {
+			return nil, err
+		}
+		single, err := parseSingleResponse(encoded)
+		if err != nil {
+			return nil, err
+		}
+		r.Responses = append(r.Responses, single)
+	}
+	if len(basic.Certs.Bytes) != 0 {
+		var sequence asn1.RawValue
+		if rest, err := asn1.Unmarshal(basic.Certs.Bytes, &sequence); err != nil || len(rest) != 0 || sequence.Tag != asn1.TagSequence || sequence.Class != 0 {
+			return nil, errors.New("ocsp: malformed responder certificates")
+		}
+		var err error
+		r.Certificates, err = cert.ParseCertificates(sequence.Bytes)
+		if err != nil {
+			return nil, err
 		}
 	}
-
-	return resp, nil
+	return r, nil
 }
 
-// Verify checks the OCSP response signature against the issuer's public key.
-func (r *Response) Verify(issuer *cert.Certificate) error {
-	if issuer == nil {
-		return errors.New("ocsp: verify: nil issuer")
-	}
-	if issuer.PublicKey == nil {
-		return errors.New("ocsp: verify: issuer has no DSTU public key")
-	}
-	if len(r.tbsResponseDataRaw) == 0 {
-		return errors.New("ocsp: verify: no TBSResponseData to verify")
-	}
-
-	digest, err := hashResponseData(r.tbsResponseDataRaw, r.sigAlgOID)
-	if err != nil {
-		return errors.New("ocsp: verify: hash: " + err.Error())
-	}
-
-	sig, err := dstu4145.UnmarshalSignature(r.sigBytes, issuer.PublicKey.Curve.Words)
-	if err != nil {
-		return errors.New("ocsp: verify: unmarshal signature: " + err.Error())
-	}
-
-	if !dstu4145.Verify(issuer.PublicKey, digest, sig) {
-		return errors.New("ocsp: verify: signature verification failed")
+func checkExtensions(extensions []pkix.Extension) error {
+	seen := map[string]bool{}
+	for _, ext := range extensions {
+		if ext.Critical || seen[ext.Id.String()] {
+			return errors.New("ocsp: critical or duplicate response extension")
+		}
+		seen[ext.Id.String()] = true
 	}
 	return nil
 }
 
-// parseSingleResponse decodes one SingleResponse entry.
-func parseSingleResponse(sr singleResponseASN1) SingleResponse {
-	id := CertID{
-		HashAlgorithmOID: sr.CertID.HashAlgorithm.Algorithm,
-		IssuerNameHash:   sr.CertID.IssuerNameHash,
-		IssuerKeyHash:    sr.CertID.IssuerKeyHash,
-		SerialNumber:     sr.CertID.SerialNumber,
+func parseSingleResponse(sr singleResponseASN1) (SingleResponse, error) {
+	id := CertID{HashAlgorithmOID: sr.CertID.HashAlgorithm.Algorithm, IssuerNameHash: sr.CertID.IssuerNameHash, IssuerKeyHash: sr.CertID.IssuerKeyHash, SerialNumber: sr.CertID.SerialNumber}
+	if id.SerialNumber == nil || id.SerialNumber.Sign() <= 0 {
+		return SingleResponse{}, errors.New("ocsp: invalid certificate serial")
 	}
-	if id.SerialNumber == nil {
-		id.SerialNumber = new(big.Int)
+	s := SingleResponse{CertID: id, ThisUpdate: sr.ThisUpdate, NextUpdate: sr.NextUpdate}
+	status := sr.CertStatus
+	if status.Class != 2 {
+		return s, errors.New("ocsp: invalid status class")
 	}
-
-	s := SingleResponse{
-		CertID:     id,
-		ThisUpdate: sr.ThisUpdate,
-		NextUpdate: sr.NextUpdate,
-	}
-
-	// CertStatus is CHOICE: [0] good (NULL), [1] revoked (RevokedInfo), [2] unknown (NULL)
-	switch sr.CertStatus.Tag {
-	case 0:
-		s.Status = Good
-	case 1:
-		s.Status = Revoked
-		var ri revokedInfo
-		if _, err := asn1.UnmarshalWithParams(sr.CertStatus.FullBytes, &ri, "explicit,tag:1"); err == nil {
-			s.RevocationTime = ri.RevocationTime
+	switch status.Tag {
+	case 0, 2:
+		if status.IsCompound || len(status.Bytes) != 0 {
+			return s, errors.New("ocsp: malformed good/unknown status")
 		}
+		if status.Tag == 2 {
+			s.Status = Unknown
+		}
+	case 1:
+		if !status.IsCompound {
+			return s, errors.New("ocsp: malformed revoked status")
+		}
+		wrapped, err := asn1.Marshal(asn1.RawValue{Tag: asn1.TagSequence, IsCompound: true, Bytes: status.Bytes})
+		if err != nil {
+			return s, err
+		}
+		var revoked revokedInfo
+		if rest, err := asn1.Unmarshal(wrapped, &revoked); err != nil || len(rest) != 0 || revoked.RevocationTime.IsZero() {
+			return s, errors.New("ocsp: malformed revocation information")
+		}
+		s.Status, s.RevocationTime = Revoked, revoked.RevocationTime
 	default:
-		s.Status = Unknown
+		return s, errors.New("ocsp: unsupported status choice")
 	}
-
-	return s
+	return s, nil
 }
 
-// hashResponseData hashes tbsData using the algorithm indicated by sigAlgOID.
-func hashResponseData(data []byte, sigAlgOID asn1.ObjectIdentifier) ([]byte, error) {
-	var h interface {
-		Write([]byte) (int, error)
-		Sum([]byte) []byte
+// Verify checks an issuer-signed response's identity and signature only.
+// Use Check to validate certificate binding, responder delegation and freshness.
+func (r *Response) Verify(issuer *cert.Certificate) error {
+	if r == nil || r.Status != 0 || issuer == nil || !r.responderMatches(issuer) {
+		return errors.New("ocsp: response does not identify the issuer")
 	}
-
-	switch {
-	case sigAlgOID.Equal(oidDSTU4145WithGOST34311):
-		h = gost34311.New()
-	case sigAlgOID.Equal(oidDSTU4145WithKupyna256):
-		h = kupyna.New256()
-	case sigAlgOID.Equal(oidDSTU4145WithKupyna512):
-		h = kupyna.New512()
-	default:
-		return nil, errors.New("ocsp: unsupported signature algorithm: " + sigAlgOID.String())
-	}
-
-	_, _ = h.Write(data)
-	return h.Sum(nil), nil
+	return cert.VerifyDataSignature(r.tbsResponseDataRaw, r.sigBytes, r.sigAlgOID, issuer.PublicKey)
 }
-
-// Signature algorithm OIDs used in OCSP responses (same as cert OIDs).
-var (
-	oidDSTU4145WithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	oidDSTU4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
-	oidDSTU4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 3}
-)

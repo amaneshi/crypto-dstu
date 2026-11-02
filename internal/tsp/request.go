@@ -1,6 +1,7 @@
 package tsp
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/asn1"
 	"errors"
@@ -24,7 +25,7 @@ type Request struct {
 }
 
 // NewRequest builds a TSP request for the given pre-computed hash and algorithm OID.
-// A random 64-bit nonce is generated automatically; CertReq is set to true.
+// A random 128-bit nonce is generated automatically; CertReq is set to true.
 func NewRequest(hash []byte, hashAlgOID asn1.ObjectIdentifier) (*Request, error) {
 	if len(hash) == 0 {
 		return nil, errors.New("tsp: hash must not be empty")
@@ -33,7 +34,10 @@ func NewRequest(hash []byte, hashAlgOID asn1.ObjectIdentifier) (*Request, error)
 		return nil, errors.New("tsp: hashAlgOID must not be empty")
 	}
 
-	nonceBuf := make([]byte, 8)
+	if err := validImprint(MessageImprint{HashAlgorithm: AlgorithmIdentifier{Algorithm: hashAlgOID}, HashedMessage: hash}); err != nil {
+		return nil, err
+	}
+	nonceBuf := make([]byte, 16)
 	if _, err := rand.Read(nonceBuf); err != nil {
 		return nil, errors.New("tsp: generate nonce: " + err.Error())
 	}
@@ -43,7 +47,7 @@ func NewRequest(hash []byte, hashAlgOID asn1.ObjectIdentifier) (*Request, error)
 		Version: 1,
 		MessageImprint: MessageImprint{
 			HashAlgorithm: AlgorithmIdentifier{Algorithm: hashAlgOID},
-			HashedMessage: hash,
+			HashedMessage: bytes.Clone(hash),
 		},
 		Nonce:   nonce,
 		CertReq: true,

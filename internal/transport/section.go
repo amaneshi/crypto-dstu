@@ -46,8 +46,7 @@ func DecodeSections(data []byte) ([]Section, error) {
 			}
 		}
 		if j >= len(data) {
-			// No null terminator found — treat as trailing garbage, stop
-			break
+			return nil, errors.New("transport: unterminated section label")
 		}
 		label := string(data[i:j])
 		i = j + 1 // skip null
@@ -67,12 +66,13 @@ func DecodeSections(data []byte) ([]Section, error) {
 		if i+4 > len(data) {
 			return nil, errors.New("transport: truncated length for section " + label)
 		}
-		length := int(binary.LittleEndian.Uint32(data[i:]))
+		wireLength := binary.LittleEndian.Uint32(data[i:])
 		i += 4
 
-		if i+length > len(data) {
+		if uint64(wireLength) > uint64(len(data)-i) {
 			return nil, errors.New("transport: truncated data for section " + label)
 		}
+		length := int(wireLength)
 		contents := make([]byte, length)
 		copy(contents, data[i:i+length])
 		i += length

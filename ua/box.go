@@ -20,9 +20,12 @@ type keyEntry struct {
 
 // Box is a stateful context that manages keys, certificates, CA list and TSP config.
 type Box struct {
-	keys       []*keyEntry
-	caCerts    []*cert.Certificate
-	tspClients []*tsp.Client
+	keys         []*keyEntry
+	caCerts      []*cert.Certificate
+	certificates []*cert.Certificate
+	selectedKey  int
+	keySelected  bool
+	tspClients   []*tsp.Client
 }
 
 // NewBox creates an empty Box.
@@ -53,24 +56,10 @@ func (b *Box) LoadKey(data []byte, password string) error {
 	}
 
 	for _, priv := range result.Keys {
-		entry := &keyEntry{privateKey: priv}
-		// Match certs to this key
-		for _, c := range parsedCerts {
-			if cert.VerifyCertPKMatch(c, priv) == nil {
-				if entry.signCert == nil {
-					entry.signCert = c
-					entry.cryptCert = c
-				}
-			}
-		}
-		if entry.signCert != nil {
-			entry.role = cert.DetectRole(entry.signCert)
-		}
-		b.keys = append(b.keys, entry)
+		b.keys = append(b.keys, &keyEntry{privateKey: priv})
 	}
-
-	// Add any unmatched certs to caCerts pool
-	b.caCerts = append(b.caCerts, parsedCerts...)
+	b.certificates = append(b.certificates, parsedCerts...)
+	b.matchCertificates()
 
 	return nil
 }
@@ -84,14 +73,16 @@ func (b *Box) LoadKeyFile(path string, password string) error {
 	return b.LoadKey(data, password)
 }
 
-// AddCert parses a DER or PEM certificate and adds it to the CA pool.
+// AddCert adds a discovery certificate and associates it with a matching key.
+// It does not trust that certificate; use LoadCABundle for explicit trust anchors.
 func (b *Box) AddCert(der []byte) error {
 	der = keystore.MaybePEM(der)
 	c, err := cert.ParseCertificate(der)
 	if err != nil {
 		return errors.New("ua: AddCert: " + err.Error())
 	}
-	b.caCerts = append(b.caCerts, c)
+	b.certificates = append(b.certificates, c)
+	b.matchCertificates()
 	return nil
 }
 
@@ -107,12 +98,13 @@ func (b *Box) AddCertFile(path string) error {
 // LoadCABundle parses a DER or PEM certificate bundle (concatenated certs or PKCS#7 certs-only)
 // and adds all found certificates to the CA pool.
 func (b *Box) LoadCABundle(data []byte) error {
-	data = keystore.MaybePEM(data)
 	certs, err := cert.ParseCertificates(data)
 	if err != nil {
 		return errors.New("ua: LoadCABundle: " + err.Error())
 	}
 	b.caCerts = append(b.caCerts, certs...)
+	b.certificates = append(b.certificates, certs...)
+	b.matchCertificates()
 	return nil
 }
 
@@ -176,5 +168,48 @@ func (b *Box) firstKey() (*keyEntry, error) {
 	if len(b.keys) == 0 {
 		return nil, errors.New("ua: no keys loaded")
 	}
+	if b.keySelected {
+		return b.keys[b.selectedKey], nil
+	}
+	if len(b.keys) != 1 {
+		return nil, errors.New("ua: multiple keys loaded; select a role explicitly")
+	}
 	return b.keys[0], nil
+}
+
+// SelectKeyByRole selects exactly one key. An ambiguous or missing role fails.
+func (b *Box) SelectKeyByRole(role string) error {
+	b.keySelected = false
+	index := -1
+	for i, e := range b.keys {
+		if e.role == cert.Role(role) {
+			if index >= 0 {
+				return errors.New("ua: ambiguous key role")
+			}
+			index = i
+		}
+	}
+	if index < 0 {
+		return errors.New("ua: key role not found")
+	}
+	b.selectedKey = index
+	b.keySelected = true
+	return nil
+}
+
+func (b *Box) matchCertificates() {
+	for _, entry := range b.keys {
+		for _, c := range b.certificates {
+			if cert.VerifyCertPKMatch(c, entry.privateKey) != nil {
+				continue
+			}
+			if cert.CheckSigningUsage(c) == nil {
+				entry.signCert = c
+				entry.role = cert.DetectRole(c)
+			}
+			if cert.CheckEncryptionUsage(c) == nil {
+				entry.cryptCert = c
+			}
+		}
+	}
 }

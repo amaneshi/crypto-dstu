@@ -55,6 +55,7 @@ func makeBox(t *testing.T) (*Box, *cert.Certificate) {
 		cryptCert:  c,
 		role:       cert.RolePersonal,
 	}}
+	b.caCerts = []*cert.Certificate{c} // Explicit test certificate pin.
 	return b, c
 }
 
@@ -144,9 +145,9 @@ func TestSignDocumentDetached(t *testing.T) {
 	require.NoError(t, err)
 
 	// Detached: content is NOT embedded — UnsignDocument will return nil Content
-	result, err := b.UnsignDocument(der)
+	result, err := b.UnsignDocumentWithContent(der, content)
 	require.NoError(t, err)
-	require.Nil(t, result.Content) // detached: no embedded content
+	require.Equal(t, content, result.Content) // detached: no embedded content
 	require.Len(t, result.Signers, 1)
 }
 
