@@ -66,6 +66,12 @@ With that tag enabled, missing environment configuration explicitly skips them. 
   modified-content rejection and wrong-password rejection.
 - IIT-generated disposable PFX keys parsed by Go; Go-written PKCS#8/Key-6 keys
   imported by IIT for signing.
+- Go-written PFX with Kalyna-protected keys and HMAC-SHA256 integrity used by IIT
+  for attached/detached GOST PB257 and Kupyna PB257/PB431 signing, including
+  Cyrillic/Ukrainian passwords. Wrong passwords and container mutations fail.
+  Matching certificates are also supplied to the SDK discovery store; automatic
+  discovery from embedded PFX certificates and native multi-key selection are
+  not established. See [PFX export](pkcs12.md#export).
 - Encryption in both directions with separate sender and recipient keys, for
   payload lengths 1, 7, 8, 9, 31, 32, 33 and 1001 bytes.
 - Wrong decryption keys and damaged wrapped content keys rejected by both implementations.

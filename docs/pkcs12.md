@@ -1,4 +1,4 @@
-# PKCS#12 import policy
+# PKCS#12 profiles and policy
 
 PKCS#12/PFX imports now require password integrity protection. The loader verifies
 the MAC over the original AuthenticatedSafe octets **before** decrypting or
@@ -8,7 +8,45 @@ errors instead of trying to reinterpret a failed container as another format.
 
 This is a compatibility change: PFX files without a MAC, with SignedData integrity,
 or with unsupported integrity algorithms are rejected. There is no implicit
-unverified-import fallback. PFX export remains unimplemented.
+unverified-import fallback.
+
+## Export
+
+`ua.ProtectPKCS12(rawKey, certificateDERs, password)` accepts an unencrypted
+PKCS#8 DER/PEM blob and DER/PEM certificates. It preserves the original PKCS#8
+bytes, including a separate IIT agreement key. `box.ExportPKCS12(password)`
+exports every loaded key and discovery certificate, regardless of selected key
+roles. It preserves scalars but re-encodes PKCS#8 using the supported PB profile;
+original algorithm metadata is not retained by `Box`.
+
+Every key must have exactly one distinct certificate matching its derived public
+key and full curve domain. Exact duplicate certificates are deduplicated. Missing
+matches, ambiguous certificates and duplicate keys fail without returning output.
+Matching certificate/key bags share an opaque SHA-256-derived `localKeyId`.
+For a single PKCS#8 bag containing IIT's separate agreement key, no one-to-one
+key-bag ID is invented; association still checks both public keys.
+
+The writer emits version-3 PFX with Data safe contents. Every private-key bag is
+a PKCS8ShroudedKeyBag protected with PBES2, PBKDF2/Kupyna MAC-256 and Kalyna-256
+CBC with strict PKCS#7 padding. Each bag has independent random 32-byte salt and
+IV and 10,000 KDF iterations. Public certificate bags remain unencrypted. The
+complete AuthenticatedSafe is authenticated with HMAC-SHA256, an independent
+random 32-byte salt, 10,000 PKCS#12 KDF iterations, and a BMP-formatted password.
+No private key is emitted in an unencrypted bag.
+
+Export passwords must contain 1–32 UTF-8 bytes, valid BMP characters and no NUL.
+Export limits are 64 keys, 512 input certificates, 512 total bags, 8 MiB combined
+input data and 16 MiB output. These limits are deliberately stricter than import.
+Neither export nor import promotes certificates to trust anchors or validates
+their trust chains.
+
+The pinned IIT SDK successfully signs attached/detached GOST PB257, Kupyna PB257
+and Kupyna PB431 CMS with Go-written PFX, including tested Cyrillic/Ukrainian
+passwords. The SDK requires the matching certificate supplied to its discovery
+store separately; embedding it in PFX does not establish automatic native
+certificate discovery. Native multi-key selection and other providers remain
+unverified. OpenSSL independently verifies the complete HMAC-SHA256 and bag
+structure; that check does not claim OpenSSL supports Kalyna key decryption.
 
 ## Integrity profiles
 
@@ -72,6 +110,12 @@ verifies the real provider MACs, and checks password/content-mutation rejection.
 `TestIITPKCS12NonASCII` additionally imports native GOST/Kupyna containers with
 Cyrillic/Ukrainian passwords and verifies signatures from the original and
 reprotected key against the public key derived in Go.
+`TestIITPKCS12Export` verifies native signing with Go-written PFX, plus native
+wrong-password and modified-container rejection. Ordinary export tests cover
+multiple keys, reordered certificates, agreement-key preservation, fresh salts
+and IVs, invalid input and corruption rejection. To run the independent complete
+PFX MAC/structure check, set `PKCS12_OPENSSL` to a local OpenSSL executable and
+run `go test ./internal/keystore -run '^TestPKCS12ExportOpenSSL$' -v`.
 The new modern PFX test also exposed and now covers a Kupyna KMAC message-padding
 buffer bug where a two-block suffix previously panicked. Boundary regressions
 exercise every message length through two blocks for KMAC-256/384/512.

@@ -307,7 +307,7 @@ dstu unprotect -key Key-6.dat:password > key.pem
 |--------|-----------|-------|
 | Key-6.dat | `.dat` | PBES2: HMAC-GOST34311 / GOST28147-CFB or Kupyna MAC-256 / Kalyna-256 CBC |
 | JKS | `.jks` | Java KeyStore; PrivatBank Privat24, may contain multiple keys |
-| PKCS#12 / PFX | `.p12`, `.pfx` | Reads supported GOST and Kupyna/Kalyna PBES2 containers |
+| PKCS#12 / PFX | `.p12`, `.pfx` | Reads supported GOST/Kupyna profiles; writes Kalyna-protected keys with SHA-256 integrity |
 | Raw PKCS#8 | `.der`, `.raw` | Unencrypted DER-encoded private key |
 | PEM | `.pem` | PEM-wrapped DER |
 
@@ -329,6 +329,25 @@ and cannot end in NUL. IIT Windows interoperability now includes tested ASCII,
 Cyrillic and Ukrainian passwords through its documented CP1251 API boundary;
 arbitrary Unicode/provider compatibility remains unverified. Certificates are
 supplied separately. See [password compatibility](docs/compatibility.md).
+
+To include matching certificates in an integrity-protected PFX:
+
+```go
+pfx, err := ua.ProtectPKCS12(rawPKCS8, certificateDERs, password)
+if err != nil {
+    return err
+}
+return os.WriteFile("identity.pfx", pfx, 0600)
+```
+
+Use `box.ExportPKCS12(password)` to export all keys and discovery certificates
+already loaded into a Box. Both APIs require an unambiguous matching certificate
+for every key. Each key
+bag uses the modern Kalyna protection above; an HMAC-SHA256 protects the complete
+container. Certificates remain public discovery data and do not become trust
+anchors. PFX export accepts 1–32 UTF-8 bytes containing BMP characters and no NUL.
+The pinned IIT SDK signs with these exports when its certificate discovery store
+is also supplied the matching certificate. See [PFX profiles and limits](docs/pkcs12.md).
 
 ---
 
@@ -636,9 +655,6 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **PFX export:** add password-protected PKCS#12 export with certificate
-  association and integrity protection. Current modern export through
-  `ua.ProtectKey` writes a single Key-6 key without embedded certificates.
 - [ ] **ONB implementation and additional profiles:** implement and independently
   validate normal-basis conversions before enabling ONB curves. Smaller PB modern
   encryption combinations and arbitrary Unicode/provider password compatibility

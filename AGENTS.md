@@ -15,8 +15,8 @@ optional native development/test adapter; the consumer library remains CGo-free.
 Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
-Remaining pending areas are broader modern-profile coverage, ONB curves,
-non-ASCII password interoperability, PFX export, security review, fuzzing, and CI.
+Remaining pending areas are additional profiles, ONB curves, arbitrary Unicode
+password interoperability, security review, fuzzing, and CI.
 PB307/PB367/PB431 Kalyna CFB/OFB and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. ONB was evaluated but remains unsupported;
 its implementation requires basis conversions. See `docs/compatibility.md`.
@@ -95,7 +95,13 @@ from a local round-trip alone.
   rejected. Exact duplicate certificates are deduplicated. Association uses the
   full supported curve domain and derived public key; unmatched certificates
   remain discovery data, never trust roots. See `docs/pkcs12.md` for size/KDF,
-  password and profile limits. PFX export remains pending. Preserve the Kupyna
+  password and profile limits. PFX export encrypts every PKCS#8 key bag with the
+  modern Kalyna profile and authenticates the container with HMAC-SHA256, fresh
+  salts/IVs and 10,000 iterations. Require an unambiguous matching certificate
+  for every contained key; preserve secondary IIT agreement-key attributes.
+  Native signing checks supply matching certificates to the SDK discovery store;
+  do not claim automatic native discovery from the embedded certificate bags.
+  Preserve the Kupyna
   message-padding two-block buffer regression coverage.
 
 ## Validation

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/amaneshi/crypto-dstu/internal/testiit"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/stretchr/testify/require"
 )
@@ -82,6 +83,18 @@ func TestIITSeparateAgreementKey(t *testing.T) {
 	require.Len(t, parsed, 2)
 	require.Equal(t, primary.Public(), parsed[0].Public())
 	require.Equal(t, agreement.Public(), parsed[1].Public())
+	// PFX export preserves the original PKCS#8 agreement-key attributes, not
+	// just the first scalar exposed by ParseRawKey.
+	pfx, err := MarshalPKCS12([][]byte{encode(attributes)}, [][]byte{
+		testiit.Certificate(t, agreement, false).Raw,
+		testiit.Certificate(t, primary, false).Raw,
+	}, "disposable-pfx")
+	require.NoError(t, err)
+	pairs, err := ParsePKCS12(pfx, "disposable-pfx")
+	require.NoError(t, err)
+	require.Len(t, pairs, 2)
+	require.Equal(t, primary.Public(), pairs[0].PrivateKey.Public())
+	require.Equal(t, agreement.Public(), pairs[1].PrivateKey.Public())
 	for _, tc := range []struct {
 		name       string
 		attributes []keyAttribute
