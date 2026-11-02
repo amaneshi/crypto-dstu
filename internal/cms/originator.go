@@ -46,7 +46,7 @@ func parseOriginator(raw asn1.RawValue) ([]byte, *originatorIdentifier, error) {
 	case choice.Class == 2 && choice.Tag == 1 && choice.IsCompound:
 		var algorithm AlgorithmIdentifier
 		fields, err := asn1.Unmarshal(choice.Bytes, &algorithm)
-		if err != nil || !algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) && !algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithKupyna256) {
+		if err != nil || !algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) && !algorithm.Algorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311) && !algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithKupyna256) {
 			return nil, nil, errors.New("cms: unsupported originator algorithm")
 		}
 		if len(algorithm.Parameters.FullBytes) != 0 && !bytes.Equal(algorithm.Parameters.FullBytes, []byte{0x05, 0x00}) {

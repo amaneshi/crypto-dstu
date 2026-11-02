@@ -91,6 +91,10 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 		one, _ := gf2m.FromHex("1", curve.Words)
 		h = one
 	}
+	h, err := curve.DecodeField(h)
+	if err != nil {
+		return nil, err
+	}
 
 	for {
 		// Random ephemeral scalar e ∈ [1, n-1]
@@ -107,6 +111,10 @@ func Sign(rng io.Reader, priv *PrivateKey, digest []byte) (*Signature, error) {
 
 		// r = (xR * h) mod f(x)  — field multiplication
 		r := gf2m.ModMul(R.X, h, curve.ModBits)
+		r, err = curve.EncodeField(r)
+		if err != nil {
+			return nil, err
+		}
 		r = truncate(r.Bytes(), n.BitLen()-1, curve.Words)
 		if r.IsZero() {
 			continue
@@ -152,6 +160,10 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 		one, _ := gf2m.FromHex("1", curve.Words)
 		h = one
 	}
+	h, err := curve.DecodeField(h)
+	if err != nil {
+		return false
+	}
 
 	// r_int from signature field element
 	rInt := fieldElemToInt(sig.R)
@@ -170,6 +182,10 @@ func Verify(pub *PublicKey, digest []byte, sig *Signature) bool {
 
 	// r' = (xR' * h) mod f(x)
 	rprime := gf2m.ModMul(Rprime.X, h, curve.ModBits)
+	rprime, err = curve.EncodeField(rprime)
+	if err != nil {
+		return false
+	}
 	rprime = truncate(rprime.Bytes(), n.BitLen()-1, curve.Words)
 
 	return rprime.Equal(sig.R)

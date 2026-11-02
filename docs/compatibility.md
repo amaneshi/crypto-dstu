@@ -58,22 +58,15 @@ requiring equality of profile-dependent opaque `EUGetKeyInfoBinary` identifiers.
 The evidence covers the tested CP1251-representable strings on this Windows SDK;
 it does not establish arbitrary Unicode passwords or other providers/platforms.
 
-## ONB evaluation
+## ONB coverage
 
-The library currently implements polynomial-basis (PB) binary fields and ten
-built-in PB curves. Optimal-normal-basis (ONB) support cannot be implemented by
-aliasing a named OID or choosing a PB curve with the same field degree.
+Five standard ONB domains now have basis conversions and independent Cryptonite
+point, signature and cofactor-agreement vectors. Named/complete explicit
+parameters, GOST ONB PKCS#8, certificates, GOST CMS and PFX paths are covered.
+PB/ONB algorithm mismatches fail, and complete domain comparisons distinguish
+domains that share field degree and subgroup order.
 
-The inspected independent Cryptonite implementation has ONB-specific domain
-parameters, conversion matrices/roots, and `onb_to_pb`/`pb_to_onb` transformations.
-Conversions occur around curve coefficients, public-point compression/expansion,
-signing and shared-secret handling. Its public named/explicit ONB parameters for
-degrees 173, 179, 191, 233 and 431 are retained as rejection fixtures with
-provenance in `pkg/dstu4145/testdata/onb-cryptonite.json`. No private material or
-reference implementation code is included in that fixture.
-
-Regressions ensure those named/explicit ONB parameters remain unresolved and ONB
-PKCS#8 keys fail import. This preserves explicit unsupported behavior; it does
-not implement ONB arithmetic. Follow-up work needs basis conversions and domain
-representation, key/certificate/CMS encoding support, independent point/signature
-and key-agreement vectors, and native cross-checks before enabling ONB profiles.
+The synthetic ONB certificate/CMS profiles were rejected by the pinned IIT SDK;
+IIT interoperability remains unresolved. Modern ONB Kupyna/Kalyna profiles and
+ONB CSR generation remain explicitly disabled. See [ONB coverage](onb.md) for
+the exact evidence, retained public fixtures, reproduction commands and limits.

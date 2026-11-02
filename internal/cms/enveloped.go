@@ -82,13 +82,14 @@ type EncryptedMessage struct {
 }
 
 type parsedRecipient struct {
-	AgreementAlgorithm asn1.ObjectIdentifier
-	Issuer             asn1.RawValue
-	SerialNumber       *big.Int
-	OriginatorPK       []byte // compressed/raw public key bytes from originator
-	OriginatorID       *originatorIdentifier
-	UKM                []byte
-	WrappedCEK         []byte
+	AgreementAlgorithm  asn1.ObjectIdentifier
+	Issuer              asn1.RawValue
+	SerialNumber        *big.Int
+	OriginatorPK        []byte // compressed/raw public key bytes from originator
+	OriginatorAlgorithm asn1.ObjectIdentifier
+	OriginatorID        *originatorIdentifier
+	UKM                 []byte
+	WrappedCEK          []byte
 }
 
 // Encrypt encrypts content for one or more recipients using ECDH + GOST28147 CFB.
@@ -237,6 +238,8 @@ func encrypt(
 		}
 		if profile.agreement.Equal(OIDKupynaDH) {
 			originatorKey.Algorithm.Algorithm = dstu4145.OIDDstu4145WithKupyna256
+		} else if senderKey.Curve.IsONB() {
+			originatorKey.Algorithm.Algorithm = dstu4145.OIDDstu4145ONBWithGost34311
 		}
 		originatorKeyDER, err := asn1.Marshal(originatorKey)
 		if err != nil {
@@ -439,6 +442,9 @@ func DecryptEnveloped(msg *EncryptedMessage, key *dstu4145.PrivateKey, myCert *c
 		candidates = append(candidates, originators...)
 		originatorPub, err = resolveOriginator(rcpt.OriginatorID, candidates)
 	} else {
+		if key.Curve.IsONB() != rcpt.OriginatorAlgorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311) {
+			return nil, errors.New("cms: originator algorithm and recipient basis differ")
+		}
 		originatorPub, err = rebuildPublicKey(key, rcpt.OriginatorPK)
 	}
 	if err != nil {
@@ -476,8 +482,16 @@ func DecryptEnveloped(msg *EncryptedMessage, key *dstu4145.PrivateKey, myCert *c
 
 // encodePublicKeyUncompressed returns uncompressed BE X||Y for a public key.
 func encodePublicKeyUncompressed(pub *dstu4145.PublicKey, byteLen int) []byte {
-	xBytes := pub.Q.X.Bytes()
-	yBytes := pub.Q.Y.Bytes()
+	x, err := pub.Curve.EncodeField(pub.Q.X)
+	if err != nil {
+		return nil
+	}
+	y, err := pub.Curve.EncodeField(pub.Q.Y)
+	if err != nil {
+		return nil
+	}
+	xBytes := x.Bytes()
+	yBytes := y.Bytes()
 	// BE-pad to byteLen
 	out := make([]byte, 2*byteLen)
 	copy(out[byteLen-len(xBytes):], xBytes)
@@ -506,8 +520,14 @@ func rebuildPublicKey(key *dstu4145.PrivateKey, pkBytes []byte) (*dstu4145.Publi
 // rebuildPubFromBEXY creates a dstu4145.PublicKey from big-endian X and Y byte slices on the given curve.
 func rebuildPubFromBEXY(curve *ec.Curve, xBE, yBE []byte) (*dstu4145.PublicKey, error) {
 	words := curve.Words
-	x := gf2m.FromBytes(xBE, words)
-	y := gf2m.FromBytes(yBE, words)
+	x, err := curve.DecodeField(gf2m.FromBytes(xBE, words))
+	if err != nil {
+		return nil, err
+	}
+	y, err := curve.DecodeField(gf2m.FromBytes(yBE, words))
+	if err != nil {
+		return nil, err
+	}
 	pt := ec.NewPoint(curve, x, y)
 	if !curve.Contains(pt) {
 		return nil, errors.New("cms: rebuilt public key point not on curve")
@@ -576,6 +596,18 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) { //noli
 	if err != nil {
 		return nil, err
 	}
+	var originatorAlgorithm asn1.ObjectIdentifier
+	if len(originatorPK) != 0 {
+		var choice asn1.RawValue
+		if _, err = asn1.Unmarshal(originatorRaw.Bytes, &choice); err != nil {
+			return nil, err
+		}
+		var algorithm AlgorithmIdentifier
+		if _, err = asn1.Unmarshal(choice.Bytes, &algorithm); err != nil {
+			return nil, err
+		}
+		originatorAlgorithm = algorithm.Algorithm
+	}
 
 	// Optional UKM [1] EXPLICIT
 	var ukm []byte
@@ -635,7 +667,8 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) { //noli
 			AgreementAlgorithm: keyEncAlg.Algorithm,
 			Issuer:             key.RID.Issuer, SerialNumber: key.RID.Serial,
 			OriginatorPK: originatorPK, OriginatorID: originatorID,
-			UKM: ukm, WrappedCEK: key.Wrapped,
+			OriginatorAlgorithm: originatorAlgorithm,
+			UKM:                 ukm, WrappedCEK: key.Wrapped,
 		})
 	}
 	return recipients, nil

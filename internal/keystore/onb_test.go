@@ -9,12 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRawKeysRejectUnsupportedONB(t *testing.T) {
+func TestRawKeysRejectBasisMismatch(t *testing.T) {
 	for index, name := range []string{"ONB173", "ONB179", "ONB191", "ONB233", "ONB431"} {
 		t.Run(name, func(t *testing.T) {
-			// Use an intentionally public scalar, then replace only the named
-			// curve. Neither bit length nor a known signature algorithm may
-			// cause an unsupported ONB key to fall back to a PB curve.
+			// A PB algorithm must not silently accept ONB field encodings.
 			key := &dstu4145.PrivateKey{Curve: dstu4145.ParamsByName("DSTU_PB_173").Curve, D: big.NewInt(1)}
 			raw, err := MarshalRawKey(key)
 			require.NoError(t, err)
@@ -33,6 +31,19 @@ func TestRawKeysRejectUnsupportedONB(t *testing.T) {
 			guessed, err := Parse(encoded, "")
 			require.Error(t, err)
 			require.Nil(t, guessed)
+			info.Algorithm.Algorithm = dstu4145.OIDDstu4145ONBWithGost34311
+			encoded, err = asn1.Marshal(info)
+			require.NoError(t, err)
+			parsed, err = ParseRawKey(encoded)
+			require.NoError(t, err)
+			require.True(t, parsed.Curve.IsONB())
+			require.Equal(t, big.NewInt(1), parsed.D)
+			repacked, err := MarshalRawKey(parsed)
+			require.NoError(t, err)
+			again, err := ParseRawKey(repacked)
+			require.NoError(t, err)
+			require.True(t, parsed.Curve.EqualDomain(again.Curve))
+			require.Equal(t, parsed.D, again.D)
 		})
 	}
 }

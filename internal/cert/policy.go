@@ -193,5 +193,5 @@ func parseBasicConstraintsFromCert(c *Certificate) bool {
 	return false
 }
 func samePublicKey(a, b *Certificate) bool {
-	return a.PublicKey != nil && b.PublicKey != nil && a.PublicKey.Curve != nil && b.PublicKey.Curve != nil && a.PublicKey.Curve.M == b.PublicKey.Curve.M && a.PublicKey.Q != nil && b.PublicKey.Q != nil && a.PublicKey.Q.X.Equal(b.PublicKey.Q.X) && a.PublicKey.Q.Y.Equal(b.PublicKey.Q.Y)
+	return a.PublicKey != nil && b.PublicKey != nil && a.PublicKey.Curve.EqualDomain(b.PublicKey.Curve) && a.PublicKey.Q != nil && b.PublicKey.Q != nil && a.PublicKey.Q.X.Equal(b.PublicKey.Q.X) && a.PublicKey.Q.Y.Equal(b.PublicKey.Q.Y)
 }

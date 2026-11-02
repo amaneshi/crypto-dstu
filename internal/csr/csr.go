@@ -61,6 +61,12 @@ type Request struct {
 
 // Create builds, signs, and returns a DER-encoded PKCS#10 CSR.
 func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
+	if priv == nil || priv.Curve == nil {
+		return nil, errors.New("csr: missing private key")
+	}
+	if priv.Curve.IsONB() {
+		return nil, errors.New("csr: ONB CSR profile is not supported")
+	}
 	privKey := priv
 
 	// Determine signature algorithm OID.
@@ -300,7 +306,7 @@ func hashData(data []byte, sigAlgOID asn1.ObjectIdentifier) ([]byte, error) {
 // Curves are identified by their field degree M and order N (not pointer equality).
 func curveOIDForKey(priv *dstu4145.PrivateKey) asn1.ObjectIdentifier {
 	for _, p := range dstu4145.AllParams() {
-		if p.Curve.M == priv.Curve.M && string(p.Curve.N) == string(priv.Curve.N) {
+		if p.Curve.EqualDomain(priv.Curve) {
 			return p.OID
 		}
 	}

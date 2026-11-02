@@ -16,7 +16,7 @@ unverified-import fallback.
 PKCS#8 DER/PEM blob and DER/PEM certificates. It preserves the original PKCS#8
 bytes, including a separate IIT agreement key. `box.ExportPKCS12(password)`
 exports every loaded key and discovery certificate, regardless of selected key
-roles. It preserves scalars but re-encodes PKCS#8 using the supported PB profile;
+roles. It preserves scalars but re-encodes PKCS#8 using the supported named PB/ONB profile;
 original algorithm metadata is not retained by `Box`.
 
 Every key must have exactly one distinct certificate matching its derived public

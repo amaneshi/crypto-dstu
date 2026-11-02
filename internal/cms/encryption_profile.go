@@ -73,6 +73,9 @@ func envelopeKEK(
 	case algorithm.Equal(OIDDSTU4145DH):
 		return dstu15946.KeyAgreement(key, peer, ukm, gost34311.New)
 	case algorithm.Equal(OIDKupynaDH):
+		if key.Curve.IsONB() {
+			return nil, errors.New("cms: unsupported ONB Kupyna agreement profile")
+		}
 		zz, err := dstu15946.SharedSecret(key, peer)
 		if err != nil {
 			return nil, err

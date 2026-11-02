@@ -327,6 +327,12 @@ func parsePublicKey(c *Certificate, spki subjectPublicKeyInfo) error {
 		// Not a DSTU key — store nil PublicKey (non-fatal)
 		return nil
 	}
+	if params.Curve.IsONB() && !algOID.Equal(oid.DSTU4145ONBWithGOST34311) && !algOID.Equal(params.OID) {
+		return errors.New("cert: unsupported ONB public-key algorithm")
+	}
+	if !params.Curve.IsONB() && algOID.Equal(oid.DSTU4145ONBWithGOST34311) {
+		return errors.New("cert: algorithm and curve basis differ")
+	}
 
 	keyBytes := spki.PublicKey.Bytes
 	if len(keyBytes) == 0 {
@@ -392,6 +398,14 @@ func expandPublicKey(curve *ec.Curve, data []byte) (*dstu4145.PublicKey, error) 
 		half := len(data) / 2
 		x := gf2m.FromBytes(leReverse(lePad(data[:half], byteLen)), words)
 		y := gf2m.FromBytes(leReverse(lePad(data[half:], byteLen)), words)
+		x, err := curve.DecodeField(x)
+		if err != nil {
+			return nil, err
+		}
+		y, err = curve.DecodeField(y)
+		if err != nil {
+			return nil, err
+		}
 		pt := &ec.Point{X: x, Y: y, Curve: curve}
 		if !curve.Contains(pt) {
 			return nil, errors.New("point not on curve")

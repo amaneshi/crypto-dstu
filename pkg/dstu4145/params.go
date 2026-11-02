@@ -17,9 +17,10 @@ type DomainParams struct {
 // Ukrainian PKI OID arcs (DSTU 4145).
 var (
 	// OIDDstu4145WithGost34311 and related are signature+hash algorithm OIDs.
-	OIDDstu4145WithGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	OIDDstu4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
-	OIDDstu4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
+	OIDDstu4145WithGost34311    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
+	OIDDstu4145ONBWithGost34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
+	OIDDstu4145WithKupyna256    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
+	OIDDstu4145WithKupyna512    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
 
 	// OIDCurvePB163 and related are curve parameter OIDs (index 0..9 maps to PB_163..PB_431).
 	OIDCurvePB163 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1, 2, 0}
@@ -45,9 +46,14 @@ var allParams = []DomainParams{
 	{"DSTU_PB_307", ec.DSTU_PB_307(), OIDCurvePB307, OIDDstu4145WithGost34311},
 	{"DSTU_PB_367", ec.DSTU_PB_367(), OIDCurvePB367, OIDDstu4145WithGost34311},
 	{"DSTU_PB_431", ec.DSTU_PB_431(), OIDCurvePB431, OIDDstu4145WithGost34311},
+	{"DSTU_ONB_173", ec.DSTU_ONB_173(), asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2, 2, 0}, OIDDstu4145ONBWithGost34311},
+	{"DSTU_ONB_179", ec.DSTU_ONB_179(), asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2, 2, 1}, OIDDstu4145ONBWithGost34311},
+	{"DSTU_ONB_191", ec.DSTU_ONB_191(), asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2, 2, 2}, OIDDstu4145ONBWithGost34311},
+	{"DSTU_ONB_233", ec.DSTU_ONB_233(), asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2, 2, 3}, OIDDstu4145ONBWithGost34311},
+	{"DSTU_ONB_431", ec.DSTU_ONB_431(), asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2, 2, 4}, OIDDstu4145ONBWithGost34311},
 }
 
-// AllParams returns domain parameters for all 10 standard DSTU curves.
+// AllParams returns domain parameters for ten PB and five ONB DSTU curves.
 func AllParams() []DomainParams {
 	return allParams
 }

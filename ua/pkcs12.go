@@ -24,7 +24,7 @@ func ProtectPKCS12(rawKey []byte, certificates [][]byte, password string) ([]byt
 // discovery certificates. Key selection/roles do not filter the export. Missing
 // or ambiguous certificate matches fail rather than discarding key material.
 // Scalar values are preserved; raw PKCS#8 algorithm metadata is re-encoded using
-// the library's supported PB profile. No certificates become trust anchors.
+// the library's supported named PB/ONB profile. No certificates become trust anchors.
 func (b *Box) ExportPKCS12(password string) ([]byte, error) {
 	if b == nil || len(b.keys) == 0 {
 		return nil, fmt.Errorf("ua: ExportPKCS12: no keys loaded")

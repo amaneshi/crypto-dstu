@@ -55,7 +55,8 @@ func ParseRawKey(der []byte) (*dstu4145.PrivateKey, error) {
 	// The AlgorithmIdentifier.algorithm is the curve OID itself (the "full" sig OID
 	// may also be used; accept both).
 	params := dstu4145.ParamsByOID(ki.Algorithm.Algorithm)
-	if params == nil && ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) {
+	gostAlgorithm := ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) || ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311)
+	if params == nil && gostAlgorithm {
 		// Try parameters field (some encodings put the curve OID there)
 		var curveOID asn1.ObjectIdentifier
 		if rest, err2 := asn1.Unmarshal(ki.Algorithm.Parameters.FullBytes, &curveOID); err2 == nil && len(rest) == 0 {
@@ -63,12 +64,15 @@ func ParseRawKey(der []byte) (*dstu4145.PrivateKey, error) {
 		}
 	}
 	if params == nil {
-		if ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145WithGost34311) {
+		if gostAlgorithm {
 			params = dstu4145.ParamsFromDER(ki.Algorithm.Parameters.FullBytes)
 		}
 	}
 	if params == nil {
 		return nil, errors.New("keystore: ParseRawKey: unrecognised curve OID " + ki.Algorithm.Algorithm.String())
+	}
+	if gostAlgorithm && params.Curve.IsONB() != ki.Algorithm.Algorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311) {
+		return nil, errors.New("keystore: ParseRawKey: algorithm and curve basis differ")
 	}
 
 	// DSTU private key d is stored as LE bytes in the OCTET STRING.
@@ -95,7 +99,7 @@ func ParseRawKey(der []byte) (*dstu4145.PrivateKey, error) {
 }
 
 // MarshalRawKey encodes a DSTU 4145 private key as an unencrypted PKCS#8 DER blob.
-// AlgorithmIdentifier contains the DSTU PB little-endian algorithm and named curve parameters.
+// AlgorithmIdentifier contains the matching PB/ONB little-endian algorithm and named curve parameters.
 // The private scalar d is stored in little-endian byte order inside the OCTET STRING.
 func MarshalRawKey(priv *dstu4145.PrivateKey) ([]byte, error) {
 	if priv == nil || priv.Curve == nil || priv.D == nil {
@@ -131,7 +135,7 @@ func MarshalRawKey(priv *dstu4145.PrivateKey) ([]byte, error) {
 	ki := privateKeyInfo{
 		Version: 0,
 		Algorithm: pkcs8AlgorithmIdentifier{
-			Algorithm:  dstu4145.OIDDstu4145WithGost34311,
+			Algorithm:  params.HashOID,
 			Parameters: asn1.RawValue{FullBytes: parameters},
 		},
 		PrivateKey: le,
@@ -155,11 +159,11 @@ func MarshalPrivateKeyPEM(priv *dstu4145.PrivateKey) ([]byte, error) {
 	return EncodePEM(der, "PRIVATE KEY"), nil
 }
 
-// paramsByPtr returns the DomainParams whose Curve matches by value (M + N bytes).
+// paramsByPtr returns the DomainParams whose complete curve and basis match.
 // ec.DSTUxxx() creates a new *Curve on each call so pointer equality is unreliable.
 func paramsByPtr(curve *ec.Curve) *dstu4145.DomainParams {
 	for i, p := range dstu4145.AllParams() {
-		if p.Curve.M == curve.M && string(p.Curve.N) == string(curve.N) {
+		if p.Curve.EqualDomain(curve) {
 			return &dstu4145.AllParams()[i]
 		}
 	}

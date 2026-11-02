@@ -55,7 +55,11 @@ func ParamsFromDER(der []byte) *DomainParams {
 		base := bytes.Clone(explicit.Base)
 		slices.Reverse(b)
 		slices.Reverse(base)
-		if new(big.Int).SetBytes(b).Cmp(new(big.Int).SetBytes(c.B.Bytes())) == 0 && bytes.Equal(base, c.BasePoint().Compress()) {
+		encodedB, err := c.EncodeField(c.B)
+		if err != nil {
+			continue
+		}
+		if new(big.Int).SetBytes(b).Cmp(new(big.Int).SetBytes(encodedB.Bytes())) == 0 && bytes.Equal(base, c.BasePoint().Compress()) {
 			return p
 		}
 	}

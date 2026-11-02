@@ -43,7 +43,7 @@ func VerifyCertPKMatch(cert *Certificate, priv *dstu4145.PrivateKey) error {
 		return errors.New("cert: VerifyCertPKMatch: certificate has no public key")
 	}
 	derived := priv.Public()
-	if priv.Curve.M != cert.PublicKey.Curve.M || !derived.Q.X.Equal(cert.PublicKey.Q.X) || !derived.Q.Y.Equal(cert.PublicKey.Q.Y) {
+	if !priv.Curve.EqualDomain(cert.PublicKey.Curve) || !derived.Q.X.Equal(cert.PublicKey.Q.X) || !derived.Q.Y.Equal(cert.PublicKey.Q.Y) {
 		return errors.New("cert: VerifyCertPKMatch: private key does not match certificate public key")
 	}
 	return nil
@@ -68,6 +68,9 @@ func checkValidity(cert *Certificate, now time.Time) error {
 func verifySignature(cert *Certificate, pub *dstu4145.PublicKey) error {
 	if pub == nil || pub.Curve == nil || pub.Q == nil {
 		return errors.New("cert: verifySignature: issuer has no DSTU public key")
+	}
+	if (cert.SigAlgOID.Equal(oid.DSTU4145WithGOST34311) && pub.Curve.IsONB()) || (cert.SigAlgOID.Equal(oid.DSTU4145ONBWithGOST34311) && !pub.Curve.IsONB()) {
+		return errors.New("cert: signature algorithm and issuer basis differ")
 	}
 
 	digest, err := hashTBS(cert)
@@ -103,7 +106,7 @@ func hashTBS(cert *Certificate) ([]byte, error) {
 	sigAlg := cert.SigAlgOID
 
 	switch {
-	case sigAlg.Equal(oid.DSTU4145WithGOST34311):
+	case sigAlg.Equal(oid.DSTU4145WithGOST34311), sigAlg.Equal(oid.DSTU4145ONBWithGOST34311):
 		h := gost34311.New()
 		h.Write(cert.TBSRaw)
 		digest := h.Sum(nil)

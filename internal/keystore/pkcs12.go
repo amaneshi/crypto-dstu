@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/asn1"
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
@@ -200,8 +199,7 @@ func associatePKCS12(keys []*dstu4145.PrivateKey, certificates [][]byte) ([]*Key
 
 func samePKCS12Domain(a, b *dstu4145.PrivateKey) bool { return samePKCS12Curves(a.Curve, b.Curve) }
 func samePKCS12Curves(a, b *ec.Curve) bool {
-	return a != nil && b != nil && a.M == b.M && a.Cofactor == b.Cofactor && slices.Equal(a.ModBits, b.ModBits) &&
-		a.A.Equal(b.A) && a.B.Equal(b.B) && bytes.Equal(a.N, b.N) && a.Gx.Equal(b.Gx) && a.Gy.Equal(b.Gy)
+	return a.EqualDomain(b)
 }
 
 func pkcs12AuthenticatedSafe(ci contentInfo) ([]byte, error) {

@@ -429,7 +429,7 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 		switch {
 		case len(signerCert.PublicKeyAlgorithm) == 0:
 			digestAlgOID = oid.Kupyna256
-		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithGOST34311), oid.IsCurveOID(signerCert.PublicKeyAlgorithm):
+		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithGOST34311), signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145ONBWithGOST34311), oid.IsCurveOID(signerCert.PublicKeyAlgorithm):
 			digestAlgOID = oid.GOST34311
 		case signerCert.PublicKeyAlgorithm.Equal(oid.DSTU4145WithKupyna256):
 			digestAlgOID = oid.Kupyna256
@@ -442,7 +442,7 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 	if err := cert.CheckSigningUsage(signerCert); err != nil {
 		return nil, err
 	}
-	sigAlgOID, err := signatureAlgorithmForDigest(digestAlgOID)
+	sigAlgOID, err := signatureAlgorithmForCurve(digestAlgOID, key.Curve)
 	if err != nil {
 		return nil, err
 	}

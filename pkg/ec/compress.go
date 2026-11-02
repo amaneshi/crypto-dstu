@@ -16,7 +16,7 @@ func (p *Point) Compress() []byte {
 	}
 
 	out := make([]byte, (p.Curve.M+7)/8)
-	x := p.X.Bytes()
+	x := p.Curve.encodeField(p.X).Bytes()
 	copy(out[len(out)-len(x):], x)
 	if !p.X.IsZero() {
 		z := gf2m.ModMul(p.Y, gf2m.Inv(p.X, p.Curve.ModBits), p.Curve.ModBits)
@@ -32,24 +32,26 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 		return nil, errors.New("invalid compressed point length")
 	}
 
-	x := gf2m.FromBytes(compressed, c.Words)
-	if x.BitLen() > c.M {
+	encodedX := gf2m.FromBytes(compressed, c.Words)
+	if encodedX.BitLen() > c.M {
 		return nil, errors.New("compressed point is outside the field")
 	}
 
 	// The all-zero encoding represents the finite point x=0, y=sqrt(b).
-	if x.IsZero() {
+	if encodedX.IsZero() {
 		// Special case: x = 0, compute y from curve equation
 		y := computeYForZeroX(c)
-		return &Point{X: x, Y: y, Curve: c, Inf: false}, nil
+		return &Point{X: encodedX, Y: y, Curve: c, Inf: false}, nil
 	}
-	selector := x.TestBit(0)
+	selector := encodedX.TestBit(0)
+	x := c.decodeField(encodedX)
 	if fieldTrace(x, c.ModBits) != int(c.A.Words()[0]&1) {
-		if x.TestBit(0) {
-			x.ClearBit(0)
+		if encodedX.TestBit(0) {
+			encodedX.ClearBit(0)
 		} else {
-			x.SetBit(0)
+			encodedX.SetBit(0)
 		}
+		x = c.decodeField(encodedX)
 	}
 
 	// Compute y from x using the curve equation

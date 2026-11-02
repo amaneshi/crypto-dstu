@@ -9,6 +9,7 @@ import (
 	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
 // VerifySigned verifies every signature, including the content digest. A nil root
@@ -67,7 +68,7 @@ func verifySigner(si SignerInfo, c *cert.Certificate, content []byte, contentTyp
 	if err := cert.CheckSigningUsage(c); err != nil {
 		return err
 	}
-	expected, err := signatureAlgorithmForDigest(si.DigestAlgorithm.Algorithm)
+	expected, err := signatureAlgorithmForCurve(si.DigestAlgorithm.Algorithm, c.PublicKey.Curve)
 	if err != nil {
 		return err
 	}
@@ -144,6 +145,16 @@ func verifySigner(si SignerInfo, c *cert.Certificate, content []byte, contentTyp
 		return errors.New("signature verification failed")
 	}
 	return nil
+}
+
+func signatureAlgorithmForCurve(digest asn1.ObjectIdentifier, curve *ec.Curve) (asn1.ObjectIdentifier, error) {
+	if curve.IsONB() {
+		if !digest.Equal(oid.GOST34311) {
+			return nil, errors.New("cms: unsupported ONB signature profile")
+		}
+		return oid.DSTU4145ONBWithGOST34311, nil
+	}
+	return signatureAlgorithmForDigest(digest)
 }
 
 func signatureAlgorithmForDigest(digest asn1.ObjectIdentifier) (asn1.ObjectIdentifier, error) {

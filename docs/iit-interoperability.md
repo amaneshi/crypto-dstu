@@ -58,6 +58,11 @@ go test -tags=integration -count=1 -v ./internal/interop -run '^TestIIT'
 The regular suite excludes IIT tests through the `integration` build tag.
 With that tag enabled, missing environment configuration explicitly skips them. Selecting a configured adapter that fails is a test failure, not a skip.
 
+The passing matrix covers the documented PB profiles. The attempted synthetic
+ONB certificate/CMS checks returned native error 50; ONB compatibility with this
+SDK is unresolved. ONB primitive evidence comes from independent Cryptonite
+vectors instead. See [ONB coverage and limits](onb.md).
+
 ## What is checked
 
 - GOST 34.311 hashing: empty input, single byte, and block-boundary/multiblock cases.

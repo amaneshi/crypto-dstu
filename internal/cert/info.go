@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // CertInfo holds human-readable extracted fields from a Certificate.
@@ -104,21 +105,10 @@ func curveName(c *Certificate) string {
 		return ""
 	}
 	curve := c.PublicKey.Curve
-	// Match against all DSTU params
-	allCurveOIDs := map[int]string{
-		163: "DSTU_PB_163",
-		167: "DSTU_PB_167",
-		173: "DSTU_PB_173",
-		179: "DSTU_PB_179",
-		191: "DSTU_PB_191",
-		233: "DSTU_PB_233",
-		257: "DSTU_PB_257",
-		307: "DSTU_PB_307",
-		367: "DSTU_PB_367",
-		431: "DSTU_PB_431",
-	}
-	if name, ok := allCurveOIDs[curve.M]; ok {
-		return name
+	for _, params := range dstu4145.AllParams() {
+		if curve.EqualDomain(params.Curve) {
+			return params.Name
+		}
 	}
 	return fmt.Sprintf("unknown(m=%d)", curve.M)
 }

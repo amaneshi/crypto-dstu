@@ -50,7 +50,7 @@ func TestOIDIsDSTU4145SigAlg(t *testing.T) {
 	require.True(t, oid.IsDSTU4145SigAlg(oid.DSTU4145WithKupyna512))
 	require.False(t, oid.IsDSTU4145SigAlg(oid.CurvePB257))
 	// The ONB GOST identifier must not be interpreted as PB Kupyna.
-	require.False(t, oid.IsDSTU4145SigAlg(asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}))
+	require.True(t, oid.IsDSTU4145SigAlg(oid.DSTU4145ONBWithGOST34311))
 }
 
 // ---- Role detection tests ----

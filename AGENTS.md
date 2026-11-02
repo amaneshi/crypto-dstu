@@ -15,11 +15,13 @@ optional native development/test adapter; the consumer library remains CGo-free.
 Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
-Remaining pending areas are additional profiles, ONB curves, arbitrary Unicode
+Remaining pending areas are additional provider profiles, arbitrary Unicode
 password interoperability, security review, fuzzing, and CI.
 PB307/PB367/PB431 Kalyna CFB/OFB and tested Cyrillic/Ukrainian Windows password
-profiles now have independent checks. ONB was evaluated but remains unsupported;
-its implementation requires basis conversions. See `docs/compatibility.md`.
+profiles now have independent checks. Five standard ONB curves now use explicit
+basis conversions, with Cryptonite point/signature/shared-secret vectors. IIT
+certificate/CMS interoperability, ONB CSR and modern ONB profiles remain pending.
+See `docs/onb.md` and `docs/compatibility.md`.
 Update the backlog when work actually completes; do not mark a profile supported
 from a local round-trip alone.
 
@@ -63,6 +65,13 @@ from a local round-trip alone.
   changes its public key. Use order-sized little-endian signature components.
 - Match full curve domains and complete originator identities. Serial numbers
   alone do not identify certificates.
+- PB and ONB curves can share field degree and subgroup order. Use complete
+  domain/basis equality for key serialization, association and agreement. Curve
+  arithmetic and stored coordinates use PB; apply ONB maps at field boundaries,
+  digest interpretation and signature-product truncation, never to scalars.
+  Preserve independently reproduced Cryptonite vectors and explicit rejection
+  of unverified ONB Kupyna/Kalyna and CSR profiles. Do not infer IIT ONB support
+  from a local roundtrip; the recorded synthetic-profile check was rejected.
 - Java JKS loading verifies store integrity and the SHA-1 KeyProtector checksum.
   Preserve IIT's separate agreement key from PKCS#8 KEP attributes, including
   its distinct parameter/scalar encoding. A single signing identity plus a

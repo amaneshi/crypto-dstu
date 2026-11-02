@@ -4,10 +4,8 @@
 package dstu15946
 
 import (
-	"bytes"
 	"errors"
 	"math/big"
-	"slices"
 
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
@@ -26,7 +24,7 @@ func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, 
 		return nil, errors.New("dstu15946: missing key")
 	}
 	a, b := priv.Curve, peer.Curve
-	if a.M != b.M || !slices.Equal(a.ModBits, b.ModBits) || !a.A.Equal(b.A) || !a.B.Equal(b.B) || !bytes.Equal(a.N, b.N) || a.Cofactor != b.Cofactor {
+	if !a.EqualDomain(b) {
 		return nil, errors.New("dstu15946: keys are on different curves")
 	}
 	curve := priv.Curve
@@ -59,7 +57,11 @@ func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, 
 
 	// Return x-coordinate as fixed-length big-endian bytes: ceil(m/8) bytes
 	byteLen := (curve.M + 7) / 8
-	return fieldElemToFixedBytes(S.X, byteLen), nil
+	x, err := curve.EncodeField(S.X)
+	if err != nil {
+		return nil, err
+	}
+	return fieldElemToFixedBytes(x, byteLen), nil
 }
 
 // fieldElemToFixedBytes converts a field element to a fixed-length big-endian

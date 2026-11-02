@@ -6,7 +6,7 @@ Pure Go implementation of Ukrainian national cryptographic standards for digital
 
 | Standard | Description |
 |----------|-------------|
-| DSTU 4145-2002 | Digital signature over elliptic curves GF(2^m); all 10 named curves |
+| DSTU 4145-2002 | Digital signatures over GF(2^m); ten PB and five ONB named curves (see [ONB limits](docs/onb.md)) |
 | DSTU 7564:2014 | Kupyna hash function (256 / 384 / 512-bit) |
 | DSTU 7624:2014 | Kalyna block cipher (all 5 variants) |
 | GOST 28147-89 | Block cipher, Ukrainian S-box; ECB / CFB / CTR (gamma) / MAC / key-wrap |
@@ -591,7 +591,7 @@ Importable by external packages. Suitable for advanced users who need direct acc
 | Package | Description |
 |---------|-------------|
 | `pkg/gf2m` | Binary field GF(2^m) arithmetic (add, mul, inv, sqr) |
-| `pkg/ec` | Elliptic curves over GF(2^m); all 10 DSTU named curves |
+| `pkg/ec` | Elliptic curves over GF(2^m); ten PB and five ONB DSTU named curves |
 | `pkg/kupyna` | DSTU 7564 Kupyna hash (`New256/384/512`) + KMAC256/384/512 |
 | `pkg/kalyna` | DSTU 7624 Kalyna block cipher; all 5 key/block variants + CTR/CBC/CFB/OFB/CMAC/XTS/KW |
 | `pkg/gost28147` | GOST 28147-89 cipher; ECB, CFB, CTR (gamma), MAC, key-wrap |
@@ -655,10 +655,11 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **ONB implementation and additional profiles:** implement and independently
-  validate normal-basis conversions before enabling ONB curves. Smaller PB modern
-  encryption combinations and arbitrary Unicode/provider password compatibility
-  remain unverified; keep unsupported profiles explicit.
+- [ ] **Additional provider profiles:** resolve ONB certificate/CMS interoperability
+  with the pinned IIT SDK and validate ONB CSR and modern Kupyna/Kalyna encodings
+  before enabling them. Smaller PB modern encryption combinations and arbitrary
+  Unicode/provider password compatibility remain unverified. ONB arithmetic and
+  GOST paths now have independent Cryptonite vectors; see [ONB coverage](docs/onb.md).
 - [ ] **Release validation:** obtain an independent security review, broaden
   parser/primitive fuzzing and external known-answer coverage, and automate the
   pinned IIT checks in CI. Include independent raw Kalyna KW vectors exercising

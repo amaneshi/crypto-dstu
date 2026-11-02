@@ -12,6 +12,14 @@ import (
 	"github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
+func TestCreateRejectsUnverifiedONBProfile(t *testing.T) {
+	key, err := dstu4145.GenerateKey(ec.DSTU_ONB_173())
+	require.NoError(t, err)
+	data, err := csr.Create(&csr.Request{}, key)
+	require.ErrorContains(t, err, "ONB CSR profile")
+	require.Nil(t, data)
+}
+
 // TestCreateParse verifies that a CSR created with NewRequest can be parsed back.
 func TestCreateParse(t *testing.T) {
 	priv, err := dstu4145.GenerateKey(ec.DSTU_PB_257())

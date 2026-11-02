@@ -8,9 +8,10 @@ import "encoding/asn1"
 
 // Signature algorithm OIDs.
 var (
-	DSTU4145WithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
-	DSTU4145WithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
-	DSTU4145WithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
+	DSTU4145WithGOST34311    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 1}
+	DSTU4145ONBWithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
+	DSTU4145WithKupyna256    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
+	DSTU4145WithKupyna512    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
 )
 
 // Named curve OIDs (index 0..9 → PB_163..PB_431).
@@ -86,30 +87,36 @@ var (
 
 // curveNames maps curve OID string → human-readable name.
 var curveNames = map[string]string{
-	CurvePB163.String(): "DSTU_PB_163",
-	CurvePB167.String(): "DSTU_PB_167",
-	CurvePB173.String(): "DSTU_PB_173",
-	CurvePB179.String(): "DSTU_PB_179",
-	CurvePB191.String(): "DSTU_PB_191",
-	CurvePB233.String(): "DSTU_PB_233",
-	CurvePB257.String(): "DSTU_PB_257",
-	CurvePB307.String(): "DSTU_PB_307",
-	CurvePB367.String(): "DSTU_PB_367",
-	CurvePB431.String(): "DSTU_PB_431",
+	CurvePB163.String():           "DSTU_PB_163",
+	CurvePB167.String():           "DSTU_PB_167",
+	CurvePB173.String():           "DSTU_PB_173",
+	CurvePB179.String():           "DSTU_PB_179",
+	CurvePB191.String():           "DSTU_PB_191",
+	CurvePB233.String():           "DSTU_PB_233",
+	CurvePB257.String():           "DSTU_PB_257",
+	CurvePB307.String():           "DSTU_PB_307",
+	CurvePB367.String():           "DSTU_PB_367",
+	CurvePB431.String():           "DSTU_PB_431",
+	"1.2.804.2.1.1.1.1.3.1.2.2.0": "DSTU_ONB_173",
+	"1.2.804.2.1.1.1.1.3.1.2.2.1": "DSTU_ONB_179",
+	"1.2.804.2.1.1.1.1.3.1.2.2.2": "DSTU_ONB_191",
+	"1.2.804.2.1.1.1.1.3.1.2.2.3": "DSTU_ONB_233",
+	"1.2.804.2.1.1.1.1.3.1.2.2.4": "DSTU_ONB_431",
 }
 
 // algorithmNames maps algorithm OID string → human-readable name.
 var algorithmNames = map[string]string{
-	DSTU4145WithGOST34311.String(): "DSTU4145-with-GOST34311",
-	DSTU4145WithKupyna256.String(): "DSTU4145-with-Kupyna256",
-	DSTU4145WithKupyna512.String(): "DSTU4145-with-Kupyna512",
-	GOST34311.String():             "GOST34311",
-	Kupyna256.String():             "Kupyna-256",
-	Kupyna384.String():             "Kupyna-384",
-	Kupyna512.String():             "Kupyna-512",
-	GOST28147.String():             "GOST28147",
-	GOST28147CFB.String():          "GOST28147-CFB",
-	GOST28147Wrap.String():         "GOST28147-Wrap",
+	DSTU4145WithGOST34311.String():    "DSTU4145-with-GOST34311",
+	DSTU4145ONBWithGOST34311.String(): "DSTU4145-ONB-with-GOST34311",
+	DSTU4145WithKupyna256.String():    "DSTU4145-with-Kupyna256",
+	DSTU4145WithKupyna512.String():    "DSTU4145-with-Kupyna512",
+	GOST34311.String():                "GOST34311",
+	Kupyna256.String():                "Kupyna-256",
+	Kupyna384.String():                "Kupyna-384",
+	Kupyna512.String():                "Kupyna-512",
+	GOST28147.String():                "GOST28147",
+	GOST28147CFB.String():             "GOST28147-CFB",
+	GOST28147Wrap.String():            "GOST28147-Wrap",
 }
 
 // CurveNameByOID returns the human-readable curve name for an OID, or "".
@@ -125,7 +132,7 @@ func AlgorithmName(o asn1.ObjectIdentifier) string {
 	return o.String()
 }
 
-// IsCurveOID reports whether o is one of the 10 standard DSTU curve OIDs.
+// IsCurveOID reports whether o is one of the supported standard PB/ONB curve OIDs.
 func IsCurveOID(o asn1.ObjectIdentifier) bool {
 	_, ok := curveNames[o.String()]
 	return ok
@@ -134,6 +141,7 @@ func IsCurveOID(o asn1.ObjectIdentifier) bool {
 // IsDSTU4145SigAlg reports whether o is one of the DSTU 4145 signature algorithm OIDs.
 func IsDSTU4145SigAlg(o asn1.ObjectIdentifier) bool {
 	return o.Equal(DSTU4145WithGOST34311) ||
+		o.Equal(DSTU4145ONBWithGOST34311) ||
 		o.Equal(DSTU4145WithKupyna256) ||
 		o.Equal(DSTU4145WithKupyna512)
 }

@@ -1,7 +1,10 @@
 package ec
 
 import (
+	"bytes"
 	"fmt"
+	"slices"
+
 	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
@@ -16,6 +19,15 @@ type Curve struct {
 	Gx       gf2m.Element // base point x-coordinate
 	Gy       gf2m.Element // base point y-coordinate
 	Words    int          // ceil(M/32) — word count for field elements
+	basis    *normalBasis // nil for PB; immutable maps for ONB wire encoding
+}
+
+// EqualDomain reports equality of the complete arithmetic domain and external
+// field basis. Equal bit lengths or subgroup orders alone do not identify it.
+func (c *Curve) EqualDomain(other *Curve) bool {
+	return c != nil && other != nil && c.M == other.M && c.IsONB() == other.IsONB() &&
+		slices.Equal(c.ModBits, other.ModBits) && c.A.Equal(other.A) && c.B.Equal(other.B) &&
+		bytes.Equal(c.N, other.N) && c.Cofactor == other.Cofactor && c.Gx.Equal(other.Gx) && c.Gy.Equal(other.Gy)
 }
 
 // NewCurve creates a new elliptic curve with the given parameters.

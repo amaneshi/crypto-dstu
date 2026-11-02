@@ -92,6 +92,9 @@ func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping b
 	switch {
 	case digest.Equal(oid.GOST34311):
 		signatureOID = oid.DSTU4145WithGOST34311
+		if key.Curve.IsONB() {
+			signatureOID = oid.DSTU4145ONBWithGOST34311
+		}
 		h = gost34311.New()
 	case digest.Equal(oid.Kupyna256):
 		signatureOID = oid.DSTU4145WithKupyna256
@@ -103,6 +106,9 @@ func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping b
 		t.Fatal("unsupported fixture digest")
 	}
 	outer.Algorithm.Algorithm = signatureOID
+	if key.Curve.IsONB() {
+		tbs.PublicKey.Algorithm.Algorithm = signatureOID
+	}
 	tbs.Signature.Algorithm = signatureOID
 	name, err := asn1.Marshal(pkix.Name{CommonName: "crypto-dstu local interoperability test"}.ToRDNSequence())
 	require.NoError(t, err)
@@ -180,7 +186,9 @@ func explicitParameters(t testing.TB, key *dstu4145.PrivateKey, includeDKE bool)
 		polynomial, err = asn1.Marshal(powers)
 	}
 	require.NoError(t, err)
-	b := new(big.Int).SetBytes(c.B.Bytes()).FillBytes(make([]byte, (c.M+7)/8))
+	encodedB, err := c.EncodeField(c.B)
+	require.NoError(t, err)
+	b := new(big.Int).SetBytes(encodedB.Bytes()).FillBytes(make([]byte, (c.M+7)/8))
 	explicit := struct {
 		Field struct {
 			M          int
