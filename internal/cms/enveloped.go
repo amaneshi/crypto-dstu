@@ -99,7 +99,7 @@ func Encrypt( //nolint:funlen
 	recipients []*cert.Certificate,
 	senderKey *dstu4145.PrivateKey,
 ) ([]byte, error) {
-	return encrypt(content, recipients, senderKey, nil, nil)
+	return encrypt(content, recipients, senderKey, nil, nil, false)
 }
 
 // EncryptWithOriginatorCertificate identifies the static agreement key by the
@@ -117,7 +117,7 @@ func EncryptWithOriginatorCertificate(content []byte, recipients []*cert.Certifi
 	if err := cert.CheckEncryptionUsage(senderCert); err != nil {
 		return nil, err
 	}
-	return encrypt(content, recipients, senderKey, senderCert, nil)
+	return encrypt(content, recipients, senderKey, senderCert, nil, false)
 }
 
 func encrypt(
@@ -126,6 +126,7 @@ func encrypt(
 	senderKey *dstu4145.PrivateKey,
 	senderCert *cert.Certificate,
 	algorithm asn1.ObjectIdentifier,
+	embedSender bool,
 ) ([]byte, error) {
 	if len(algorithm) == 0 {
 		algorithm = OIDGost28147CFB
@@ -301,6 +302,9 @@ func encrypt(
 		EncryptedContentInfo: eci,
 	}
 
+	if embedSender {
+		ed.OriginatorInfo = asn1.RawValue{FullBytes: tlv(0xa0, tlv(0xa0, senderCert.Raw))}
+	}
 	edDER, err := asn1.Marshal(ed)
 	if err != nil {
 		return nil, errors.New("cms: marshal EnvelopedData: " + err.Error())

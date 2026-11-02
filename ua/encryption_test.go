@@ -55,3 +55,27 @@ func TestEncryptionProfilesThroughBox(t *testing.T) {
 	require.ErrorContains(t, err, "unsupported encryption")
 	require.Nil(t, output)
 }
+
+func TestStaticOriginatorEmbedsAgreementCertificate(t *testing.T) {
+	sender, key := testpki.Issue(t, "sender", nil, nil, nil)
+	recipient, recipientKey := testpki.Issue(t, "recipient", nil, nil, nil)
+	box := NewBox()
+	box.keys = []*keyEntry{{privateKey: key, signCert: sender, cryptCert: sender}}
+	receiver := NewBox()
+	receiver.keys = []*keyEntry{{privateKey: recipientKey, cryptCert: recipient}}
+	for _, algorithm := range []EncryptionAlgorithm{EncryptionGOST28147CFB, EncryptionKalyna256CFB, EncryptionKalyna256OFB} {
+		t.Run(string(algorithm), func(t *testing.T) {
+			content := []byte("static certificate discovery")
+			encoded, err := box.EncryptDocumentWithOptions(content, recipient.Raw, EncryptionOptions{Algorithm: algorithm, StaticOriginator: true})
+			require.NoError(t, err)
+			message, err := cms.ParseEnveloped(encoded)
+			require.NoError(t, err)
+			require.Len(t, message.OriginatorCertificates, 1)
+			require.Equal(t, sender.Raw, message.OriginatorCertificates[0].Raw)
+			plain, err := receiver.DecryptDocument(encoded)
+			require.NoError(t, err)
+			require.Equal(t, content, plain)
+			require.Empty(t, receiver.caCerts)
+		})
+	}
+}

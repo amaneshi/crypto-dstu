@@ -38,13 +38,14 @@ func TestCreateVerifiedSignatureTimestamp(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
 		detached, noTax bool
-	}{{"attached raw", false, true}, {"detached raw", true, true}, {"attached transport", false, false}, {"detached transport", true, false}, {"empty attached", false, true}, {"empty detached", true, true}} {
+	}{{"attached raw", false, true}, {"detached raw", true, true}, {"attached transport", false, false}, {"detached transport", true, false}, {"empty attached", false, true}, {"empty detached", true, true}, {"content and signature timestamps", false, true}, {"detached content and signature timestamps", true, true}} {
 		t.Run(tc.name, func(t *testing.T) {
 			content := []byte("protected input")
 			if tc.name == "empty attached" || tc.name == "empty detached" {
 				content = []byte{}
 			}
 			options := SignOptions{NoTax: tc.noTax, Detached: tc.detached, Timestamp: &TimestampSignOptions{TSARoots: [][]byte{root.Raw}, Fetch: fetch}}
+			options.Timestamp.IncludeContentTimestamp = tc.name == "content and signature timestamps" || tc.name == "detached content and signature timestamps"
 			signed, err := box.SignDocumentWithContext(context.Background(), content, options)
 			require.NoError(t, err)
 			var detached []byte
@@ -56,6 +57,19 @@ func TestCreateVerifiedSignatureTimestamp(t *testing.T) {
 			require.Equal(t, content, verified.Content)
 			require.Len(t, verified.Timestamps, 1)
 			require.True(t, verified.Timestamps[0].Valid)
+			if options.Timestamp.IncludeContentTimestamp {
+				message, err := cms.ParseSigned(signed)
+				require.NoError(t, err)
+				tokens, err := message.ContentTimestampTokens(0)
+				require.NoError(t, err)
+				require.Len(t, tokens, 1)
+				hash, err := tsp.HashData(content, asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 1})
+				require.NoError(t, err)
+				_, err = tsp.VerifyToken(tokens[0], hash, nil, []*cert.Certificate{root})
+				require.NoError(t, err)
+				_, err = tsp.VerifyToken(tokens[0], []byte("wrong imprint"), nil, []*cert.Certificate{root})
+				require.Error(t, err)
+			}
 		})
 	}
 	t.Run("sign timestamp encrypt", func(t *testing.T) {

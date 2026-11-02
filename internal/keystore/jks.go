@@ -45,7 +45,6 @@ const (
 //	    alias    utf8    (uint16 length prefix)
 //	    stamp    int64   (millis since epoch — ignored)
 //	    For tag=1:
-//	        key_count  uint32 (always 1 for single key)
 //	        key_data   length-prefixed OCTET STRING
 //	        cert_count uint32
 //	        For each cert:
@@ -73,6 +72,9 @@ func ParseJKS(data []byte) ([]JKSEntry, error) {
 	count, err := r.readUint32()
 	if err != nil {
 		return nil, errors.New("keystore: JKS: truncated entry count")
+	}
+	if uint64(count) > uint64(r.remaining()/12) {
+		return nil, errors.New("keystore: JKS: invalid entry count")
 	}
 
 	entries := make([]JKSEntry, 0, count)
@@ -114,19 +116,13 @@ func ParseJKS(data []byte) ([]JKSEntry, error) {
 		}
 	}
 
+	if r.remaining() != 20 {
+		return nil, errors.New("keystore: JKS: missing integrity digest or trailing data")
+	}
 	return entries, nil
 }
 
 func parseJKSKeyEntry(r *byteReader, alias string) (JKSEntry, error) {
-	// Number of keys (always 1 for PKCS8 JKS)
-	keyCount, err := r.readUint32()
-	if err != nil {
-		return JKSEntry{}, errors.New("keystore: JKS: truncated key count")
-	}
-	if keyCount != 1 {
-		return JKSEntry{}, errors.New("keystore: JKS: unexpected key count")
-	}
-
 	keyData, err := r.readLenBytes()
 	if err != nil {
 		return JKSEntry{}, errors.New("keystore: JKS: truncated key data")
@@ -136,6 +132,9 @@ func parseJKSKeyEntry(r *byteReader, alias string) (JKSEntry, error) {
 	certCount, err := r.readUint32()
 	if err != nil {
 		return JKSEntry{}, errors.New("keystore: JKS: truncated cert count")
+	}
+	if uint64(certCount) > uint64(r.remaining()/6) {
+		return JKSEntry{}, errors.New("keystore: JKS: invalid certificate count")
 	}
 
 	certs := make([][]byte, 0, certCount)

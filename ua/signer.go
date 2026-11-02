@@ -86,6 +86,12 @@ func (b *Box) SignDocumentWithContext(ctx context.Context, content []byte, opts 
 	}
 
 	cmsOpts := cms.SignOptions{Detached: opts.Detached, DigestAlgorithm: opts.DigestAlgorithm}
+	if opts.Timestamp != nil && opts.Timestamp.IncludeContentTimestamp {
+		cmsOpts.ContentTimestamp, err = b.requestVerifiedTimestamp(ctx, content, *opts.Timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("ua: content timestamp: %w", err)
+		}
+	}
 	cmsDER, err := cms.Sign(content, entry.privateKey, entry.signCert, cmsOpts)
 	if err != nil {
 		return nil, errors.New("ua: SignDocument: " + err.Error())

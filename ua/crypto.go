@@ -56,7 +56,12 @@ func (b *Box) encryptDocumentWithOptions(content []byte, rc *cert.Certificate, o
 		entry = agreement
 	}
 
-	return cms.EncryptWithOptions(content, []*cert.Certificate{rc}, entry.privateKey, cms.EncryptOptions{Algorithm: algorithm})
+	cmsOptions := cms.EncryptOptions{Algorithm: algorithm}
+	if options.StaticOriginator {
+		cmsOptions.OriginatorCertificate = entry.cryptCert
+		cmsOptions.EmbedOriginatorCertificate = true
+	}
+	return cms.EncryptWithOptions(content, []*cert.Certificate{rc}, entry.privateKey, cmsOptions)
 }
 
 // DecryptDocument decrypts an incoming document.

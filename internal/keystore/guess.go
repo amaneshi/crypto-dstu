@@ -69,12 +69,8 @@ func Parse(data []byte, password string) (*ParseResult, error) {
 	}
 
 	// 3. Try JKS
-	if entries, err := ParseJKS(origData); err == nil && len(entries) > 0 {
-		return &ParseResult{
-			Keys:   nil, // JKS keys need separate decryption; return entries' raw data via Certs
-			Certs:  collectJKSCerts(entries),
-			Format: FormatJKS,
-		}, nil
+	if result, err := ParseJKSWithPassword(origData, password); err == nil {
+		return result, nil
 	}
 
 	// 4. Try raw unencrypted PKCS#8 PrivateKeyInfo
@@ -92,6 +88,9 @@ func Parse(data []byte, password string) (*ParseResult, error) {
 // ParseJKSWithPassword parses a JKS file and attempts to decrypt each key entry
 // using ParseKey6 (the key data in PrivatBank JKS is a PKCS#8 encrypted blob).
 func ParseJKSWithPassword(data []byte, password string) (*ParseResult, error) {
+	if err := verifyJKSDigest(data, password); err != nil {
+		return nil, err
+	}
 	entries, err := ParseJKS(data)
 	if err != nil {
 		return nil, err
@@ -102,13 +101,20 @@ func ParseJKSWithPassword(data []byte, password string) (*ParseResult, error) {
 
 	var keys []*dstu4145.PrivateKey
 	var certs [][]byte
-	var priv *dstu4145.PrivateKey
-
 	for _, entry := range entries {
-		// Each entry's KeyDER is a PKCS#8 encrypted blob (same as Key-6.dat)
-		if priv, err = ParseKey6(entry.KeyDER, password); err == nil {
-			keys = append(keys, priv)
+		var entryKeys []*dstu4145.PrivateKey
+		if plaintext, decryptErr := decryptJavaKey(entry.KeyDER, password); decryptErr == nil {
+			entryKeys, err = parseRawKeys(plaintext)
+			clear(plaintext)
+		} else {
+			var priv *dstu4145.PrivateKey
+			priv, err = ParseKey6(entry.KeyDER, password)
+			entryKeys = []*dstu4145.PrivateKey{priv}
 		}
+		if err != nil {
+			return nil, errors.New("keystore: JKS: could not decrypt or parse key entry")
+		}
+		keys = append(keys, entryKeys...)
 		certs = append(certs, entry.CertChain...)
 	}
 

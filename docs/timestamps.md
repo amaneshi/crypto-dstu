@@ -146,13 +146,29 @@ TSA usage/path and requested revocation policy. A rejected response never
 produces a partially signed output. The original CMS signature octets and signed
 attributes are preserved when the unsigned timestamp attribute is appended.
 The writer supports fresh single-signer SignedData, including attached, detached,
-empty content and tax transport output. Content/archive timestamp creation remains
+empty content and tax transport output. Go callers can also set
+`TimestampSignOptions.IncludeContentTimestamp=true` to obtain a separately verified
+timestamp over the original content before signing, in addition to the signature
+timestamp. Its token becomes a signed `content-time-stamp` attribute. The CLI
+continues to select signature timestamps only. Archive timestamp creation remains
 unsupported. Revocation is not checked unless explicitly required; creation
 without it does not imply a qualified or archival validation result.
 
 `SignAndEncryptWithContext` performs the same timestamp step before encryption.
 The existing context-free signing methods remain wrappers using a background
 context. Cancellation, timestamp failures and encryption failures return no bytes.
+
+`TestLivePrivatPublicTimestampProfile` is a separately tagged and opted-in test
+using a literal public message and disposable keys. It verifies content and
+signature timestamps from PrivatBank's service against an explicitly supplied
+official NBU root, then requires native IIT signature-timestamp recognition.
+It never reads a taxpayer keystore or sends a report to DPS. The service currently
+uses the NBU 2026 root; the older NBU 2019 root cannot validate that TSA path.
+
+An explicit trust anchor is not a service leaf in RFC 5280 path validation.
+The path builder does not apply the target service's EKU to a non-target explicit
+anchor's noncritical CA-role EKU. Target pins and intermediates still undergo
+purpose checks; validity, issuer constraints and critical-extension checks remain.
 
 The CLI enables the same flow explicitly:
 

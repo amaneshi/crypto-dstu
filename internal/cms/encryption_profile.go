@@ -16,8 +16,9 @@ import (
 // EncryptOptions selects a complete supported envelope profile. A nil Algorithm
 // selects GOST CFB. OriginatorCertificate selects a static certificate reference.
 type EncryptOptions struct {
-	Algorithm             asn1.ObjectIdentifier
-	OriginatorCertificate *cert.Certificate
+	Algorithm                  asn1.ObjectIdentifier
+	OriginatorCertificate      *cert.Certificate
+	EmbedOriginatorCertificate bool
 }
 
 // EncryptWithOptions encrypts using explicit cipher, agreement and wrapping
@@ -39,7 +40,10 @@ func EncryptWithOptions(
 			return nil, err
 		}
 	}
-	return encrypt(content, recipients, key, options.OriginatorCertificate, options.Algorithm)
+	if options.EmbedOriginatorCertificate && options.OriginatorCertificate == nil {
+		return nil, errors.New("cms: embedded originator certificate is required")
+	}
+	return encrypt(content, recipients, key, options.OriginatorCertificate, options.Algorithm, options.EmbedOriginatorCertificate)
 }
 
 type envelopeProfile struct {

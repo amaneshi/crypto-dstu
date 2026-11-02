@@ -262,6 +262,22 @@ extension. A matching serial alone is insufficient. Discovery and embedded
 certificates do not become trusted roots; verify the decrypted signed document
 against explicitly configured trust anchors before using its content.
 
+Go callers can request a static originator with
+`ua.EncryptionOptions{StaticOriginator: true}`. The writer references the matched
+agreement certificate by issuer/serial and embeds it in `OriginatorInfo` for
+recipient discovery. The zero value retains the public-key originator profile.
+`TestIITStaticOriginatorCertificates/go-to-iit-embedded-certificate` verifies that
+IIT decrypts without the sender certificate being separately preloaded. Certificate
+discovery does not establish trust or authenticate CFB/OFB content.
+
+Java JKS v2 imports verify the store integrity digest and support standard Java
+KeyProtector-protected keys. IIT PKCS#8 attributes can hold a separate agreement
+key with big-endian explicit curve coordinates and bit-reversed little-endian
+scalar bytes; the loader preserves both keys and matches their certificates by
+public key. Tests use an independent keystore-go public-scalar vector and
+disposable signing/agreement keys. `Box.SigningCertificate` and `Certificates`
+return copies for application adapters without exposing internal packages.
+
 GOST CFB and Kalyna CFB/OFB do not authenticate the content. Wrapped-key corruption is checked;
 arbitrary ciphertext changes require a verified signature to detect. Decryption
 alone does not establish the sender's identity or the integrity of a report.

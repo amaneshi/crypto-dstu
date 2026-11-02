@@ -59,6 +59,11 @@ from a local round-trip alone.
   changes its public key. Use order-sized little-endian signature components.
 - Match full curve domains and complete originator identities. Serial numbers
   alone do not identify certificates.
+- Java JKS loading verifies store integrity and the SHA-1 KeyProtector checksum.
+  Preserve IIT's separate agreement key from PKCS#8 KEP attributes, including
+  its distinct parameter/scalar encoding. A single signing identity plus a
+  separate agreement key is unambiguous; multiple signing identities still
+  require explicit role selection. Never turn embedded certificates into roots.
 - Discovery certificates and imported keystore certificates are not trust roots.
   Public verification requires explicitly configured trust. Internal CMS checks
   with nil roots are mathematical fixture checks, not trust validation.

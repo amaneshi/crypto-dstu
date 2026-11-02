@@ -172,6 +172,22 @@ func (b *Box) firstKey() (*keyEntry, error) {
 		return b.keys[b.selectedKey], nil
 	}
 	if len(b.keys) != 1 {
+		// A container may hold one signing key and a separate agreement key.
+		// Select the sole signing identity; multiple signing identities remain
+		// ambiguous and require explicit role selection.
+		var signing *keyEntry
+		for _, entry := range b.keys {
+			if entry.signCert == nil {
+				continue
+			}
+			if signing != nil {
+				return nil, errors.New("ua: multiple keys loaded; select a role explicitly")
+			}
+			signing = entry
+		}
+		if signing != nil {
+			return signing, nil
+		}
 		return nil, errors.New("ua: multiple keys loaded; select a role explicitly")
 	}
 	return b.keys[0], nil

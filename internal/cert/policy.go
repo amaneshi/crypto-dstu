@@ -140,13 +140,24 @@ func buildCertChain(leaf *Certificate, roots, intermediates []*Certificate, now 
 		if err := checkValidity(c, now); err != nil {
 			return nil, err
 		}
-		if err := checkCriticalForUsage(c, usage); err != nil {
-			return nil, err
-		}
 		for _, root := range roots {
 			if root != nil && len(c.Raw) > 0 && bytes.Equal(c.Raw, root.Raw) && samePublicKey(c, root) {
+				// RFC 5280 section 6.1 excludes the explicit trust anchor from
+				// the prospective path. A CA-role EKU on that anchor is not
+				// the leaf service purpose. Keep target-certificate pins subject
+				// to their requested purpose and retain critical-extension checks.
+				if len(seen) == 0 {
+					if err := checkCriticalForUsage(c, usage); err != nil {
+						return nil, err
+					}
+				} else if err := checkCritical(c); err != nil {
+					return nil, err
+				}
 				return []*Certificate{c}, nil
 			}
+		}
+		if err := checkCriticalForUsage(c, usage); err != nil {
+			return nil, err
 		}
 		seen[c] = true
 		defer delete(seen, c)

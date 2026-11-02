@@ -19,6 +19,37 @@ func (m *SignedMessage) SignatureBytes(index int) ([]byte, error) {
 	return bytes.Clone(m.rawSigners[index].Signature), nil
 }
 
+// ContentTimestampTokens extracts the signed content-time-stamp attribute.
+// Tokens remain untrusted until their imprint and TSA signature are verified.
+func (m *SignedMessage) ContentTimestampTokens(index int) ([][]byte, error) {
+	if index < 0 || index >= len(m.rawSigners) {
+		return nil, errors.New("cms: invalid signer index")
+	}
+	attrs, err := parseRawAttributes(m.rawSigners[index].SignedAttrs.FullBytes)
+	if err != nil {
+		return nil, err
+	}
+	var tokens [][]byte
+	for _, attribute := range attrs {
+		if !attribute.Type.Equal(OIDContentTimestamp) {
+			continue
+		}
+		if tokens != nil {
+			return nil, errors.New("cms: duplicate content timestamp attribute")
+		}
+		var values asn1.RawValue
+		if rest, err := asn1.Unmarshal(attribute.Values.FullBytes, &values); err != nil || len(rest) != 0 || values.Class != 0 || values.Tag != asn1.TagSet || !values.IsCompound {
+			return nil, errors.New("cms: invalid content timestamp values")
+		}
+		var token asn1.RawValue
+		if rest, err := asn1.Unmarshal(values.Bytes, &token); err != nil || len(rest) != 0 || token.Class != 0 || token.Tag != asn1.TagSequence || !token.IsCompound || len(token.FullBytes) > 4<<20 {
+			return nil, errors.New("cms: invalid content timestamp token")
+		}
+		tokens = [][]byte{bytes.Clone(token.FullBytes)}
+	}
+	return tokens, nil
+}
+
 // HasSigningCertificate reports whether a signer carries an ESS certificate binding.
 // VerifySigned must also succeed to authenticate that binding.
 func (m *SignedMessage) HasSigningCertificate(index int) bool {

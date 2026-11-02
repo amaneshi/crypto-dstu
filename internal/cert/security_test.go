@@ -33,6 +33,40 @@ func TestTrustRequiresExplicitMatchingAnchor(t *testing.T) {
 	require.Error(t, VerifyCertChain(c, []*Certificate{c}))
 }
 
+func TestTrustAnchorRoleEKUDoesNotReplaceLeafPurpose(t *testing.T) {
+	root, rootKey := securityCert(t)
+	leaf, _ := securityCert(t)
+	marshal := func(value any) []byte { der, err := asn1.Marshal(value); require.NoError(t, err); return der }
+	usageOID := asn1.ObjectIdentifier{2, 5, 29, 37}
+	timestamp := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 8}
+	ocsp := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9}
+	caRole := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 19398, 1, 1, 8, 31}
+	caExtensions := []rawExtension{
+		{Id: oid.OIDExtBasicConstraints, Critical: true, Value: marshal(struct{ CA bool }{true})},
+		{Id: oid.OIDExtKeyUsage, Critical: true, Value: marshal(asn1.BitString{Bytes: []byte{0x06}, BitLength: 7})},
+		{Id: usageOID, Value: marshal([]asn1.ObjectIdentifier{caRole})},
+	}
+	root = issueSecurityCert(t, root, root, rootKey, caExtensions)
+	leafExtensions := []rawExtension{{Id: usageOID, Critical: true, Value: marshal([]asn1.ObjectIdentifier{timestamp})}}
+	leaf = issueSecurityCert(t, leaf, root, rootKey, leafExtensions)
+	chain, err := BuildCertChainForUsageAt(leaf, []*Certificate{root}, nil, time.Now(), timestamp)
+	require.NoError(t, err)
+	require.Len(t, chain, 2)
+	_, err = BuildCertChainForUsageAt(leaf, []*Certificate{root}, nil, time.Now(), ocsp)
+	require.Error(t, err)
+	_, err = BuildCertChainForUsageAt(leaf, []*Certificate{leaf}, nil, time.Now(), ocsp)
+	require.Error(t, err, "pinning the target must not bypass its EKU")
+	other, _ := securityCert(t)
+	_, err = BuildCertChainForUsageAt(leaf, []*Certificate{other}, []*Certificate{root}, time.Now(), timestamp)
+	require.Error(t, err, "discovery must not promote a CA to a trust anchor")
+	intermediate, intermediateKey := securityCert(t)
+	intermediate = issueSecurityCert(t, intermediate, root, rootKey, caExtensions)
+	child, _ := securityCert(t)
+	child = issueSecurityCert(t, child, intermediate, intermediateKey, leafExtensions)
+	_, err = BuildCertChainForUsageAt(child, []*Certificate{root}, []*Certificate{intermediate}, time.Now(), timestamp)
+	require.Error(t, err, "a non-anchor CA purpose restriction is still enforced")
+}
+
 func TestKeyMatchRejectsOppositePointWithSameX(t *testing.T) {
 	c, k := securityCert(t)
 	c.PublicKey = &dstu4145.PublicKey{Curve: k.Curve, Q: k.Public().Q.Neg()}

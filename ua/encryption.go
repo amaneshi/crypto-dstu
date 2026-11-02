@@ -20,7 +20,12 @@ const (
 
 // EncryptionOptions selects the content cipher and its associated KDF/wrap.
 // The zero value preserves the GOST CFB default.
-type EncryptionOptions struct{ Algorithm EncryptionAlgorithm }
+type EncryptionOptions struct {
+	Algorithm EncryptionAlgorithm
+	// StaticOriginator references and embeds the matched agreement certificate.
+	// This supplies sender certificate discovery, not trust or content authentication.
+	StaticOriginator bool
+}
 
 func (options EncryptionOptions) algorithmOID() (asn1.ObjectIdentifier, error) {
 	switch options.Algorithm {

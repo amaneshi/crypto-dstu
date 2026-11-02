@@ -385,9 +385,12 @@ type ContentInfo struct {
 
 // SignOptions controls SignedData creation.
 type SignOptions struct {
-	Detached        bool                  // omit content from SignedData
-	ContentType     asn1.ObjectIdentifier // default: OIDData
-	DigestAlgorithm asn1.ObjectIdentifier // default: supported certificate public-key profile
+	// ContentTimestamp is an already authenticated RFC3161 token over content.
+	// Caller verification is required because tsp depends on this CMS package.
+	ContentTimestamp []byte
+	Detached         bool                  // omit content from SignedData
+	ContentType      asn1.ObjectIdentifier // default: OIDData
+	DigestAlgorithm  asn1.ObjectIdentifier // default: supported certificate public-key profile
 }
 
 // SignedMessage is the result of parsing a SignedData.
@@ -459,6 +462,16 @@ func Sign(content []byte, key *dstu4145.PrivateKey, signerCert *cert.Certificate
 		return nil, err
 	}
 	attrs = append(attrs, certificateAttribute)
+	if len(opts.ContentTimestamp) > 0 {
+		if len(opts.ContentTimestamp) > 4<<20 {
+			return nil, errors.New("cms: content timestamp exceeds size limit")
+		}
+		token, err := ParseSigned(opts.ContentTimestamp)
+		if err != nil || !token.ContentType().Equal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4}) {
+			return nil, errors.New("cms: content timestamp token is required")
+		}
+		attrs = append(attrs, Attribute{Type: OIDContentTimestamp, Values: asn1.RawValue{FullBytes: marshalSETOF(opts.ContentTimestamp)}})
+	}
 
 	// 3. DER-encode signed attrs as SET OF (this is what gets signed)
 	signedAttrsDER, err := MarshalSignedAttrs(attrs)

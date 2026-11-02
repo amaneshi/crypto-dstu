@@ -22,6 +22,7 @@ var (
 	OIDMessageDigest        = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}
 	OIDSigningTime          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}
 	OIDTimestampToken       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 14}
+	OIDContentTimestamp     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 20}
 	OIDCertificateRefs      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 21}
 	OIDRevocationRefs       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 22}
 	OIDCertificateValues    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 23}

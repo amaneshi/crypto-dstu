@@ -22,13 +22,39 @@ type TimestampRequest struct{ DER []byte }
 // Nil Fetch uses explicitly configured Box.AddTSP endpoints. RevocationOptions
 // accepts only revocation settings; TSA trust is selected through TSARoots.
 type TimestampSignOptions struct {
-	TSARoots          [][]byte
-	ImprintAlgorithm  asn1.ObjectIdentifier // zero selects GOST 34.311
-	Fetch             func(context.Context, TimestampRequest) ([]byte, error)
-	RevocationOptions VerificationOptions
+	// IncludeContentTimestamp also obtains an authenticated timestamp over the
+	// original content and signs it as a content-time-stamp attribute.
+	IncludeContentTimestamp bool
+	TSARoots                [][]byte
+	ImprintAlgorithm        asn1.ObjectIdentifier // zero selects GOST 34.311
+	Fetch                   func(context.Context, TimestampRequest) ([]byte, error)
+	RevocationOptions       VerificationOptions
 }
 
 func (b *Box) addSignatureTimestamp(ctx context.Context, document []byte, options TimestampSignOptions) ([]byte, error) {
+	message, err := cms.ParseSigned(document)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := message.SignatureBytes(0)
+	if err != nil {
+		return nil, err
+	}
+	token, err := b.requestVerifiedTimestamp(ctx, signature, options)
+	if err != nil {
+		return nil, err
+	}
+	timestamped, err := cms.AttachSignatureTimestamp(document, token)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+	return timestamped, nil
+}
+
+func (b *Box) requestVerifiedTimestamp(ctx context.Context, data []byte, options TimestampSignOptions) ([]byte, error) {
 	if len(options.TSARoots) == 0 {
 		return nil, errors.New("ua: timestamp creation requires explicit TSA trust roots")
 	}
@@ -47,19 +73,11 @@ func (b *Box) addSignatureTimestamp(ctx context.Context, document []byte, option
 		}
 		roots = append(roots, c)
 	}
-	message, err := cms.ParseSigned(document)
-	if err != nil {
-		return nil, err
-	}
-	signature, err := message.SignatureBytes(0)
-	if err != nil {
-		return nil, err
-	}
 	algorithm := options.ImprintAlgorithm
 	if len(algorithm) == 0 {
 		algorithm = oid.GOST34311
 	}
-	imprint, err := tsp.HashData(signature, algorithm)
+	imprint, err := tsp.HashData(data, algorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -117,12 +135,8 @@ func (b *Box) addSignatureTimestamp(ctx context.Context, document []byte, option
 	if err != nil {
 		return nil, err
 	}
-	timestamped, err := cms.AttachSignatureTimestamp(document, token)
-	if err != nil {
-		return nil, err
-	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return timestamped, nil
+	return token, nil
 }

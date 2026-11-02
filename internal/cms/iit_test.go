@@ -275,6 +275,16 @@ func TestIITStaticOriginatorCertificates(t *testing.T) {
 	senderCert := makeIITTestCertificate(t, senderKey)
 	senderKey6 := makeIITKey6(t, senderKey)
 	content := []byte("static originator interoperability\x00\xff\r\nТест")
+	t.Run("go-to-iit-embedded-certificate", func(t *testing.T) {
+		encoded, err := EncryptWithOptions(content, []*cert.Certificate{recipientCert}, senderKey, EncryptOptions{OriginatorCertificate: senderCert, EmbedOriginatorCertificate: true})
+		require.NoError(t, err)
+		message, err := ParseEnveloped(encoded)
+		require.NoError(t, err)
+		require.Len(t, message.OriginatorCertificates, 1)
+		result := invokeIIT(t, iitRequest{Operation: "decrypt", Data: encoded, PrivateKey: recipientPFX, Password: iitTestPassword, Certificates: [][]byte{recipientCert.Raw}})
+		require.True(t, result.OK, result.Error)
+		require.Equal(t, content, result.Data)
+	})
 	t.Run("iit-to-go", func(t *testing.T) {
 		result := invokeIIT(t, iitRequest{Operation: "encrypt", StaticOriginator: true, Data: content, PrivateKey: senderKey6, Password: iitTestPassword, Certificates: [][]byte{senderCert.Raw, recipientCert.Raw}, Recipients: [][]byte{recipientCert.Raw}})
 		require.True(t, result.OK, result.Error)
