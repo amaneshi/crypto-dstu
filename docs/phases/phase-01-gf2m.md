@@ -7,7 +7,7 @@ Implement GF(2^m) finite field arithmetic — the mathematical foundation for DS
 None — this is the foundational layer.
 
 ## Package
-`crypto-dstu/gf2m`
+`github.com/amaneshi/crypto-dstu/gf2m`
 
 ## JS Reference
 - `jkurwa/lib/gf2m.js` — core arithmetic (`mul_1x1`, `mul_2x2`, `fmul`, `fmod`, `finv`, `blength`, `shiftRight`)

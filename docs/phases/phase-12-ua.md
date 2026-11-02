@@ -14,7 +14,7 @@ Implement the high-level operations that compose all lower-level primitives into
   - Phase 11 (`tsp`) — timestamps
 
 ## Package
-`crypto-dstu/ua`
+`github.com/amaneshi/crypto-dstu/ua`
 
 ## JS Reference
 - `dstucrypt/agent/index.js` — full CLI workflow: sign, encrypt, decrypt, unwrap

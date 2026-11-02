@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
 )
 
 type CertStatus int

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
 )
 
 // Standard CMS attribute OIDs (RFC 5652, RFC 5911).

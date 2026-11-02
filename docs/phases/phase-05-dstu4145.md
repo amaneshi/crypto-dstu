@@ -9,7 +9,7 @@ Implement the DSTU 4145-2002 elliptic curve digital signature algorithm: key gen
 - **Phase 3** (`kupyna` or `gost34311`) — at least one hash function for message digests
 
 ## Package
-`crypto-dstu/dstu4145`
+`github.com/amaneshi/crypto-dstu/dstu4145`
 
 ## JS Reference
 - `jkurwa/lib/models/Priv.js` — `sign()`, `pub()` (derive public key)

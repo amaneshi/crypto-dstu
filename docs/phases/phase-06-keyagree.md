@@ -9,7 +9,7 @@ Implement EC Diffie-Hellman key agreement and key derivation as specified in DST
 - **Phase 3** (`kupyna` or `gost34311`) — hash function for KDF
 
 ## Package
-`crypto-dstu/dstu15946`
+`github.com/amaneshi/crypto-dstu/dstu15946`
 
 ## JS Reference
 - `jkurwa/lib/models/Priv.js` — `sharedSecret()` method, `dh()` method

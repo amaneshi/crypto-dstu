@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"errors"
 
-	"crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
 )
 
 // ProtectKey encrypts a single unencrypted PKCS#8 DER or PEM DSTU key into a

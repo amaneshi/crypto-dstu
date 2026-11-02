@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"crypto-dstu/ua"
+	"github.com/amaneshi/crypto-dstu/ua"
 )
 
 func runUnprotect(args []string) {

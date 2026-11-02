@@ -7,10 +7,10 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // OIDs used in Key-6.dat / PKCS#8 encrypted containers (Ukrainian PKI profile).

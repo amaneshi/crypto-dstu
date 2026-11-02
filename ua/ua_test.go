@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // ---- test helpers ----

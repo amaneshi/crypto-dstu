@@ -9,8 +9,8 @@ import (
 	"io"
 	"math/big"
 
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 // PrivateKey holds a DSTU 4145 private key.

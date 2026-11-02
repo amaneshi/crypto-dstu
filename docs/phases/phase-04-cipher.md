@@ -12,8 +12,8 @@ None — block ciphers are independent of EC/field arithmetic.
 (GOST 34.311 hash from Phase 3 depends on this cipher, so this should ideally be done before or alongside Phase 3.)
 
 ## Packages
-- `crypto-dstu/kalyna`
-- `crypto-dstu/gost28147`
+- `github.com/amaneshi/crypto-dstu/kalyna`
+- `github.com/amaneshi/crypto-dstu/gost28147`
 
 ## JS Reference
 - Kalyna: **no JS impl** in dstucrypt — use C reference from `Roman-Oliynykov/Kalyna-reference` (`main.c`, `kalyna.c`, `tables.c`) and `privat-it/cryptonite`

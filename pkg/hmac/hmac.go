@@ -6,9 +6,9 @@ import (
 	gostdhmac "crypto/hmac"
 	"hash"
 
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // New returns an HMAC using the given hash factory.

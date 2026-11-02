@@ -14,9 +14,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/pkg/dstu4145"
-	czo "crypto-dstu/testdata/czo"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	czo "github.com/amaneshi/crypto-dstu/testdata/czo"
 )
 
 func TestMain(m *testing.M) {

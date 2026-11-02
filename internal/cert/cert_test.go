@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 
 	"github.com/stretchr/testify/require"
 )

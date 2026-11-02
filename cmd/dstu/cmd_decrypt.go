@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"crypto-dstu/ua"
+	"github.com/amaneshi/crypto-dstu/ua"
 )
 
 func runDecrypt(args []string) {

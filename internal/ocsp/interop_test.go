@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"crypto-dstu/internal/ocsp"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
 	"github.com/stretchr/testify/require"
 )
 

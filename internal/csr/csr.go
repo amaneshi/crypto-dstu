@@ -9,12 +9,12 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gf2m"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // --- ASN.1 structures (RFC 2986) ---

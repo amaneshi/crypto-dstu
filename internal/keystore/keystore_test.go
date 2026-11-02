@@ -5,8 +5,8 @@ import (
 	"encoding/asn1"
 	"testing"
 
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 
 	"github.com/stretchr/testify/require"
 )

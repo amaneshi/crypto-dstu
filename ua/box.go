@@ -4,10 +4,10 @@ import (
 	"errors"
 	"os"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/keystore"
-	"crypto-dstu/internal/tsp"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/tsp"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // keyEntry holds a private key with its associated certificates (internal).

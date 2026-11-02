@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
 )
 
 // Client performs OCSP requests over HTTP.

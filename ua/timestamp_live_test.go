@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/testpki"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/testpki"
 	"github.com/stretchr/testify/require"
 )
 

@@ -2,9 +2,9 @@
 package ec
 
 import (
-	"crypto-dstu/pkg/gf2m"
 	"encoding/hex"
 	"fmt"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 func mustDecodeHex(s string) []byte {

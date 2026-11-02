@@ -14,7 +14,7 @@ Implement parsers and writers for all private key container formats used in Ukra
 - **Phase 5** (`dstu4145`) — private key types
 
 ## Package
-`crypto-dstu/keystore`
+`github.com/amaneshi/crypto-dstu/keystore`
 
 ## Reference
 - `privat-it/cryptonite/tree/master/src/storage` — cryptonite storage utilities (key unwrapping)

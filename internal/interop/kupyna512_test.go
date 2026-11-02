@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/keystore"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/internal/testiit"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/testiit"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/stretchr/testify/require"
 )
 

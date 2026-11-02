@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/ocsp"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
 )
 
 // RevocationPolicy selects offline verification or required authenticated OCSP.

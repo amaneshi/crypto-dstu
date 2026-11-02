@@ -5,8 +5,8 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/kalyna"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/kalyna"
 )
 
 var oidKalyna256CBC = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 5, 2}

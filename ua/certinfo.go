@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
 )
 
 // CertInfo holds human-readable fields extracted from a certificate.

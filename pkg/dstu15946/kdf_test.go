@@ -6,11 +6,11 @@ import (
 	"encoding/asn1"
 	"testing"
 
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 
 	"github.com/stretchr/testify/require"
 )

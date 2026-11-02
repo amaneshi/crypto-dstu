@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/testpki"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/testpki"
 	"github.com/stretchr/testify/require"
 )
 

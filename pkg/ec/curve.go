@@ -1,8 +1,8 @@
 package ec
 
 import (
-	"crypto-dstu/pkg/gf2m"
 	"fmt"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 // Curve represents an elliptic curve over GF(2^m) with equation y² + xy = x³ + ax² + b.

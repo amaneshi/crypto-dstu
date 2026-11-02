@@ -5,9 +5,9 @@ import (
 	"errors"
 	"math/big"
 
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
 )
 
 // PrivateKeyInfo is the ASN.1 structure for an unencrypted PKCS#8 private key

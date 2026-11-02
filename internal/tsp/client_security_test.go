@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"crypto-dstu/internal/tsp"
+	"github.com/amaneshi/crypto-dstu/internal/tsp"
 	"github.com/stretchr/testify/require"
 )
 

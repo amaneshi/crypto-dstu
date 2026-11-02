@@ -4,9 +4,9 @@ import (
 	"encoding/asn1"
 	"fmt"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
 )
 
 // EncryptionAlgorithm identifies a complete supported CMS encryption profile.

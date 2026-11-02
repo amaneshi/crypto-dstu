@@ -9,7 +9,7 @@ Implement RFC 3161 Timestamp Protocol (TSP) for requesting and verifying timesta
 - **Phase 8** (`cert`, `oid`) — certificate verification for TSP authority
 
 ## Package
-`crypto-dstu/tsp`
+`github.com/amaneshi/crypto-dstu/tsp`
 
 ## JS Reference
 - `jkurwa/lib/util/tsp.js` — TSP request building, response parsing

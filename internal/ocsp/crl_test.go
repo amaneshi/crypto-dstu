@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/ocsp"
-	"crypto-dstu/internal/testpki"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
+	"github.com/amaneshi/crypto-dstu/internal/testpki"
 	"github.com/stretchr/testify/require"
 )
 

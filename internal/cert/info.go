@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 )
 
 // CertInfo holds human-readable extracted fields from a Certificate.

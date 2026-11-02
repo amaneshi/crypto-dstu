@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
-	czo "crypto-dstu/testdata/czo"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
+	czo "github.com/amaneshi/crypto-dstu/testdata/czo"
 	"github.com/stretchr/testify/require"
 )
 

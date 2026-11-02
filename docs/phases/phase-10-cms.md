@@ -10,7 +10,7 @@ Implement CMS (Cryptographic Message Syntax) / PKCS#7 for creating and parsing s
 - **Phase 4** (`gost28147`) — symmetric cipher for EnvelopedData
 
 ## Package
-`crypto-dstu/cms`
+`github.com/amaneshi/crypto-dstu/cms`
 
 ## JS Reference
 - `jkurwa/lib/spec/dstszi.js` — ASN.1 schema definitions for CMS structures

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/ocsp"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
 	"github.com/stretchr/testify/require"
 )
 

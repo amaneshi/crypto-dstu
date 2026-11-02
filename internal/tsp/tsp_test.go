@@ -11,10 +11,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // ---- helpers ----

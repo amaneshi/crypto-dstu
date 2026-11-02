@@ -11,10 +11,10 @@ import (
 	"hash"
 	"math/big"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // --- ASN.1 structures (RFC 6960) ---

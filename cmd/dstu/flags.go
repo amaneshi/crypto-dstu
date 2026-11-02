@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/ua"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/ua"
 )
 
 func parseSigningDigest(value string) (asn1.ObjectIdentifier, error) {

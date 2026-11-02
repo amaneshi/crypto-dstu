@@ -9,7 +9,7 @@ cryptonite (`_ref/cryptonite/src/cryptonite/c/dstu7564.h`).
 - **Phase 3** (`kupyna`) — existing hash implementation; KMAC builds on top of it
 
 ## Package
-`crypto-dstu/pkg/kupyna` — extend in-place, no new package
+`github.com/amaneshi/crypto-dstu/pkg/kupyna` — extend in-place, no new package
 
 ## Reference
 - `_ref/cryptonite/src/cryptonite/c/dstu7564.h` — `dstu7564_init_kmac`,

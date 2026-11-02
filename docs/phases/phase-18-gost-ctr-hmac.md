@@ -12,8 +12,8 @@
 - **Phase 3** (`gost34311`, `kupyna`) — hash functions used inside HMAC
 
 ## Packages
-- `crypto-dstu/pkg/gost28147` — add CTR mode in-place
-- `crypto-dstu/pkg/hmac` — new package
+- `github.com/amaneshi/crypto-dstu/pkg/gost28147` — add CTR mode in-place
+- `github.com/amaneshi/crypto-dstu/pkg/hmac` — new package
 
 ## Reference
 - `_ref/cryptonite/src/cryptonite/c/gost28147.h` — `gost28147_init_ctr`

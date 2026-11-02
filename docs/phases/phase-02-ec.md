@@ -7,7 +7,7 @@ Implement elliptic curve arithmetic over binary fields for the curve form `y² +
 - **Phase 1** (`gf2m`) — field arithmetic must be complete and tested
 
 ## Package
-`crypto-dstu/ec`
+`github.com/amaneshi/crypto-dstu/ec`
 
 ## JS Reference
 - `jkurwa/lib/curve.js` — `Curve` class: constructor, `expand()`, `contains()`, `keygen()`, `truncate()`, `curve_id()`

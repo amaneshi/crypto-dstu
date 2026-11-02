@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // VerifyCert verifies cert's signature using issuerCert's public key.

@@ -5,7 +5,7 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
 )
 
 // Response is an RFC 3161 TimeStampResp.

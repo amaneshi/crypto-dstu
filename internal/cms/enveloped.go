@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"slices"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gf2m"
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/kalyna"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/kalyna"
 )
 
 // OIDs for EnvelopedData algorithms.

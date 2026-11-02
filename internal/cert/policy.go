@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 )
 
 func dnBytes(n asn1.RawValue) []byte {

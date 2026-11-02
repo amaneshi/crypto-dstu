@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"crypto-dstu/internal/csr"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/internal/csr"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
 // TestCreateParse verifies that a CSR created with NewRequest can be parsed back.

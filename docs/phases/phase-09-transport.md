@@ -7,7 +7,7 @@ Implement the binary transport container format defined by Order #499 (12.07.201
 None strictly — the transport format is a binary container independent of crypto primitives. However, meaningful integration tests need Phase 5+ for actual signed/encrypted content.
 
 ## Package
-`crypto-dstu/transport`
+`github.com/amaneshi/crypto-dstu/transport`
 
 ## JS Reference
 - `jkurwa/lib/util/transport.js` — `transport_encode()`, `transport_decode()`, `header_decode()`

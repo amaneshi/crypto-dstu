@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // VerifySigned verifies every signature, including the content digest. A nil root

@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"crypto-dstu/pkg/ec"
-	"crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 
 	"github.com/stretchr/testify/require"
 )

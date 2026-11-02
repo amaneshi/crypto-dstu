@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 // Compress returns the compressed representation of the point.

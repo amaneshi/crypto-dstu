@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/internal/tsp"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/tsp"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 func der(t testing.TB, value any) []byte {

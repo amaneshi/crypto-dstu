@@ -31,24 +31,22 @@ Aligned with the [cryptonite](https://github.com/privat-it/cryptonite) reference
 Clone the repository and build:
 
 ```bash
-git clone https://github.com/your-org/crypto-dstu
+git clone https://github.com/amaneshi/crypto-dstu
 cd crypto-dstu
 go build -o dstu ./cmd/dstu
 ```
 
-Once the module is published to a Go proxy:
+Or install directly from GitHub:
 
 ```bash
-go install github.com/your-org/crypto-dstu/cmd/dstu@latest
+go install github.com/amaneshi/crypto-dstu/cmd/dstu@latest
 ```
 
 ### Library
 
 ```bash
-go get github.com/your-org/crypto-dstu
+go get github.com/amaneshi/crypto-dstu
 ```
-
-> **Note:** The module is currently named `crypto-dstu` (local). Replace `github.com/your-org/crypto-dstu` with the actual published module path.
 
 Requires Go 1.27 or later (see `go.mod`).
 
@@ -338,7 +336,7 @@ compatibility is not established. Certificates are supplied separately.
 
 ```go
 import (
-    "crypto-dstu/ua"
+    "github.com/amaneshi/crypto-dstu/ua"
 )
 
 box := ua.NewBox()
@@ -421,7 +419,7 @@ container, err := box.SignAndEncrypt(content, recipientDER, ua.SignOptions{
 ### Certificate information
 
 ```go
-import "crypto-dstu/ua"
+import "github.com/amaneshi/crypto-dstu/ua"
 
 info, err := ua.GetCertInfo(certDER)
 if err != nil {
@@ -435,7 +433,7 @@ fmt.Printf("Valid:  %s — %s\n", info.NotBefore.Format("2006-01-02"), info.NotA
 ### Remove password protection from a key
 
 ```go
-import "crypto-dstu/ua"
+import "github.com/amaneshi/crypto-dstu/ua"
 
 data, _ := os.ReadFile("Key-6.dat")
 keyPEM, err := ua.UnprotectKey(data, "password", "pem")
@@ -451,8 +449,8 @@ keyPEM, err := ua.UnprotectKey(data, "password", "pem")
 ```go
 import (
     "crypto/rand"
-    "crypto-dstu/pkg/dstu4145"
-    "crypto-dstu/pkg/kupyna"
+    "github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+    "github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 params := dstu4145.ParamsByName("DSTU_PB_257")
@@ -475,7 +473,7 @@ ok := dstu4145.Verify(pub, digest, sig)
 ### Kupyna hash
 
 ```go
-import "crypto-dstu/pkg/kupyna"
+import "github.com/amaneshi/crypto-dstu/pkg/kupyna"
 
 h := kupyna.New256()
 h.Write(data)
@@ -485,7 +483,7 @@ digest := h.Sum(nil) // 32 bytes
 ### GOST 28147-89 encryption
 
 ```go
-import "crypto-dstu/pkg/gost28147"
+import "github.com/amaneshi/crypto-dstu/pkg/gost28147"
 
 block, err := gost28147.NewCipher(key) // 32-byte key, returns cipher.Block
 // CFB mode
@@ -497,7 +495,7 @@ stream, err = gost28147.NewCTR(block, iv) // iv must be 8 bytes
 ### HMAC
 
 ```go
-import "crypto-dstu/pkg/hmac"
+import "github.com/amaneshi/crypto-dstu/pkg/hmac"
 
 // Generic HMAC (works with any hash.Hash factory)
 mac := hmac.New(sha256.New, key)
@@ -518,10 +516,10 @@ mac = hmac.NewKupyna512(key)
 
 ```go
 import (
-    "crypto-dstu/internal/csr"
-    "crypto-dstu/internal/oid"
-    "crypto-dstu/pkg/dstu4145"
-    "crypto-dstu/pkg/ec"
+    "github.com/amaneshi/crypto-dstu/internal/csr"
+    "github.com/amaneshi/crypto-dstu/internal/oid"
+    "github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+    "github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
 priv, _ := dstu4145.GenerateKey(ec.DSTU_PB_257())

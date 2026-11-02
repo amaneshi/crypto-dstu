@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"hash"
 
-	"crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
 )
 
 const Size = 32

@@ -9,8 +9,8 @@ import (
 	"math/big"
 	"slices"
 
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 // SharedSecret computes the ECDH shared secret, matching cryptonite dstu4145_dh

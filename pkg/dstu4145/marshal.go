@@ -5,7 +5,7 @@ import (
 	"errors"
 	"math/big"
 
-	"crypto-dstu/pkg/gf2m"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 )
 
 // asn1Signature is the ASN.1 encoding of a DSTU 4145 signature.

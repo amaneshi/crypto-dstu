@@ -3,7 +3,7 @@ package keystore
 import (
 	"errors"
 
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // Format identifies the detected key container format.

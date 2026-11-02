@@ -3,7 +3,7 @@ package dstu4145
 import (
 	"encoding/asn1"
 
-	"crypto-dstu/pkg/ec"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
 // DomainParams bundles a curve with its OID and recommended hash OID.

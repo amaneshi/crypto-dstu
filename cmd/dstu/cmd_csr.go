@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"crypto-dstu/internal/csr"
-	"crypto-dstu/internal/keystore"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/internal/csr"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 func runCSR(args []string) {

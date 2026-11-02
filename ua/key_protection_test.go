@@ -5,7 +5,7 @@ import (
 	"encoding/asn1"
 	"testing"
 
-	"crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
 	"github.com/stretchr/testify/require"
 )
 

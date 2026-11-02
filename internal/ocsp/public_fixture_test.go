@@ -5,11 +5,11 @@ package ocsp_test
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/ocsp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"

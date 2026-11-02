@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/stretchr/testify/require"
 )
 

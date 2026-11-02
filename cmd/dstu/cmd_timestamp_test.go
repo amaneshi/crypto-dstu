@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/keystore"
-	"crypto-dstu/internal/testpki"
-	"crypto-dstu/internal/testtimestamp"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/testpki"
+	"github.com/amaneshi/crypto-dstu/internal/testtimestamp"
 	"github.com/stretchr/testify/require"
 )
 

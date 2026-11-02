@@ -13,8 +13,8 @@
 - **Phase 10** (`cms`) — OCSP responses embed CMS-like structures
 
 ## Packages
-- `crypto-dstu/internal/ocsp` — new package
-- `crypto-dstu/internal/csr` — new package
+- `github.com/amaneshi/crypto-dstu/internal/ocsp` — new package
+- `github.com/amaneshi/crypto-dstu/internal/csr` — new package
 
 ## Reference
 - `_ref/cryptonite/src/pkix/c/api/ocsp_request.h`

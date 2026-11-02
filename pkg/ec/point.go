@@ -1,8 +1,8 @@
 package ec
 
 import (
-	"crypto-dstu/pkg/gf2m"
 	"fmt"
+	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 	"math/big"
 )
 

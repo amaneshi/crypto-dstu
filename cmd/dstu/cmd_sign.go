@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"crypto-dstu/ua"
+	"github.com/amaneshi/crypto-dstu/ua"
 )
 
 func runSign(args []string) {

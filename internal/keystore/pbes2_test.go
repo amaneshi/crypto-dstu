@@ -5,7 +5,7 @@ import (
 	"encoding/asn1"
 	"testing"
 
-	"crypto-dstu/pkg/kalyna"
+	"github.com/amaneshi/crypto-dstu/pkg/kalyna"
 	"github.com/stretchr/testify/require"
 )
 

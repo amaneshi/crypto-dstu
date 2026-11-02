@@ -4,13 +4,13 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/pkg/dstu15946"
-	"crypto-dstu/pkg/dstu4145"
-	"crypto-dstu/pkg/gost28147"
-	"crypto-dstu/pkg/gost34311"
-	"crypto-dstu/pkg/kalyna"
-	"crypto-dstu/pkg/kupyna"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu15946"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost34311"
+	"github.com/amaneshi/crypto-dstu/pkg/kalyna"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
 // EncryptOptions selects a complete supported envelope profile. A nil Algorithm

@@ -10,7 +10,7 @@ Implement a command-line interface tool (`dstu`) that exposes the full `ua` pack
 - **Phase 11** (`tsp`) — timestamp support
 
 ## Package
-`crypto-dstu/cmd/dstu`
+`github.com/amaneshi/crypto-dstu/cmd/dstu`
 
 ## Reference
 - `dstucrypt/agent` README — CLI flags and workflow descriptions
@@ -95,7 +95,7 @@ import (
     "os"
     "strings"
 
-    "crypto-dstu/ua"
+    "github.com/amaneshi/crypto-dstu/ua"
 )
 
 type commonFlags struct {

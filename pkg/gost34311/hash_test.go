@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"crypto-dstu/pkg/gost28147"
+	"github.com/amaneshi/crypto-dstu/pkg/gost28147"
 
 	"github.com/stretchr/testify/require"
 )

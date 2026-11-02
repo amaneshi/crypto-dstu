@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"testing"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/stretchr/testify/require"
 )
 

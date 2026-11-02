@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/transport"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/transport"
 )
 
 // SignOptions controls SignDocument behaviour.

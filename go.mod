@@ -1,4 +1,4 @@
-module crypto-dstu
+module github.com/amaneshi/crypto-dstu
 
 go 1.27
 

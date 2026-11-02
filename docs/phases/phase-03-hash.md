@@ -16,8 +16,8 @@ However, GOST 34.311 internally uses the GOST 28147 cipher, so either:
 **Recommended**: implement Kupyna first (fully independent), then GOST 34.311 after Phase 4.
 
 ## Packages
-- `crypto-dstu/kupyna`
-- `crypto-dstu/gost34311`
+- `github.com/amaneshi/crypto-dstu/kupyna`
+- `github.com/amaneshi/crypto-dstu/gost34311`
 
 ## JS Reference
 - Kupyna: no JS impl in dstucrypt (they use GOST hash). Use the **C reference** from `privat-it/cryptonite` and the **spec paper** https://eprint.iacr.org/2015/885.pdf

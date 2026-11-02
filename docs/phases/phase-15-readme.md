@@ -29,10 +29,10 @@ Write a comprehensive `README.md` in the repository root that serves two audienc
 ### 3. Installation
 ```bash
 # CLI tool
-go install crypto-dstu/cmd/dstu@latest
+go install github.com/amaneshi/crypto-dstu/cmd/dstu@latest
 
 # Library
-go get crypto-dstu
+go get github.com/amaneshi/crypto-dstu
 ```
 
 ### 4. CLI Usage (complete reference)

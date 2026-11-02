@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/internal/testiit"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/testiit"
 	"github.com/stretchr/testify/require"
 )
 

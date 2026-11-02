@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
 )
 
 // VerifyCert validates a DER or PEM certificate against the Box CA pool.

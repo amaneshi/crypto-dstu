@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"testing"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/transport"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/transport"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,7 +1,7 @@
 package tsp
 
 import (
-	"crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

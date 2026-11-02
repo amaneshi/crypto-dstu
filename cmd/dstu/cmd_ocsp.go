@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/keystore"
-	"crypto-dstu/internal/ocsp"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/keystore"
+	"github.com/amaneshi/crypto-dstu/internal/ocsp"
 )
 
 func runOCSP(args []string) {

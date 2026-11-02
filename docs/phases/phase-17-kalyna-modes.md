@@ -11,7 +11,7 @@ CCM is deferred (complex; not required by current UA PKI profiles).
 - **Phase 4** (`kalyna`) — existing `cipher.Block` implementation
 
 ## Package
-`crypto-dstu/pkg/kalyna` — extend in-place
+`github.com/amaneshi/crypto-dstu/pkg/kalyna` — extend in-place
 
 ## Reference
 - `_ref/cryptonite/src/cryptonite/c/dstu7624.h`

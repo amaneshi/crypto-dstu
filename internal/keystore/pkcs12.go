@@ -4,7 +4,7 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // PKCS#12 / PFX OIDs.

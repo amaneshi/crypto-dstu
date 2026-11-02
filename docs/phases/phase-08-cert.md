@@ -8,8 +8,8 @@ Implement X.509v3 certificate parsing with Ukrainian PKI extensions, certificate
 - **Phase 3** (`kupyna`/`gost34311`) — hash algorithms referenced in certificates
 
 ## Packages
-- `crypto-dstu/cert`
-- `crypto-dstu/oid`
+- `github.com/amaneshi/crypto-dstu/cert`
+- `github.com/amaneshi/crypto-dstu/oid`
 
 ## JS Reference
 - `jkurwa/lib/models/Certificate.js` — certificate parsing, `from_asn1()`, extensions

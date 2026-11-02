@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"crypto-dstu/internal/cert"
-	"crypto-dstu/internal/cms"
-	"crypto-dstu/internal/oid"
-	"crypto-dstu/internal/tsp"
+	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/internal/tsp"
 )
 
 // TimestampRequest carries only an encoded RFC 3161 request containing the

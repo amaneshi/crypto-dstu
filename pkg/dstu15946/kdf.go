@@ -6,7 +6,7 @@ import (
 	"errors"
 	"hash"
 
-	"crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 // OIDGost28147CfbWrap is the Ukrainian PKI OID for GOST 28147-89 CFB key-wrap.

@@ -4,7 +4,7 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"crypto-dstu/pkg/kalyna"
+	"github.com/amaneshi/crypto-dstu/pkg/kalyna"
 )
 
 // MarshalKey6Kalyna wraps raw PKCS#8 DER with the IIT Kupyna MAC-256 /
