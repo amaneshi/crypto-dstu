@@ -634,10 +634,12 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **Next priority — PKCS#12 hardening:** verify container MACs, define explicit
-  handling for missing or unsupported integrity protection, and match certificates
-  to private keys by public key instead of the parser's current index pairing.
-  Add tampering, reordered-bag, multiple-key and ambiguous-association tests.
+- [x] **PKCS#12 hardening:** verify supported container MACs before importing keys,
+  reject missing/unsupported integrity, and associate certificates by public key
+  instead of bag position. Tampering, reordered-bag, multiple-key and ambiguous
+  association tests pass, with OpenSSL MAC vectors and disposable GOST/Kupyna IIT
+  containers. This also fixes a two-block Kupyna KMAC message-padding panic.
+  See [PKCS#12 import policy and limits](docs/pkcs12.md).
 - [ ] **Broader compatibility:** extend modern Kalyna encryption coverage beyond
   PB257, investigate cross-provider non-ASCII passwords, and evaluate ONB curve
   support. Keep unsupported profiles explicit until independently validated.

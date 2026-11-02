@@ -1,0 +1,85 @@
+{
+  "producer": "OpenSSL 3.5.9 29 Sep 2026 (Library: OpenSSL 3.5.9 29 Sep 2026)",
+  "vectors": [
+    {
+      "keyHex": "83681bc488a5208c09b06bc47035d9d390e84fc4",
+      "iterations": 1,
+      "name": "sha1",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "password",
+      "oid": "1.3.14.3.2.26",
+      "macHex": "bd0a55f1001bb1c1e023d8897e9e3ae5a5b91a52"
+    },
+    {
+      "keyHex": "7db8e05ad108b5d982c76360aadc71e9ac06848fbaed4761aab3e2c5",
+      "iterations": 2048,
+      "name": "sha224",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "password",
+      "oid": "2.16.840.1.101.3.4.2.4",
+      "macHex": "ed4d4c6fb74932a5ba36798cffb4d1fee7153a10527333030d97328f"
+    },
+    {
+      "keyHex": "4f510e1b5428cb3a1b784ceee7b1a95670f60e825199c121bd1752ee9e1c83f2",
+      "iterations": 2048,
+      "name": "sha256",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "password",
+      "oid": "2.16.840.1.101.3.4.2.1",
+      "macHex": "299b97f2e052557ee56398c370ce4a89092e1573045bdbeccc5bdc78b9d22afc"
+    },
+    {
+      "keyHex": "763ff6adc8b94e0e08b022aa5fb2ec07265d6f836cca401f131a9590fddc6e638f48cd8ef76e70dd85f8c5a892a6fb67",
+      "iterations": 1000,
+      "name": "sha384",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "password",
+      "oid": "2.16.840.1.101.3.4.2.2",
+      "macHex": "1d2e3361a671963be760eb3a41353d57a4de29518f45aabeef179cc44eadb5efee2f7e32b8c9986ae80e9040ae9f44f7"
+    },
+    {
+      "keyHex": "ad26e4b067a5117031b060335151a03a74fe5f0d7c1e116ea2c22e85a9eca166b71091c2b318942a51460aad4529eb02fa9ad40a0230303d14cb522a7171c7c9",
+      "iterations": 2048,
+      "name": "sha512",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "password",
+      "oid": "2.16.840.1.101.3.4.2.3",
+      "macHex": "f2e5e02e4334c0d8df61590cd6a72c83a89a3c6620d847da15085f61ec00a77d9fe5d955a2dbda82a8cc468219189bd87b4f2e5d1c20dd9f0ccdb701fc6dd8a7"
+    },
+    {
+      "keyHex": "878f85ff6db5c92f2da873fdb0ecae4bdc9dcc3cb5faf9226d10ee23af02546a",
+      "iterations": 2048,
+      "name": "empty",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "",
+      "oid": "2.16.840.1.101.3.4.2.1",
+      "macHex": "4b1968e3e7cda9ccba9e15b3c4de7acca8f40466e8e07e89880bdbe88d7eb3f2"
+    },
+    {
+      "keyHex": "a39c0067be40cb06605bbe998c8343bf2d5e2b7d6f5e19474eccab0e9cdf8f3e",
+      "iterations": 2048,
+      "name": "bmp",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "Пароль",
+      "oid": "2.16.840.1.101.3.4.2.1",
+      "macHex": "b3a13bcfbb7ba9627a497e92f7bd5ba1de6a31d6f8be1f9bf2af0b42709ddba5"
+    },
+    {
+      "keyHex": "b908aa91424eed3b01f9b2f5c4339be3eaa87f80e8becb0952cce8c2cc06a85d",
+      "iterations": 2048,
+      "name": "long-password",
+      "messageHex": "696e646570656e64656e7420504b43533132204d41432074657374",
+      "saltHex": "0102030405060708",
+      "password": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+      "oid": "2.16.840.1.101.3.4.2.1",
+      "macHex": "ff0d1db7974fdcfb842b0d2ce8830a4af50f5efe8dcf9fb09ffcb87ac62c99e8"
+    }
+  ]
+}

@@ -173,10 +173,14 @@ func (k *kmacDigest) finalise() []byte {
 	// --- PAD(M): pad lastBlock in-place at lastBlockEl offset ---
 	// padding() uses: buf_len_out = lastBlockEl (offset into buf),
 	//                 buf_len_out_bit = msgLen*8 (bit count of message only)
-	paddedLen := kmacPaddingInPlace(k.lastBlock, k.lastBlockEl, msgLen*8, k.blockSize)
+	// A partial block with fewer than 13 free bytes needs two blocks for
+	// the marker and 96-bit length. Write retains only one input block.
+	paddingBlocks := make([]byte, 2*k.blockSize)
+	copy(paddingBlocks, k.lastBlock)
+	paddedLen := kmacPaddingInPlace(paddingBlocks, k.lastBlockEl, msgLen*8, k.blockSize)
 	for i := 0; i < paddedLen; i += k.blockSize {
 		k.msgTotLen += uint64(k.blockSize) * 8
-		compress(k.state, k.lastBlock[i:i+k.blockSize], k.rounds)
+		compress(k.state, paddingBlocks[i:i+k.blockSize], k.rounds)
 	}
 
 	// Clear lastBlock — it has been consumed

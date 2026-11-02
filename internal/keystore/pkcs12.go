@@ -1,10 +1,15 @@
 package keystore
 
 import (
+	"bytes"
 	"encoding/asn1"
 	"errors"
+	"slices"
+	"strings"
 
+	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 )
 
 // PKCS#12 / PFX OIDs.
@@ -26,7 +31,7 @@ var (
 type KeyCertPair struct {
 	PrivateKey *dstu4145.PrivateKey
 	Cert       []byte   // DER-encoded leaf certificate
-	CertChain  [][]byte // DER-encoded intermediate + root certs
+	CertChain  [][]byte // Additional unmatched certificates for discovery; not a validated chain.
 }
 
 // pfxASN is the outer PFX structure.
@@ -64,12 +69,34 @@ type safeBag struct {
 	BagAttrs asn1.RawValue `asn1:"set,optional"`
 }
 
+// Identify a PFX envelope before format guessing can obscure its integrity
+// error. Do not reinterpret a recognized but invalid PFX as another key format.
+func looksLikePKCS12(data []byte) bool {
+	var fields []asn1.RawValue
+	if _, err := asn1.Unmarshal(data, &fields); err != nil || len(fields) < 2 {
+		return false
+	}
+	var version int
+	if _, err := asn1.Unmarshal(fields[0].FullBytes, &version); err != nil || version != 3 {
+		return false
+	}
+	var ci contentInfo
+	if _, err := asn1.Unmarshal(fields[1].FullBytes, &ci); err != nil {
+		return false
+	}
+	return strings.HasPrefix(ci.ContentType.String(), "1.2.840.113549.1.7.")
+}
+
 // ParsePKCS12 parses a PKCS#12 / PFX container and returns key+cert pairs.
-// Handles both plain-data and encrypted-data content (GOST or AES/3DES encrypted).
-// For encrypted content, password is used via PBES2 / PBKDF2.
+// Requires a supported password-integrity MAC before decrypting/importing any
+// bags. SignedData integrity and missing/unsupported MACs fail closed. Privacy
+// uses the supported PBES2 profiles; certificates are associated by public key.
 //
 // Reference: cryptonite src/storage/c/file/pkcs12.c.
 func ParsePKCS12(data []byte, password string) ([]*KeyCertPair, error) {
+	if len(data) > 16<<20 {
+		return nil, errors.New("keystore: PKCS12: container too large")
+	}
 	data = MaybePEM(data)
 
 	var pfx pfxASN
@@ -80,6 +107,17 @@ func ParsePKCS12(data []byte, password string) ([]*KeyCertPair, error) {
 	}
 	if pfx.Version != 3 {
 		return nil, errors.New("keystore: PKCS12: unsupported version")
+	}
+	canonical, err := asn1.Marshal(pfx)
+	if err != nil || !bytes.Equal(canonical, data) {
+		return nil, errors.New("keystore: PKCS12: noncanonical PFX")
+	}
+	authenticatedSafe, err := pkcs12AuthenticatedSafe(pfx.AuthSafe)
+	if err != nil {
+		return nil, err
+	}
+	if err = verifyPKCS12MAC(pfx.MacData, authenticatedSafe, password); err != nil {
+		return nil, err
 	}
 
 	// authSafe content must be Data (plain) or EncryptedData
@@ -101,46 +139,97 @@ func ParsePKCS12(data []byte, password string) ([]*KeyCertPair, error) {
 		}
 		keys = append(keys, ks...)
 		certs = append(certs, cs...)
+		if len(keys) > 64 || len(certs) > 512 {
+			return nil, errors.New("keystore: PKCS12: too many keys or certificates")
+		}
 	}
 
 	if len(keys) == 0 {
 		return nil, errors.New("keystore: PKCS12: no private keys found")
 	}
 
-	// Pair each key with a cert (by index; detailed matching requires cert parsing)
-	pairs := make([]*KeyCertPair, len(keys))
-	for i, k := range keys {
-		pair := &KeyCertPair{PrivateKey: k}
-		if i < len(certs) {
-			pair.Cert = certs[i]
+	return associatePKCS12(keys, certs)
+}
+
+func associatePKCS12(keys []*dstu4145.PrivateKey, certificates [][]byte) ([]*KeyCertPair, error) {
+	var parsed []*cert.Certificate
+	unique := map[string]bool{}
+	for _, der := range certificates {
+		if unique[string(der)] {
+			continue
 		}
-		if len(certs) > len(keys) {
-			pair.CertChain = certs[len(keys):]
+		unique[string(der)] = true
+		c, err := cert.ParseCertificate(der)
+		if err != nil {
+			return nil, errors.New("keystore: PKCS12: malformed certificate")
+		}
+		parsed = append(parsed, c)
+	}
+	pairs := make([]*KeyCertPair, len(keys))
+	used := make(map[*cert.Certificate]bool)
+	for i, key := range keys {
+		for _, earlier := range keys[:i] {
+			if samePKCS12Domain(key, earlier) && key.D.Cmp(earlier.D) == 0 {
+				return nil, errors.New("keystore: PKCS12: duplicate private key")
+			}
+		}
+		pair := &KeyCertPair{PrivateKey: key}
+		pub := key.Public()
+		for _, c := range parsed {
+			if c.PublicKey == nil || c.PublicKey.Q == nil || !samePKCS12Curves(key.Curve, c.PublicKey.Curve) ||
+				!pub.Q.X.Equal(c.PublicKey.Q.X) || !pub.Q.Y.Equal(c.PublicKey.Q.Y) {
+				continue
+			}
+			if pair.Cert != nil {
+				return nil, errors.New("keystore: PKCS12: ambiguous certificates for private key")
+			}
+			pair.Cert = bytes.Clone(c.Raw)
+			used[c] = true
 		}
 		pairs[i] = pair
+	}
+	for _, pair := range pairs {
+		for _, c := range parsed {
+			if !used[c] {
+				pair.CertChain = append(pair.CertChain, bytes.Clone(c.Raw))
+			}
+		}
 	}
 	return pairs, nil
 }
 
+func samePKCS12Domain(a, b *dstu4145.PrivateKey) bool { return samePKCS12Curves(a.Curve, b.Curve) }
+func samePKCS12Curves(a, b *ec.Curve) bool {
+	return a != nil && b != nil && a.M == b.M && a.Cofactor == b.Cofactor && slices.Equal(a.ModBits, b.ModBits) &&
+		a.A.Equal(b.A) && a.B.Equal(b.B) && bytes.Equal(a.N, b.N) && a.Gx.Equal(b.Gx) && a.Gy.Equal(b.Gy)
+}
+
+func pkcs12AuthenticatedSafe(ci contentInfo) ([]byte, error) {
+	if !ci.ContentType.Equal(oidDataContentType) {
+		return nil, ErrPKCS12UnsupportedMAC
+	}
+	if ci.Content.Class != 2 || ci.Content.Tag != 0 || !ci.Content.IsCompound {
+		return nil, errors.New("keystore: PKCS12: invalid explicit content")
+	}
+	var octets []byte
+	if rest, err := asn1.Unmarshal(ci.Content.Bytes, &octets); err != nil || len(rest) != 0 {
+		return nil, errors.New("keystore: PKCS12: invalid authenticated content")
+	}
+	return octets, nil
+}
+
 // parseAuthSafe returns the DER bytes of each inner SafeContents.
 func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
-	if !ci.ContentType.Equal(oidDataContentType) {
-		return nil, errors.New("keystore: PKCS12: authSafe is not Data ContentInfo")
-	}
-
-	// The Content is [0] EXPLICIT OCTET STRING containing an OCTET STRING
-	var outer []byte
-	var err error
-	_, err = asn1.Unmarshal(ci.Content.Bytes, &outer)
+	outer, err := pkcs12AuthenticatedSafe(ci)
 	if err != nil {
-		return nil, errors.New("keystore: PKCS12: authSafe content: " + err.Error())
+		return nil, err
 	}
 
 	// outer is a DER SEQUENCE OF ContentInfo
 	var safeContents []contentInfo
-	_, err = asn1.Unmarshal(outer, &safeContents)
-	if err != nil {
-		return nil, errors.New("keystore: PKCS12: AuthenticatedSafe: " + err.Error())
+	rest, err := asn1.Unmarshal(outer, &safeContents)
+	if err != nil || len(rest) != 0 || len(safeContents) > 64 {
+		return nil, errors.New("keystore: PKCS12: malformed or excessive AuthenticatedSafe")
 	}
 
 	result := make([][]byte, 0, len(safeContents))
@@ -148,9 +237,9 @@ func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
 	for _, sc := range safeContents {
 		switch {
 		case sc.ContentType.Equal(oidDataContentType):
-			_, err = asn1.Unmarshal(sc.Content.Bytes, &plain)
+			plain, err = pkcs12AuthenticatedSafe(sc)
 			if err != nil {
-				return nil, errors.New("keystore: PKCS12: SafeContents Data: " + err.Error())
+				return nil, err
 			}
 			result = append(result, plain)
 
@@ -162,7 +251,7 @@ func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
 			result = append(result, plain)
 
 		default:
-			// skip unknown ContentInfo types
+			return nil, errors.New("keystore: PKCS12: unsupported safe content type")
 		}
 	}
 	return result, nil
@@ -172,9 +261,14 @@ func parseAuthSafe(ci contentInfo, password string) ([][]byte, error) {
 func decryptPKCS12Content(rawContent []byte, password string) ([]byte, error) {
 	var ed encryptedData
 	var err error
-	_, err = asn1.Unmarshal(rawContent, &ed)
-	if err != nil {
-		return nil, errors.New("keystore: PKCS12: EncryptedData: " + err.Error())
+	rest, err := asn1.Unmarshal(rawContent, &ed)
+	if err != nil || len(rest) != 0 {
+		return nil, errors.New("keystore: PKCS12: malformed EncryptedData")
+	}
+	if ed.Version != 0 || !ed.EncryptedContentInfo.ContentType.Equal(oidDataContentType) ||
+		ed.EncryptedContentInfo.EncryptedContent.Class != 2 || ed.EncryptedContentInfo.EncryptedContent.Tag != 0 ||
+		ed.EncryptedContentInfo.EncryptedContent.IsCompound {
+		return nil, errors.New("keystore: PKCS12: unsupported encrypted content")
 	}
 
 	enc := ed.EncryptedContentInfo.EncryptedContent.Bytes
@@ -195,7 +289,6 @@ func decryptPKCS12Content(rawContent []byte, password string) ([]byte, error) {
 
 	// Attempt PBES2 decryption
 	var outer encryptedPrivateKeyInfo
-	var rest []byte
 	rest, err = asn1.Unmarshal(epkiDER, &outer)
 	if err != nil || len(rest) != 0 {
 		return nil, errors.New("keystore: PKCS12: EPKI roundtrip failed")
@@ -217,36 +310,54 @@ func decryptEPKI(epki encryptedPrivateKeyInfo, password string) ([]byte, error) 
 // parseSafeBags parses a DER-encoded SafeContents (SEQUENCE OF SafeBag).
 func parseSafeBags(der []byte, password string) ([]*dstu4145.PrivateKey, [][]byte, error) {
 	var bags []safeBag
-	if _, err := asn1.Unmarshal(der, &bags); err != nil {
-		return nil, nil, errors.New("keystore: PKCS12: SafeContents: " + err.Error())
+	if rest, err := asn1.Unmarshal(der, &bags); err != nil || len(rest) != 0 || len(bags) > 512 {
+		return nil, nil, errors.New("keystore: PKCS12: malformed or excessive SafeContents")
 	}
 
 	var keys []*dstu4145.PrivateKey
 	var certs [][]byte
 
 	for _, bag := range bags {
+		if len(keys) >= 64 || len(certs) >= 512 {
+			return nil, nil, errors.New("keystore: PKCS12: too many bags")
+		}
+		if bag.BagValue.Class != 2 || bag.BagValue.Tag != 0 || !bag.BagValue.IsCompound {
+			return nil, nil, errors.New("keystore: PKCS12: invalid bag wrapper")
+		}
 		switch {
 		case bag.BagID.Equal(oidKeyBag):
 			// Unencrypted PrivateKeyInfo
-			priv, err := ParseRawKey(bag.BagValue.Bytes)
+			priv, err := parseRawKeys(bag.BagValue.Bytes)
 			if err != nil {
 				return nil, nil, err
 			}
-			keys = append(keys, priv)
+			keys = append(keys, priv...)
 
 		case bag.BagID.Equal(oidPKCS8ShroudedKeyBag):
 			// Encrypted PrivateKeyInfo — parse as Key6 format
-			priv, err := ParseKey6(bag.BagValue.Bytes, password)
+			var epki encryptedPrivateKeyInfo
+			if rest, err := asn1.Unmarshal(bag.BagValue.Bytes, &epki); err != nil || len(rest) != 0 {
+				return nil, nil, errors.New("keystore: PKCS12: malformed encrypted key bag")
+			}
+			plain, err := decryptEPKI(epki, password)
 			if err != nil {
 				return nil, nil, err
 			}
-			keys = append(keys, priv)
+			priv, err := parseRawKeys(plain)
+			clear(plain)
+			if err != nil {
+				return nil, nil, err
+			}
+			keys = append(keys, priv...)
 
 		case bag.BagID.Equal(oidCertBag):
 			cert, err := parseCertBag(bag.BagValue.Bytes)
-			if err == nil && cert != nil {
-				certs = append(certs, cert)
+			if err != nil {
+				return nil, nil, err
 			}
+			certs = append(certs, cert)
+		default:
+			return nil, nil, errors.New("keystore: PKCS12: unsupported safe bag type")
 		}
 	}
 	return keys, certs, nil
@@ -263,16 +374,19 @@ func parseCertBag(der []byte) ([]byte, error) {
 		CertID    asn1.ObjectIdentifier
 		CertValue asn1.RawValue `asn1:"explicit,tag:0"`
 	}
-	if _, err := asn1.Unmarshal(der, &cb); err != nil {
-		return nil, err
+	if rest, err := asn1.Unmarshal(der, &cb); err != nil || len(rest) != 0 {
+		return nil, errors.New("keystore: PKCS12: malformed certificate bag")
 	}
 	if !cb.CertID.Equal(oidX509Certificate) {
-		return nil, nil
+		return nil, errors.New("keystore: PKCS12: unsupported certificate bag type")
 	}
 	// CertValue is an OCTET STRING containing the DER cert
 	var cert []byte
-	if _, err := asn1.Unmarshal(cb.CertValue.Bytes, &cert); err != nil {
-		return nil, err
+	if cb.CertValue.Class != 2 || cb.CertValue.Tag != 0 || !cb.CertValue.IsCompound {
+		return nil, errors.New("keystore: PKCS12: invalid certificate wrapper")
+	}
+	if rest, err := asn1.Unmarshal(cb.CertValue.Bytes, &cert); err != nil || len(rest) != 0 || len(cert) == 0 {
+		return nil, errors.New("keystore: PKCS12: malformed certificate octets")
 	}
 	return cert, nil
 }

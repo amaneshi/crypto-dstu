@@ -12,9 +12,10 @@ in the separate `tax-reporting` project and remain deferred unless requested.
 Do not add an IIT runtime dependency to the library. `cmd/iit-oracle` is an
 optional native development/test adapter; the consumer library remains CGo-free.
 
-Use README's **Pending changes** as the maintained backlog. The next priority is
-PKCS#12 integrity verification and public-key-based certificate association.
-Other pending areas are broader modern-profile coverage, ONB curves,
+Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
+verifies supported MACs and matches certificates by public key; preserve its
+fail-closed handling of missing/unsupported integrity and ambiguous association.
+Remaining pending areas are broader modern-profile coverage, ONB curves,
 non-ASCII password interoperability, PFX export, security review, fuzzing, and CI.
 Update the backlog when work actually completes; do not mark a profile supported
 from a local round-trip alone.
@@ -83,8 +84,14 @@ from a local round-trip alone.
   `ua.ProtectKey` generates fresh salt/IV; it writes Key-6, not PFX. Its 1–32-byte
   password API rejects trailing NUL. IIT password compatibility is established
   for tested ASCII cases; non-ASCII compatibility remains unresolved.
-- PKCS#12 MAC verification and index-based certificate pairing are known pending
-  issues. Do not describe the existing loader as fully integrity-validated.
+- PKCS#12 import verifies SHA-1/SHA-2 HMAC, GOST HMAC, and independently tested
+  IIT Kupyna-256 KMAC before releasing keys. Missing MACs, SignedData integrity,
+  unsupported profiles, duplicate keys and ambiguous distinct certificates are
+  rejected. Exact duplicate certificates are deduplicated. Association uses the
+  full supported curve domain and derived public key; unmatched certificates
+  remain discovery data, never trust roots. See `docs/pkcs12.md` for size/KDF,
+  password and profile limits. PFX export remains pending. Preserve the Kupyna
+  message-padding two-block buffer regression coverage.
 
 ## Validation
 

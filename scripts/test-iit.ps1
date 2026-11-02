@@ -36,6 +36,8 @@ try {
         $env:IIT_SDK_SHA256=$actualHash
         [Environment]::SetEnvironmentVariable('IIT_TEST_CA_DIR',$testCA,'Process')
         Write-Output "IIT SDK SHA256: $actualHash; oracle architecture: $oracleArchitecture"
+        & $GoExecutable test -tags=integration -mod=readonly -count=1 -timeout=90s -v ./internal/keystore -run '^TestIITPKCS12Integrity$'
+        if($LASTEXITCODE -ne 0){throw 'IIT PKCS12 integrity tests failed'}
         & $GoExecutable test -tags=integration -mod=readonly -count=1 -timeout=180s -v ./internal/cms -run '^TestIIT'
         if($LASTEXITCODE -ne 0){throw 'IIT interoperability tests failed'}
         # Run after CMS initializes the shared public CZO fixture cache.

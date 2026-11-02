@@ -51,19 +51,32 @@ func Parse(data []byte, password string) (*ParseResult, error) {
 	}
 
 	// 2. Try PKCS#12 / PFX
-	if pairs, err := ParsePKCS12(data, password); err == nil && len(pairs) > 0 {
+	pairs, pfxErr := ParsePKCS12(data, password)
+	if pfxErr != nil && looksLikePKCS12(data) {
+		return nil, pfxErr
+	}
+	if pfxErr == nil && len(pairs) > 0 {
 		format = FormatPKCS12
 		if wasPEM {
 			format = FormatPEM
 		}
 		keys := make([]*dstu4145.PrivateKey, 0, len(pairs))
 		certs := make([][]byte, 0)
+		seen := map[string]bool{}
+		addCert := func(der []byte) {
+			if len(der) != 0 && !seen[string(der)] {
+				seen[string(der)] = true
+				certs = append(certs, der)
+			}
+		}
 		for _, p := range pairs {
 			keys = append(keys, p.PrivateKey)
 			if p.Cert != nil {
-				certs = append(certs, p.Cert)
+				addCert(p.Cert)
 			}
-			certs = append(certs, p.CertChain...)
+			for _, der := range p.CertChain {
+				addCert(der)
+			}
 		}
 		return &ParseResult{Keys: keys, Certs: certs, Format: format}, nil
 	}
