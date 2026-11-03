@@ -185,7 +185,7 @@ func Parse(der []byte) (*ParsedRequest, error) {
 	if len(cr.SignatureAlgorithm.Parameters.FullBytes) != 0 && !bytes.Equal(cr.SignatureAlgorithm.Parameters.FullBytes, []byte{5, 0}) {
 		return nil, errors.New("csr: unsupported signature parameters")
 	}
-	if national && (!cr.SignatureAlgorithm.Algorithm.Equal(cri.PublicKey.Algorithm.Algorithm) || cri.Attributes.Class != 2 || cri.Attributes.Tag != 0 || !cri.Attributes.IsCompound) {
+	if national && (!consistentNationalAlgorithms(cri.PublicKey.Algorithm.Algorithm, cr.SignatureAlgorithm.Algorithm) || cri.Attributes.Class != 2 || cri.Attributes.Tag != 0 || !cri.Attributes.IsCompound) {
 		return nil, errors.New("csr: inconsistent national request profile")
 	}
 
@@ -300,11 +300,11 @@ func hashData(data []byte, sigAlgOID asn1.ObjectIdentifier) ([]byte, error) {
 		h := gost34311.New()
 		_, _ = h.Write(data)
 		return h.Sum(nil), nil
-	case sigAlgOID.Equal(oid.DSTU4145WithKupyna256):
+	case sigAlgOID.Equal(oid.DSTU4145WithKupyna256), sigAlgOID.Equal(oid.DSTU4145ONBWithKupyna256):
 		h := kupyna.New256()
 		_, _ = h.Write(data)
 		return h.Sum(nil), nil
-	case sigAlgOID.Equal(oid.DSTU4145WithKupyna512):
+	case sigAlgOID.Equal(oid.DSTU4145WithKupyna512), sigAlgOID.Equal(oid.DSTU4145ONBWithKupyna512):
 		h := kupyna.New512()
 		_, _ = h.Write(data)
 		return h.Sum(nil), nil

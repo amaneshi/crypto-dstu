@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/asn1"
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/amaneshi/crypto-dstu/internal/csr"
 	"github.com/amaneshi/crypto-dstu/internal/keystore"
@@ -24,6 +24,7 @@ DSTU_PB_257 (or -curve) is generated and used for this CSR only.
 Options:
   -key path[:password]    Existing key container (optional)
   -curve name             Curve for fresh key generation (default: DSTU_PB_257)
+  -digest name            auto, gost34311, kupyna256 or kupyna512 (default: auto)
   -cn value               Common name (Subject CN)
   -org value              Organisation (Subject O)
   -country value          Country code (Subject C, 2 chars)
@@ -35,6 +36,7 @@ Options:
 
 	keyFlag := fs.String("key", "", "key container path[:password]")
 	curveName := fs.String("curve", "DSTU_PB_257", "curve for key generation")
+	digestName := fs.String("digest", "auto", "CSR signature digest")
 	cnFlag := fs.String("cn", "", "common name")
 	orgFlag := fs.String("org", "", "organisation")
 	countryFlag := fs.String("country", "", "country code")
@@ -43,6 +45,10 @@ Options:
 	output := fs.String("output", "-", "output DER file")
 
 	fs.Parse(args) //nolint:errcheck // ExitOnError: never returns non-nil
+	digest, err := parseSigningDigest(*digestName)
+	if err != nil {
+		fatalf("csr: %v", err)
+	}
 
 	if *cnFlag == "" && *edrpouFlag == "" {
 		fmt.Fprintln(os.Stderr, "dstu csr: at least -cn or -edrpou is required")
@@ -53,11 +59,7 @@ Options:
 	// Obtain private key: from container or freshly generated.
 	var priv *dstu4145.PrivateKey
 	if *keyFlag != "" {
-		parts := strings.SplitN(*keyFlag, ":", 2)
-		path, password := parts[0], ""
-		if len(parts) == 2 {
-			password = parts[1]
-		}
+		path, password := splitKeyArgument(*keyFlag)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			fatalf("csr: read key: %v", err)
@@ -103,7 +105,27 @@ Options:
 		subject = append(subject, csr.AttributeTypeAndValue{Type: oid.DRFO, Value: *drfoFlag})
 	}
 
-	der, err := csr.Create(&csr.Request{Subject: subject}, priv)
+	var algorithm asn1.ObjectIdentifier
+	if digest != nil {
+		switch {
+		case digest.Equal(oid.GOST34311):
+			algorithm = oid.DSTU4145WithGOST34311
+			if priv.Curve.IsONB() {
+				algorithm = oid.DSTU4145ONBWithGOST34311
+			}
+		case digest.Equal(oid.Kupyna256):
+			algorithm = oid.DSTU4145WithKupyna256
+			if priv.Curve.IsONB() {
+				algorithm = oid.DSTU4145ONBWithKupyna256
+			}
+		case digest.Equal(oid.Kupyna512):
+			algorithm = oid.DSTU4145WithKupyna512
+			if priv.Curve.IsONB() {
+				algorithm = oid.DSTU4145ONBWithKupyna512
+			}
+		}
+	}
+	der, err := csr.Create(&csr.Request{Subject: subject, SignatureAlgorithmOID: algorithm}, priv)
 	if err != nil {
 		fatalf("csr: %v", err)
 	}

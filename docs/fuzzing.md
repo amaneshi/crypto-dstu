@@ -5,8 +5,8 @@ seed corpora during ordinary `go test`; active mutation requires `-fuzz`.
 
 | Target | Coverage and assertions |
 | --- | --- |
-| `internal/csr/FuzzParseAndVerify` | National PB257/ONB173 GOST, PB257 Kupyna-256/PB431 Kupyna-512 and legacy PB257 seeds; malformed DER, input immutability, nil results on parse errors, trailing-data rejection, signature verification and rejection of modified signed information/signatures |
-| `internal/cert/FuzzParseCertificates` | PB257 and all five named ONB curves, concatenated DER and PEM bundles, malformed encodings; input immutability, reparsing accepted certificates and no partial output after a malformed bundle tail |
+| `internal/csr/FuzzParseAndVerify` | National PB257/ONB173 GOST, PB257 Kupyna-256/PB431 Kupyna-512, ONB173 Kupyna-256/ONB431 Kupyna-512 and legacy PB257 seeds; malformed DER, input immutability, nil results on parse errors, trailing-data rejection, signature verification and rejection of modified signed information/signatures |
+| `internal/cert/FuzzParseCertificates` | PB257 and all five named ONB curves (GOST and Kupyna-256/512 certificate signatures), concatenated DER and PEM bundles, malformed encodings; input immutability, reparsing accepted certificates and no partial output after a malformed bundle tail |
 | `internal/cms/FuzzParseAndVerifySigned` | PB257 GOST/Kupyna-256/Kupyna-512, native ONB173/ONB431 Kupyna-256/512 attached/detached seeds (original and explicitly relabeled test forms), CZO examples and two-signer valid/partially invalid messages; no authenticated flags from parsing, trailing-data rejection, input immutability, mathematical signature checks and clearing flags after content changes |
 | `internal/cms/FuzzParseAndDecryptEnveloped` | PB257 GOST CFB and Kalyna-256 CFB/OFB plus ONB173 standard-DH CFB/OFB (original/mislabeled native data, explicit test relabeling, dynamic and embedded-static forms); input immutability, trailing-data rejection and no plaintext on decryption errors |
 | `internal/keystore/FuzzParseRawKey` | Public scalar 2 on all fifteen PB/ONB domains, scalar range/domain preservation after canonical serialization, nil results on errors and unchanged caller input |
@@ -113,9 +113,16 @@ independently authenticated valid documents. Setup assertions verify that valid
 privacy, signature and revocation seeds reach their intended operations. The
 full regression suite, vet, correctness lint and gopls diagnostics also passed.
 
+After adding modern ONB certificate/CSR seeds, two further three-minute campaigns
+passed on the same toolchain with two workers: 982,081 CSR executions and
+6,431,579 certificate executions. The full Go suite, vet, correctness lint,
+gopls diagnostics, isolated native suite and independent UAPKIC replay also passed.
+See [modern ONB fixtures](../internal/testvectors/testdata/modern-onb-pki/README.md)
+for the separate interoperability evidence and its scope.
+
 Fuzzing remains ongoing maintenance. These bounded campaigns cannot establish
 the absence of bugs, exhaust every ASN.1 variant, measure maximum-size resource
 exhaustion or replace an external cryptographic/security review. Primitive
-fuzzing and additional independent known-answer validation remain a separate
-README item. Retain minimized inputs and add focused regressions for actual
-defects discovered by future runs.
+fuzzing and independent known-answer validation are documented separately in
+[primitive validation](primitive-validation.md). Retain minimized inputs and add
+focused regressions for actual defects discovered by future runs.

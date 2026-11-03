@@ -2,8 +2,14 @@
 
 The CSR module and CLI now write national DSTU requests with the GOST PB/ONB
 algorithm appropriate to the complete curve domain. All ten PB and five ONB
-curves are covered by GOST request tests. Modern PB signature overrides remain
-available; ONB Kupyna signatures remain explicitly unsupported.
+curves are covered by GOST request tests. PB and ONB support explicit Kupyna-256/512
+signatures. For example:
+
+```sh
+dstu csr -curve DSTU_ONB_173 -cn Example -digest kupyna512 -output request.der
+```
+
+The default remains GOST.
 
 ## Wire-format correction
 
@@ -46,12 +52,19 @@ moves the selector from `m-1` to bit 0 before invoking Cryptonite's legacy
 decompressor. Hashing and signature arithmetic remain independent and unmodified;
 this adapter is not evidence that Cryptonite accepts the new wire bytes directly.
 
-The pinned Cryptonite DSTU verification API requires exactly 32 digest bytes.
-Kupyna-512 is covered by local roundtrips, not this independent CSR signature
-check. During diagnosis its independently computed CRI digest matched Go; the
-reference verifier rejected the digest length. No wider claim is made from that.
+The pinned Cryptonite API requires exactly 32 digest bytes. The additional
+UAPKIC reference at `1996c0fe56dbbc69f5b00d67784a5bc3033b57fe` supports the full
+64-byte Kupyna-512 digest. All five ONB curves now have exact CRI signature checks
+with both digest sizes, plus modified-subject and signature rejection. OpenSSL
+parses every request; IIT accepts the identical SPKI in matching certificates and
+uses their keys. IIT CSR import/CA issuance is not claimed. The ONB public-key
+identifier remains GOST ONB (`1.2.804.2.1.1.1.1.3.1.2`), with legacy named curve
+parameters and DKE; only the self-signature uses the modern ONB OID. Alternate
+modern SPKI OIDs remain rejected. Public fixtures, provenance and reproduction
+are in [modern ONB PKI fixtures](../internal/testvectors/testdata/modern-onb-pki/README.md).
 
-The generator/verifier uses intentionally public `d=2` fixture keys. No taxpayer
+The original Cryptonite generator uses public `d=2` keys; the modern ONB matrix
+uses public full-width scalars documented with its fixtures. No taxpayer
 keys, passwords, external submissions, CA requests or runtime C dependencies are
 involved. Ordinary tests include national-format, corruption, malformed-input,
 unsupported-profile and old-format import regressions without external tools.

@@ -69,7 +69,9 @@ func verifySignature(cert *Certificate, pub *dstu4145.PublicKey) error {
 	if pub == nil || pub.Curve == nil || pub.Q == nil {
 		return errors.New("cert: verifySignature: issuer has no DSTU public key")
 	}
-	if (cert.SigAlgOID.Equal(oid.DSTU4145WithGOST34311) && pub.Curve.IsONB()) || (cert.SigAlgOID.Equal(oid.DSTU4145ONBWithGOST34311) && !pub.Curve.IsONB()) {
+	pb := cert.SigAlgOID.Equal(oid.DSTU4145WithGOST34311) || cert.SigAlgOID.Equal(oid.DSTU4145WithKupyna256) || cert.SigAlgOID.Equal(oid.DSTU4145WithKupyna512)
+	onb := cert.SigAlgOID.Equal(oid.DSTU4145ONBWithGOST34311) || cert.SigAlgOID.Equal(oid.DSTU4145ONBWithKupyna256) || cert.SigAlgOID.Equal(oid.DSTU4145ONBWithKupyna512)
+	if (pb && pub.Curve.IsONB()) || (onb && !pub.Curve.IsONB()) {
 		return errors.New("cert: signature algorithm and issuer basis differ")
 	}
 
@@ -115,7 +117,7 @@ func hashTBS(cert *Certificate) ([]byte, error) {
 		}
 		return digest, nil
 
-	case sigAlg.Equal(oid.DSTU4145WithKupyna256):
+	case sigAlg.Equal(oid.DSTU4145WithKupyna256), sigAlg.Equal(oid.DSTU4145ONBWithKupyna256):
 		h := kupyna.New256()
 		h.Write(cert.TBSRaw)
 		digest := h.Sum(nil)
@@ -124,7 +126,7 @@ func hashTBS(cert *Certificate) ([]byte, error) {
 		}
 		return digest, nil
 
-	case sigAlg.Equal(oid.DSTU4145WithKupyna512):
+	case sigAlg.Equal(oid.DSTU4145WithKupyna512), sigAlg.Equal(oid.DSTU4145ONBWithKupyna512):
 		h := kupyna.New512()
 		h.Write(cert.TBSRaw)
 		digest := h.Sum(nil)

@@ -119,6 +119,9 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	if err != nil {
 		return nil, errors.New("cert: ParseCertificate: TBS: " + err.Error())
 	}
+	if !tbs.Signature.Algorithm.Equal(outer.SignatureAlgorithm.Algorithm) {
+		return nil, errors.New("cert: inner and outer signature algorithms differ")
+	}
 
 	c := &Certificate{
 		Raw:                   der,

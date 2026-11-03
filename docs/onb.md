@@ -39,9 +39,9 @@ PKCS#8 and certificate loaders reject an algorithm/basis mismatch. Embedded
 certificates retain the usual discovery-only trust policy.
 
 Explicit Kupyna-256/512 CMS signing and Kalyna CFB/OFB with explicit standard DH
-now support GOST ONB certificates. ONB cofactor-Kupyna agreement and modern
-public-key certificate/CSR profiles still return explicit errors. Their wire
-profiles require separate validation. Passing the
+now support GOST ONB certificates. Named ONB certificates and CSRs also support
+Kupyna-256/512 signatures while retaining the GOST ONB SPKI algorithm. Alternate
+modern SPKI identifiers and ONB cofactor-Kupyna agreement remain rejected. Passing the
 primitive tests does not enable arbitrary ONB degrees or nonstandard domains.
 These routines do not claim constant-time operation or a completed security review.
 
@@ -140,9 +140,29 @@ ordinary verification regressions. See the fixture README for reproduction.
 This is signature/arithmetic and outgoing-wire evidence, not acceptance of
 unmodified native producer output with PB tags on ONB keys.
 
-Modern ONB certificate probes with both legacy and modern named-curve OIDs
-returned certificate parse error 50 and context-key-read error 33 in this SDK.
-Modern certificate and CSR support remains pending independently of CMS signing.
+## Kupyna certificate and CSR signatures
+
+Named ONB certificates and CSRs support Kupyna-256/512 signatures on all five
+curves. The subject public-key identifier remains GOST ONB, with legacy named
+curve parameters and DKE; the issuer/self-signature has the modern ONB OID.
+The issuer's basis determines signature compatibility, independently of the
+subject key's algorithm. Inner and outer certificate signature OIDs must agree.
+
+`TestIITModernONBPKI` checks native certificate parsing and key use, exact CSR/SPKI
+identity, OpenSSL request parsing, and independent verification of original
+TBSCertificate/CRI signatures with unmodified UAPKIC primitives at commit
+`1996c0fe56dbbc69f5b00d67784a5bc3033b57fe`. The bounded C test reader explicitly
+transcodes the point selector for the reference's legacy decompressor. This is
+signature/encoding evidence, not the reference PKIX parser, CA acceptance or trust.
+`TestModernONBPKIFixtures` retains all ten public certificate/CSR pairs and checks
+wrong keys, wrong basis tags, inconsistent signature identifiers and corruption.
+An opt-in replay also verifies independent rejection of modified signed bytes.
+See [fixture provenance and reproduction](../internal/testvectors/testdata/modern-onb-pki/README.md).
+
+Probes using modern signature OIDs as the SPKI algorithm, with both legacy and
+modern named-curve OIDs, returned IIT certificate parse error 50 and key-read
+error 33. Those alternate SPKI profiles remain unsupported; their rejection does
+not prevent a modern issuer signature over a GOST ONB subject key.
 
 ## Kalyna standard-DH profile
 

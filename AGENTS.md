@@ -27,8 +27,9 @@ that passing profile. Explicit Kupyna-256/512 CMS with GOST ONB certificates now
 has native checks and captured independent signatures. Explicit standard-DH
 Kalyna CFB/OFB now has native checks on all five ONB curves plus PB257, and
 independent standard-DH primitive vectors on all fifteen curves. Modern
-certificate/CSR profiles remain pending. GOST
-ONB CSR generation now has independent hashing/signature checks; see `docs/csr.md`.
+certificate/CSR profiles support Kupyna-256/512 signatures with GOST ONB SPKI
+and legacy named parameters, checked by IIT/UAPKIC/OpenSSL. Alternate modern
+SPKI OIDs remain rejected. See `docs/csr.md` for CSR evidence and limits.
 See `docs/onb.md` and `docs/compatibility.md`.
 Update the backlog when work actually completes; do not mark a profile supported
 from a local round-trip alone.
@@ -78,7 +79,7 @@ from a local round-trip alone.
   arithmetic and stored coordinates use PB; apply ONB maps at field boundaries,
   digest interpretation and signature-product truncation, never to scalars.
   Preserve independently reproduced Cryptonite vectors, verified ONB Kupyna CMS
-  and rejection of unverified ONB cofactor-Kupyna/certificate/CSR profiles. Apply the
+  and rejection of unverified ONB cofactor-Kupyna and alternate SPKI profiles. Apply the
   zero-digest substitute after basis conversion; preserve the independent
   zero-digest vectors. CSR output uses
   national compressed points, raw-signature OCTET STRING wrapping and little-endian

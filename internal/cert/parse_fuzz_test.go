@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/amaneshi/crypto-dstu/internal/testiit"
 	"github.com/amaneshi/crypto-dstu/internal/testpki"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
@@ -24,6 +25,8 @@ func FuzzParseCertificates(f *testing.F) {
 		if params.Curve.IsONB() {
 			key := &dstu4145.PrivateKey{Curve: params.Curve, D: big.NewInt(2)}
 			f.Add(testiit.NamedCertificate(f, key).Raw)
+			f.Add(testiit.NamedCertificateForDigest(f, key, oid.Kupyna256).Raw)
+			f.Add(testiit.NamedCertificateForDigest(f, key, oid.Kupyna512).Raw)
 		}
 	}
 	f.Add([]byte{})

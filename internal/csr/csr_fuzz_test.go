@@ -24,6 +24,8 @@ func FuzzParseAndVerify(f *testing.F) {
 		{"DSTU_ONB_173", nil},
 		{"DSTU_PB_257", oid.DSTU4145WithKupyna256},
 		{"DSTU_PB_431", oid.DSTU4145WithKupyna512},
+		{"DSTU_ONB_173", oid.DSTU4145ONBWithKupyna256},
+		{"DSTU_ONB_431", oid.DSTU4145ONBWithKupyna512},
 	} {
 		// Deliberately public fixture scalar, never an operational credential.
 		key := &dstu4145.PrivateKey{Curve: dstu4145.ParamsByName(profile.curve).Curve, D: big.NewInt(2)}

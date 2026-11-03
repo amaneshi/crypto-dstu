@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test-only wire construction while modern ONB certificates remain disabled in the
+// Test-only wire construction for unsupported modern ONB SPKI identifiers in the
 // consumer library. No parser/signing allowlist is relaxed to run this probe.
 func modernONBCertificate(t *testing.T, key *dstu4145.PrivateKey, bits int, modernCurve bool) []byte {
 	t.Helper()
@@ -121,7 +121,7 @@ func modernONBCertificate(t *testing.T, key *dstu4145.PrivateKey, bits int, mode
 	return encoded
 }
 
-func TestIITModernONBCertificateDiagnostic(t *testing.T) {
+func TestIITModernONBPublicKeyAlgorithmDiagnostic(t *testing.T) {
 	if os.Getenv("IIT_ONB_DIAGNOSTIC") != "1" {
 		t.Skip("enable modern ONB certificate diagnostic")
 	}

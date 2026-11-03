@@ -91,7 +91,8 @@ Native CMS carrying PB signature tags on ONB keys remains rejected; test adapter
 alone normalize that known SDK quirk. Kalyna CFB/OFB also supports explicitly
 selected standard DH (OID ending in `.8`), with full prime-order subgroup checks.
 The native ONB producer's `.7`-tagged non-cofactor envelopes remain rejected;
-there is no implicit cofactor fallback. Modern ONB certificates/CSRs remain
-disabled. GOST ONB CSR generation is independently checked; see
+there is no implicit cofactor fallback. Named ONB certificates/CSRs support
+Kupyna-256/512 signatures with GOST ONB SPKI and legacy named parameters.
+Alternate modern SPKI identifiers remain rejected. See
 [CSR encoding](csr.md). See [ONB coverage](onb.md) for
 the exact evidence, retained public fixtures, reproduction commands and limits.

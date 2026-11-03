@@ -353,3 +353,14 @@ Nine public Cryptonite known-answer vectors cover all five Kalyna block/key size
 combinations and aligned/non-aligned cases. Additional tests cover trailing zeros,
 every-byte wrapped-key corruption, wrong keys, malformed lengths and padding.
 These raw primitive checks do not extend the IIT CMS interoperability matrix.
+
+## Modern ONB certificate/CSR signatures
+
+`TestIITModernONBPKI` covers all five ONB curves with Kupyna-256 and Kupyna-512
+certificate and CSR signatures. IIT parses each named certificate and uses the
+matching key for native CMS signing/verification. The CSR has the identical
+GOST ONB SPKI. OpenSSL parses each CSR; a separate bounded test reader verifies
+exact original certificate/CSR signatures with pinned, unmodified UAPKIC primitives.
+This does not establish IIT CSR import or CA issuance. Modern SPKI identifiers
+remain unsupported. See [ONB profile details](onb.md#kupyna-certificate-and-csr-signatures)
+and [retained fixtures](../internal/testvectors/testdata/modern-onb-pki/README.md).

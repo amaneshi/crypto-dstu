@@ -52,7 +52,13 @@ func AgreementCertificateForDigest(t testing.TB, key *dstu4145.PrivateKey, diges
 
 // NamedCertificate uses a standard named domain instead of explicit parameters.
 func NamedCertificate(t testing.TB, key *dstu4145.PrivateKey) *cert.Certificate {
-	return certificateForDigest(t, key, false, oid.GOST34311, 0xc8, true)
+	return NamedCertificateForDigest(t, key, oid.GOST34311)
+}
+
+// NamedCertificateForDigest keeps the GOST public-key profile independent of
+// the certificate issuer's GOST/Kupyna signature digest.
+func NamedCertificateForDigest(t testing.TB, key *dstu4145.PrivateKey, digest asn1.ObjectIdentifier) *cert.Certificate {
+	return certificateForDigest(t, key, false, digest, 0xc8, true)
 }
 
 func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping bool, digest asn1.ObjectIdentifier, usage byte, named bool) *cert.Certificate {
@@ -118,16 +124,22 @@ func certificateForDigest(t testing.TB, key *dstu4145.PrivateKey, timestamping b
 		h = gost34311.New()
 	case digest.Equal(oid.Kupyna256):
 		signatureOID = oid.DSTU4145WithKupyna256
+		if key.Curve.IsONB() {
+			signatureOID = oid.DSTU4145ONBWithKupyna256
+		}
 		h = kupyna.New256()
 	case digest.Equal(oid.Kupyna512):
 		signatureOID = oid.DSTU4145WithKupyna512
+		if key.Curve.IsONB() {
+			signatureOID = oid.DSTU4145ONBWithKupyna512
+		}
 		h = kupyna.New512()
 	default:
 		t.Fatal("unsupported fixture digest")
 	}
 	outer.Algorithm.Algorithm = signatureOID
 	if key.Curve.IsONB() {
-		tbs.PublicKey.Algorithm.Algorithm = signatureOID
+		tbs.PublicKey.Algorithm.Algorithm = oid.DSTU4145ONBWithGOST34311
 	}
 	tbs.Signature.Algorithm = signatureOID
 	name, err := asn1.Marshal(pkix.Name{CommonName: "crypto-dstu local interoperability test"}.ToRDNSequence())

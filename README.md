@@ -239,6 +239,7 @@ dstu csr \
 |------|---------|-------------|
 | `-key path[:password]` | | Existing key container (optional; fresh key generated if omitted) |
 | `-curve name` | `DSTU_PB_257` | Curve for generated key |
+| `-digest name` | `auto` | `auto`/`gost34311`, `kupyna256` or `kupyna512`; signature OID follows the key basis |
 | `-cn value` | | Common name (Subject CN) |
 | `-org value` | | Organisation (Subject O) |
 | `-country value` | | Country code (Subject C) |
@@ -558,8 +559,8 @@ err = parsed.Verify()
 ```
 
 CSR output uses the national compressed-key and signature encodings, including
-GOST ONB requests on all five standard ONB curves. Older library CSRs remain
-readable. See [CSR encoding and validation](docs/csr.md) for the exact coverage
+GOST and Kupyna-256/512 ONB requests on all five standard ONB curves. Older PB
+library CSRs remain readable. See [CSR encoding and validation](docs/csr.md) for the exact coverage
 and compatibility change.
 
 ### OCSP certificate status check
@@ -660,8 +661,6 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **Modern ONB certificates/CSRs:** independently validate modern public-key
-  certificate and request profiles before enabling them.
 - [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
   password profiles beyond the tested Windows CP1251 cases.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
@@ -674,7 +673,8 @@ in [parser fuzzing](docs/fuzzing.md).
 Independent primitive fixtures, fuzz campaigns and regression fixes are
 documented in [primitive validation](docs/primitive-validation.md).
 The five ONB curves now have independent named-certificate GOST/Kupyna CMS and
-explicit standard-DH Kalyna CFB/OFB checks with the pinned IIT SDK;
+explicit standard-DH Kalyna CFB/OFB checks with the pinned IIT SDK. Named ONB
+certificates and CSRs signed with Kupyna-256/512 also have independent checks;
 see [ONB encoding changes, evidence and limits](docs/onb.md).
 
 Tax-report submission, receipt polling and report-status handling are deferred

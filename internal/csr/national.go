@@ -56,7 +56,7 @@ func validateRequestInfo(info certificationRequestInfo) error {
 
 func checkSignatureProfile(algorithm asn1.ObjectIdentifier, curve *ec.Curve) error {
 	if curve.IsONB() {
-		if algorithm.Equal(oid.DSTU4145ONBWithGOST34311) {
+		if algorithm.Equal(oid.DSTU4145ONBWithGOST34311) || algorithm.Equal(oid.DSTU4145ONBWithKupyna256) || algorithm.Equal(oid.DSTU4145ONBWithKupyna512) {
 			return nil
 		}
 	} else if algorithm.Equal(oid.DSTU4145WithGOST34311) || algorithm.Equal(oid.DSTU4145WithKupyna256) || algorithm.Equal(oid.DSTU4145WithKupyna512) {
@@ -78,6 +78,11 @@ func buildNationalSPKI(key *dstu4145.PrivateKey, algorithm asn1.ObjectIdentifier
 	curveOID := curveOIDForKey(key)
 	if curveOID == nil {
 		return subjectPublicKeyInfo{}, errors.New("csr: unknown curve")
+	}
+	// An ONB request's public-key profile is independent of its self-signature
+	// digest. This matches the named SPKI accepted in native certificates.
+	if key.Curve.IsONB() {
+		algorithm = oid.DSTU4145ONBWithGOST34311
 	}
 	var dke []byte
 	if algorithm.Equal(oid.DSTU4145WithGOST34311) || algorithm.Equal(oid.DSTU4145ONBWithGOST34311) {
@@ -119,7 +124,7 @@ func parseNationalOrLegacySPKI(spki subjectPublicKeyInfo) (*dstu4145.PublicKey, 
 		return nil, false, errors.New("csr: unknown curve")
 	}
 	curve := params.Curve
-	if err := checkSignatureProfile(spki.Algorithm.Algorithm, curve); err != nil && !spki.Algorithm.Algorithm.Equal(params.OID) {
+	if err := checkPublicKeyProfile(spki.Algorithm.Algorithm, curve); err != nil && !spki.Algorithm.Algorithm.Equal(params.OID) {
 		return nil, false, err
 	}
 	keyBytes, size := spki.PublicKey.Bytes, (curve.M+7)/8
@@ -177,4 +182,19 @@ func parseNationalOrLegacySPKI(spki subjectPublicKeyInfo) (*dstu4145.PublicKey, 
 		return nil, false, errors.New("csr: invalid signing public key")
 	}
 	return &dstu4145.PublicKey{Curve: curve, Q: point}, false, nil
+}
+
+func checkPublicKeyProfile(algorithm asn1.ObjectIdentifier, curve *ec.Curve) error {
+	if curve.IsONB() && !algorithm.Equal(oid.DSTU4145ONBWithGOST34311) {
+		return errors.New("csr: unsupported ONB public-key profile")
+	}
+	return checkSignatureProfile(algorithm, curve)
+}
+
+func consistentNationalAlgorithms(keyAlgorithm, signatureAlgorithm asn1.ObjectIdentifier) bool {
+	if keyAlgorithm.Equal(signatureAlgorithm) {
+		return true
+	}
+	return keyAlgorithm.Equal(oid.DSTU4145ONBWithGOST34311) &&
+		(signatureAlgorithm.Equal(oid.DSTU4145ONBWithKupyna256) || signatureAlgorithm.Equal(oid.DSTU4145ONBWithKupyna512))
 }
