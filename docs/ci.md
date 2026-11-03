@@ -1,5 +1,18 @@
 # Continuous integration
 
+CI is paused. Both workflow definitions have the `.yml.disabled` suffix, so
+GitHub Actions does not discover them. No push, pull-request, scheduled or manual
+workflow is active in this checkout. This change takes effect on GitHub when
+pushed; it does not cancel an already running job. To reactivate, rename
+`ci.yml.disabled` and `iit.yml.disabled` to `.yml` in `.github/workflows`.
+While paused, validate their syntax with:
+
+```sh
+actionlint .github/workflows/ci.yml.disabled .github/workflows/iit.yml.disabled
+```
+
+The following describes the workflows when enabled.
+
 `.github/workflows/ci.yml` runs on pushes, pull requests, manual dispatches and
 Monday mornings. It uses the Go minor version declared in `go.mod` with the
 latest available patch (`check-latest: true`). In the initial local check,

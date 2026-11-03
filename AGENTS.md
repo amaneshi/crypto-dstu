@@ -99,6 +99,9 @@ from a local round-trip alone.
   cipher, agreement KDF, and key wrap. CFB/OFB do not authenticate content.
 - Raw `KW.Wrap`/`Unwrap` process whole blocks and verify a full integrity block.
   Non-aligned input uses explicit padded methods with the original byte length.
+  Preserve the independent Bouncy Castle vectors at 246/258/270 rounds for all
+  five Kalyna block/key profiles. The raw KW counter is 32-bit little-endian;
+  one-byte truncation fails for larger wrapped inputs. See `pkg/kalyna/testdata`.
 - Modern Key-6 protection uses PBKDF2 with Kupyna MAC-256, not HMAC-Kupyna,
   zero-padded password bytes, Kalyna-256 CBC and strict PKCS#7 padding.
   `ua.ProtectKey` generates fresh salt/IV; it writes Key-6, not PFX. Its 1–32-byte
@@ -133,14 +136,19 @@ go vet -mod=readonly ./...
 Use `gopls` diagnostics when available. Run targeted fuzzing or race checks when
 the change warrants them. Local HTTP mock tests require loopback networking;
 distinguish sandbox socket restrictions from actual test failures.
+See `docs/fuzzing.md` for fuzz targets, invariants and remaining coverage gaps.
+Parsing certificates does not establish trust; unsupported discovery algorithms
+may intentionally have no DSTU public key. Preserve that distinction in tests.
 
 The Taskfile's `lint`/`lint-fix` paths invoke a `go.mod` task that stages files and
 runs `go mod tidy`. Avoid those paths when staging/dependency changes are outside
 the authorized task. `task lint-only` runs the configured linter without that
 staging step; it may require downloading the pinned tool.
 
-`task lint-ci` runs the enforced correctness baseline in `.golangci-ci.yml`
-without staging or tidying. Hosted CI also runs Linux race tests and govulncheck;
+`task lint-ci` runs the correctness baseline in `.golangci-ci.yml`
+without staging or tidying. CI is paused: workflow definitions are retained as
+`.yml.disabled` files. Do not reactivate them unless requested. When enabled,
+hosted CI also runs Linux race tests and govulncheck;
 use the current patch of the Go minor version declared in `go.mod`. The optional
 native workflow is manual/default-branch-only and requires a dedicated runner
 and pinned SDK variables. Do not run untrusted PR code on that runner.

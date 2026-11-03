@@ -1,3 +1,4 @@
+# Paused: rename to iit.yml to reactivate after reviewing docs/ci.md.
 name: Pinned IIT interoperability
 
 on:

@@ -660,24 +660,30 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **Additional provider profiles:** resolve ONB certificate/CMS interoperability
-  with the pinned IIT SDK and validate modern ONB Kupyna/Kalyna encodings
-  before enabling them. Arbitrary Unicode/provider password compatibility
-  remains unverified. ONB arithmetic and
-  GOST paths now have independent Cryptonite vectors; see [ONB coverage](docs/onb.md).
-- [ ] **Release validation:** obtain an independent security review, broaden
-  parser/primitive fuzzing and external known-answer coverage, and provision/run
-  the dedicated IIT CI runner described in [CI setup](docs/ci.md). Include
-  independent raw Kalyna KW vectors exercising
-  round counters above 255.
+- [ ] **ONB provider interoperability:** resolve certificate/CMS failures with
+  the pinned IIT SDK; see [ONB coverage](docs/onb.md).
+- [ ] **Modern ONB profiles:** independently validate Kupyna/Kalyna encodings
+  before enabling them.
+- [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
+  password profiles beyond the tested Windows CP1251 cases.
+- [ ] **Parser fuzzing:** add CMS, Key-6/PKCS#8/JKS and revocation targets;
+  extend PFX coverage, add legacy CSR/ONB certificate seeds and run longer
+  campaigns. See [current targets and limits](docs/fuzzing.md).
+- [ ] **Primitive validation:** broaden primitive fuzzing and independent
+  known-answer coverage beyond the current tested profiles.
+- [ ] **Independent review:** obtain an external cryptographic/security review.
+
+CI provisioning and native runner execution are deferred while CI is paused;
+see [CI setup](docs/ci.md).
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current
 work scope. See [IIT interoperability](docs/iit-interoperability.md) for the exact
 tested profiles and [AGENTS.md](AGENTS.md) for contributor/agent instructions.
 
-Hosted test/race, lint and vulnerability checks and a manual hash-pinned IIT
-workflow are defined in `.github/workflows`; see [CI setup](docs/ci.md).
+CI is paused. Hosted test/race, lint and vulnerability checks and a manual
+hash-pinned IIT workflow are retained with `.disabled` filenames in
+`.github/workflows`; see [CI setup](docs/ci.md) to reactivate them.
 
 ## License
 

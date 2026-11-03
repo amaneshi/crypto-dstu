@@ -64,6 +64,63 @@ func TestKWKnownAnswers(t *testing.T) {
 	}
 }
 
+func TestKWLargeCounterKnownAnswers(t *testing.T) {
+	t.Parallel()
+	fixture, err := os.ReadFile("testdata/bouncycastle-kw-large.json")
+	require.NoError(t, err)
+	var reference struct {
+		Artifact, JarSHA256 string
+		Vectors             []struct {
+			Name, Key, Plain, Wrapped string
+			BlockSize, Rounds         int
+		}
+	}
+	require.NoError(t, json.Unmarshal(fixture, &reference))
+	require.Equal(t, "org.bouncycastle:bcprov-jdk18on:1.86", reference.Artifact)
+	require.Equal(t, "2af190b300cbb0b35e248ccf5f4a06b6072030aeb3da7a98ec73abe5b4cb371f", reference.JarSHA256)
+	require.Len(t, reference.Vectors, 15)
+	for _, v := range reference.Vectors {
+		t.Run(v.Name, func(t *testing.T) {
+			key, plain, expected := mustHex(v.Key), mustHex(v.Plain), mustHex(v.Wrapped)
+			require.Len(t, expected, len(plain)+v.BlockSize)
+			require.Equal(t, v.Rounds, 6*(len(expected)/(v.BlockSize/2)-1))
+			require.Contains(t, []int{246, 258, 270}, v.Rounds)
+			t.Run("wrap", func(t *testing.T) {
+				original := bytes.Clone(plain)
+				kw := NewKWEncrypter(kwTestBlock(t, v.BlockSize, key))
+				wrapped, err := kw.Wrap(plain)
+				require.NoError(t, err)
+				require.Equal(t, expected, wrapped)
+				require.Equal(t, original, plain)
+			})
+			t.Run("unwrap", func(t *testing.T) {
+				original := bytes.Clone(expected)
+				kw := NewKWDecrypter(kwTestBlock(t, v.BlockSize, key))
+				recovered, err := kw.Unwrap(expected)
+				require.NoError(t, err)
+				require.Equal(t, plain, recovered)
+				require.Equal(t, original, expected)
+			})
+			t.Run("reject", func(t *testing.T) {
+				wrongKey := bytes.Clone(key)
+				wrongKey[0] ^= 0x80
+				wrong := NewKWDecrypter(kwTestBlock(t, v.BlockSize, wrongKey))
+				recovered, err := wrong.Unwrap(expected)
+				require.Error(t, err)
+				require.Nil(t, recovered)
+				kw := NewKWDecrypter(kwTestBlock(t, v.BlockSize, key))
+				for _, offset := range []int{0, len(expected) / 2, len(expected) - 1} {
+					corrupted := bytes.Clone(expected)
+					corrupted[offset] ^= 1
+					recovered, err := kw.Unwrap(corrupted)
+					require.Error(t, err, "corrupted byte %d", offset)
+					require.Nil(t, recovered)
+				}
+			})
+		})
+	}
+}
+
 func TestKWIntegrityAndLengths(t *testing.T) {
 	for _, bs := range []int{16, 32, 64} {
 		t.Run(fmt.Sprint(bs), func(t *testing.T) {

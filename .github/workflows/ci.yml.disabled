@@ -1,3 +1,4 @@
+# Paused: rename to ci.yml to reactivate after reviewing docs/ci.md.
 name: Go CI
 
 on:
