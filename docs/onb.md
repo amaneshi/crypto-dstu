@@ -38,9 +38,10 @@ conversion occurs before the zero check, covered by independent zero-digest vect
 PKCS#8 and certificate loaders reject an algorithm/basis mismatch. Embedded
 certificates retain the usual discovery-only trust policy.
 
-Explicit Kupyna-256/512 CMS signing now supports GOST ONB certificates. ONB
-Kalyna agreement and modern public-key certificate/CSR profiles still return
-explicit errors. Their wire profiles require separate validation. Passing the
+Explicit Kupyna-256/512 CMS signing and Kalyna CFB/OFB with explicit standard DH
+now support GOST ONB certificates. ONB cofactor-Kupyna agreement and modern
+public-key certificate/CSR profiles still return explicit errors. Their wire
+profiles require separate validation. Passing the
 primitive tests does not enable arbitrary ONB degrees or nonstandard domains.
 These routines do not claim constant-time operation or a completed security review.
 
@@ -141,10 +142,54 @@ unmodified native producer output with PB tags on ONB keys.
 
 Modern ONB certificate probes with both legacy and modern named-curve OIDs
 returned certificate parse error 50 and context-key-read error 33 in this SDK.
-An initial Kalyna static-envelope probe on ONB173/ONB431 also failed the expected
-Kupyna KEK unwrap, after selecting the intended recipient. Its cause is not
-established; no alternative KDF or basis fallback is enabled. Modern certificate,
-CSR and Kalyna agreement support remain pending independently of CMS signing.
+Modern certificate and CSR support remains pending independently of CMS signing.
+
+## Kalyna standard-DH profile
+
+Kalyna-256 CFB and OFB now support explicitly selected standard DH on all five
+ONB curves. It uses the non-cofactor agreement OID `1.2.804.2.1.1.1.1.3.8` from
+the [national CMS specification](https://zakon.rada.gov.ua/laws/show/z1273-20).
+The existing GOST default and PB cofactor profiles remain unchanged. Select the
+new profile through the Go API:
+
+```go
+options := ua.EncryptionOptions{
+    Algorithm: ua.EncryptionKalyna256CFB, // or EncryptionKalyna256OFB
+    Agreement: ua.AgreementStandardDH,
+    StaticOriginator: true, // optional; embeds the agreement certificate
+}
+encrypted, err := box.EncryptDocumentWithOptions(data, recipientDER, options)
+```
+
+`dstu15946.SharedSecretStandard` validates a nonzero peer in the prime-order
+subgroup (`n*Q = O`) before computing `d*Q`, without cofactor multiplication.
+Small-order and mixed-order points, infinity, inconsistent domains and out-of-field
+coordinates fail. It preserves fixed-width ONB shared-secret encoding for the
+Kupyna KDF and national Kalyna key wrap. Fifteen retained vectors from unmodified
+Cryptonite `dstu4145_dh(..., false, ...)` independently check the primitive on all
+ten PB and five ONB curves. The test adapter is
+`pkg/dstu15946/testdata/generate-standard-dh.c`, linked against the pinned
+Cryptonite revision used above; ordinary tests need only its JSON output.
+
+The earlier native unwrap mismatch was caused by the provider's agreement scheme:
+all five tested ONB curves use `h=1` in its Kalyna output, while it writes the
+cofactor-DH identifier ending in `.7`. The PB257 control uses its actual cofactor
+of 4. Native decryption accepts correctly encoded standard-DH `.8` output from Go.
+The library continues to reject the native ONB producer's mislabeled `.7` data;
+it never retries without a cofactor or rewrites a received envelope automatically.
+
+`TestIITStandardDHKalyna` checks both content modes on all five ONB curves plus
+PB257, 1/33/65-byte payloads and dynamic, referenced-static and embedded-static
+originators (108 Go-to-IIT cases). For native-to-Go checks, only the test adapter
+explicitly changes the known `.7` header to `.8`, without altering the native
+ciphertext or wrapped key; Go and IIT then decrypt it. Wrong keys and wrapped-key
+corruption release no plaintext. Ten unmodified native envelopes, their disposable
+certificates and provenance are retained under `internal/cms/testdata/iit-onb-kalyna`.
+These fixtures also require rejection of the untouched mislabeled originals.
+The complete isolated native regression runner passed with this profile enabled.
+Two workers passed three-minute follow-up campaigns: 3,948,444 envelope parsing/
+decryption executions and 1,539 signature/agreement executions, the latter now
+checking both standard and cofactor DH on all fifteen domains.
 
 ## Reproducing operation vectors
 

@@ -2,3 +2,5 @@
 internal/testvectors/testdata/*.json text eol=lf
 pkg/dstu4145/testdata/pb-operations-cryptonite.json text eol=lf
 internal/cms/testdata/iit-onb-kupyna/*.json text eol=lf
+pkg/dstu15946/testdata/standard-dh-cryptonite.json text eol=lf
+internal/cms/testdata/iit-onb-kalyna/*.json text eol=lf

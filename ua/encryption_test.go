@@ -56,6 +56,21 @@ func TestEncryptionProfilesThroughBox(t *testing.T) {
 	require.Nil(t, output)
 }
 
+func TestEncryptionRejectsUnknownAndIncompatibleAgreement(t *testing.T) {
+	box := NewBox()
+	for _, options := range []EncryptionOptions{
+		{Algorithm: EncryptionKalyna256CFB, Agreement: "unknown"},
+		{Algorithm: EncryptionGOST28147CFB, Agreement: AgreementStandardDH},
+	} {
+		output, err := box.EncryptDocumentWithOptions([]byte("data"), nil, options)
+		require.Error(t, err)
+		require.Nil(t, output)
+		output, err = box.SignAndEncrypt([]byte("data"), nil, SignOptions{Encryption: options})
+		require.Error(t, err)
+		require.Nil(t, output)
+	}
+}
+
 func TestStaticOriginatorEmbedsAgreementCertificate(t *testing.T) {
 	sender, key := testpki.Issue(t, "sender", nil, nil, nil)
 	recipient, recipientKey := testpki.Issue(t, "recipient", nil, nil, nil)

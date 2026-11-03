@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/amaneshi/crypto-dstu/pkg/ec"
 	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
@@ -17,13 +18,14 @@ import (
 
 // OIDs for EnvelopedData algorithms.
 var (
-	OIDGost28147CFB  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3}
-	OIDGost28147Wrap = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 5}
-	OIDDSTU4145DH    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 4}
-	OIDKalyna256CFB  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 3, 2}
-	OIDKalyna256OFB  = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 6, 2}
-	OIDKalynaWrap    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 11}
-	OIDKupynaDH      = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 7}
+	OIDGost28147CFB     = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 3}
+	OIDGost28147Wrap    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 1, 5}
+	OIDDSTU4145DH       = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 4}
+	OIDKalyna256CFB     = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 3, 2}
+	OIDKalyna256OFB     = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 6, 2}
+	OIDKalynaWrap       = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 1, 3, 11}
+	OIDKupynaDH         = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 7}
+	OIDKupynaStandardDH = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 8}
 )
 
 // EncryptedContentInfo holds the symmetrically encrypted payload.
@@ -100,7 +102,7 @@ func Encrypt( //nolint:funlen
 	recipients []*cert.Certificate,
 	senderKey *dstu4145.PrivateKey,
 ) ([]byte, error) {
-	return encrypt(content, recipients, senderKey, nil, nil, false)
+	return encrypt(content, recipients, senderKey, nil, nil, nil, false)
 }
 
 // EncryptWithOriginatorCertificate identifies the static agreement key by the
@@ -118,7 +120,7 @@ func EncryptWithOriginatorCertificate(content []byte, recipients []*cert.Certifi
 	if err := cert.CheckEncryptionUsage(senderCert); err != nil {
 		return nil, err
 	}
-	return encrypt(content, recipients, senderKey, senderCert, nil, false)
+	return encrypt(content, recipients, senderKey, senderCert, nil, nil, false)
 }
 
 func encrypt(
@@ -127,12 +129,13 @@ func encrypt(
 	senderKey *dstu4145.PrivateKey,
 	senderCert *cert.Certificate,
 	algorithm asn1.ObjectIdentifier,
+	agreement asn1.ObjectIdentifier,
 	embedSender bool,
 ) ([]byte, error) {
 	if len(algorithm) == 0 {
 		algorithm = OIDGost28147CFB
 	}
-	profile, err := profileForCipher(algorithm)
+	profile, err := profileForAgreement(algorithm, agreement)
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +239,11 @@ func encrypt(
 			Algorithm: AlgorithmIdentifier{Algorithm: dstu4145.OIDDstu4145WithGost34311, Parameters: asn1.RawValue{Tag: asn1.TagNull}},
 			PublicKey: asn1.BitString{Bytes: senderPKBytes, BitLength: len(senderPKBytes) * 8},
 		}
-		if profile.agreement.Equal(OIDKupynaDH) {
+		if profile.ivSize == 32 {
 			originatorKey.Algorithm.Algorithm = dstu4145.OIDDstu4145WithKupyna256
+			if senderKey.Curve.IsONB() {
+				originatorKey.Algorithm.Algorithm = oid.DSTU4145ONBWithKupyna256
+			}
 		} else if senderKey.Curve.IsONB() {
 			originatorKey.Algorithm.Algorithm = dstu4145.OIDDstu4145ONBWithGost34311
 		}
@@ -369,7 +375,7 @@ func ParseEnveloped(der []byte) (*EncryptedMessage, error) {
 		return nil, errors.New("cms: no supported key-agreement recipients")
 	}
 	for _, recipient := range msg.Recipients {
-		if !recipient.AgreementAlgorithm.Equal(profile.agreement) {
+		if _, err := profileForAgreement(msg.Algorithm, recipient.AgreementAlgorithm); err != nil {
 			return nil, errors.New("cms: mismatched content and agreement profiles")
 		}
 	}
@@ -442,7 +448,8 @@ func DecryptEnveloped(msg *EncryptedMessage, key *dstu4145.PrivateKey, myCert *c
 		candidates = append(candidates, originators...)
 		originatorPub, err = resolveOriginator(rcpt.OriginatorID, candidates)
 	} else {
-		if key.Curve.IsONB() != rcpt.OriginatorAlgorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311) {
+		onb := rcpt.OriginatorAlgorithm.Equal(dstu4145.OIDDstu4145ONBWithGost34311) || rcpt.OriginatorAlgorithm.Equal(oid.DSTU4145ONBWithKupyna256)
+		if key.Curve.IsONB() != onb {
 			return nil, errors.New("cms: originator algorithm and recipient basis differ")
 		}
 		originatorPub, err = rebuildPublicKey(key, rcpt.OriginatorPK)
@@ -452,7 +459,7 @@ func DecryptEnveloped(msg *EncryptedMessage, key *dstu4145.PrivateKey, myCert *c
 	}
 
 	// Derive the KEK for the explicitly parsed agreement profile.
-	profile, err := profileForCipher(msg.Algorithm)
+	profile, err := profileForAgreement(msg.Algorithm, rcpt.AgreementAlgorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +474,7 @@ func DecryptEnveloped(msg *EncryptedMessage, key *dstu4145.PrivateKey, myCert *c
 
 	// Unwrap CEK
 	var cek []byte
-	if rcpt.AgreementAlgorithm.Equal(OIDKupynaDH) {
+	if profile.ivSize == 32 {
 		cek, err = kalyna.UnwrapKey(kek, rcpt.WrappedCEK)
 	} else {
 		cek, err = gost28147.UnwrapKey(kek, rcpt.WrappedCEK)
@@ -634,7 +641,7 @@ func parseKeyAgreeRecipientInfo(data []byte) ([]parsedRecipient, error) { //noli
 		return nil, errors.New("cms: unsupported key agreement or wrapping algorithm")
 	}
 	wrappedLength := 44
-	if keyEncAlg.Algorithm.Equal(OIDKupynaDH) && wrapAlgorithm.Algorithm.Equal(OIDKalynaWrap) {
+	if (keyEncAlg.Algorithm.Equal(OIDKupynaDH) || keyEncAlg.Algorithm.Equal(OIDKupynaStandardDH)) && wrapAlgorithm.Algorithm.Equal(OIDKalynaWrap) {
 		if !bytesEqual(wrapAlgorithm.Parameters.FullBytes, []byte{5, 0}) {
 			return nil, errors.New("cms: Kalyna wrap parameters must be NULL")
 		}

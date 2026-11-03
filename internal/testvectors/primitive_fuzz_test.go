@@ -264,6 +264,11 @@ func FuzzSignaturesAndAgreement(f *testing.F) {
 		right, err := dstu15946.SharedSecret(peer, key.Public())
 		require.NoError(t, err)
 		require.Equal(t, left, right)
+		left, err = dstu15946.SharedSecretStandard(key, peer.Public())
+		require.NoError(t, err)
+		right, err = dstu15946.SharedSecretStandard(peer, key.Public())
+		require.NoError(t, err)
+		require.Equal(t, left, right)
 	})
 }
 

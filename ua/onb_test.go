@@ -67,6 +67,15 @@ func TestONBApplicationRoundtrip(t *testing.T) {
 			out, err := box.EncryptDocumentWithOptions(message, certificate.Raw, EncryptionOptions{Algorithm: EncryptionKalyna256CFB})
 			require.Error(t, err)
 			require.Nil(t, out)
+			for _, algorithm := range []EncryptionAlgorithm{EncryptionKalyna256CFB, EncryptionKalyna256OFB} {
+				for _, static := range []bool{false, true} {
+					out, err := box.EncryptDocumentWithOptions(message, certificate.Raw, EncryptionOptions{Algorithm: algorithm, Agreement: AgreementStandardDH, StaticOriginator: static})
+					require.NoError(t, err)
+					plain, err := box.DecryptDocument(out)
+					require.NoError(t, err)
+					require.Equal(t, message, plain)
+				}
+			}
 		})
 	}
 }

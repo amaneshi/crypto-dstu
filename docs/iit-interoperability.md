@@ -243,7 +243,13 @@ curves use Kupyna-256 certificates except PB431, which uses Kupyna-512 signature
 agreement derivation still uses the Kalyna profile's Kupyna-256 KDF. Together with
 PB257, both content modes now cover all ten standard PB domains. PB173 requires
 the corrected cofactor 4; see [the compatibility change](compatibility.md).
-This modern encryption matrix covers PB. ONB Kalyna agreement remains disabled.
+This cofactor encryption matrix covers PB. A separate standard-DH Kalyna matrix
+now covers PB257 and all five ONB curves, both CFB/OFB, 1/33/65-byte payloads and
+dynamic/referenced-static/embedded-static originators. Go emits explicit agreement
+OID `.3.8`, which IIT decrypts. The native ONB producer uses non-cofactor agreement
+but writes `.3.7`; consumers retain rejection of that mismatch. Only the fixture
+adapter relabels those original native envelopes before independent decryption.
+See [the standard-DH profile and evidence](onb.md#kalyna-standard-dh-profile).
 Separate ONB matrices establish named-certificate GOST CMS and explicit
 Kupyna-256/512 CMS signing with GOST ONB certificates. The latter validates the
 outgoing ONB OIDs and native signature arithmetic; the native producer's PB

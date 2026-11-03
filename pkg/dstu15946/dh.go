@@ -20,6 +20,17 @@ import (
 //
 // Returns the x-coordinate of S as exactly ceil(m/8) big-endian bytes.
 func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, error) {
+	return sharedSecret(priv, peer, true)
+}
+
+// SharedSecretStandard computes ECDH without cofactor multiplication. It requires
+// the peer to be a nonzero point in the prime-order subgroup (n*Q = O).
+// Use this only with an explicitly identified non-cofactor agreement protocol.
+func SharedSecretStandard(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, error) {
+	return sharedSecret(priv, peer, false)
+}
+
+func sharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey, withCofactor bool) ([]byte, error) {
 	if priv == nil || priv.Curve == nil || priv.D == nil || peer == nil || peer.Curve == nil || peer.Q == nil {
 		return nil, errors.New("dstu15946: missing key")
 	}
@@ -28,11 +39,23 @@ func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, 
 		return nil, errors.New("dstu15946: keys are on different curves")
 	}
 	curve := priv.Curve
+	if peer.Q.Curve == nil || !curve.EqualDomain(peer.Q.Curve) {
+		return nil, errors.New("dstu15946: point and key are on different curves")
+	}
+	if peer.Q.X.BitLen() > curve.M || peer.Q.Y.BitLen() > curve.M {
+		return nil, errors.New("dstu15946: peer coordinates are outside the field")
+	}
 	if priv.D.Sign() <= 0 || priv.D.Cmp(new(big.Int).SetBytes(curve.N)) >= 0 {
 		return nil, errors.New("dstu15946: private scalar out of range")
 	}
 	if !curve.Contains(peer.Q) {
 		return nil, errors.New("dstu15946: peer public key is not on the curve")
+	}
+	if peer.Q.IsInfinity() {
+		return nil, errors.New("dstu15946: peer public key is infinity")
+	}
+	if !withCofactor && !peer.Q.ScalarMul(new(big.Int).SetBytes(curve.N)).IsInfinity() {
+		return nil, errors.New("dstu15946: peer public key is not in the prime-order subgroup")
 	}
 
 	cofactor := big.NewInt(int64(curve.Cofactor))
@@ -50,7 +73,9 @@ func SharedSecret(priv *dstu4145.PrivateKey, peer *dstu4145.PublicKey) ([]byte, 
 	}
 
 	// Step 3: S = S · cofactor  (matches cryptonite with_cofactor branch)
-	S = S.ScalarMul(cofactor)
+	if withCofactor {
+		S = S.ScalarMul(cofactor)
+	}
 	if S.IsInfinity() {
 		return nil, errors.New("dstu15946: shared point after cofactor mul is infinity")
 	}

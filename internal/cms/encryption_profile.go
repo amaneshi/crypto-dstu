@@ -17,6 +17,7 @@ import (
 // selects GOST CFB. OriginatorCertificate selects a static certificate reference.
 type EncryptOptions struct {
 	Algorithm                  asn1.ObjectIdentifier
+	AgreementAlgorithm         asn1.ObjectIdentifier // nil selects the cipher's cofactor profile
 	OriginatorCertificate      *cert.Certificate
 	EmbedOriginatorCertificate bool
 }
@@ -43,7 +44,22 @@ func EncryptWithOptions(
 	if options.EmbedOriginatorCertificate && options.OriginatorCertificate == nil {
 		return nil, errors.New("cms: embedded originator certificate is required")
 	}
-	return encrypt(content, recipients, key, options.OriginatorCertificate, options.Algorithm, options.EmbedOriginatorCertificate)
+	return encrypt(content, recipients, key, options.OriginatorCertificate, options.Algorithm, options.AgreementAlgorithm, options.EmbedOriginatorCertificate)
+}
+
+func profileForAgreement(cipher, agreement asn1.ObjectIdentifier) (envelopeProfile, error) {
+	profile, err := profileForCipher(cipher)
+	if err != nil {
+		return envelopeProfile{}, err
+	}
+	if len(agreement) == 0 || agreement.Equal(profile.agreement) {
+		return profile, nil
+	}
+	if profile.ivSize == 32 && agreement.Equal(OIDKupynaStandardDH) {
+		profile.agreement = OIDKupynaStandardDH
+		return profile, nil
+	}
+	return envelopeProfile{}, errors.New("cms: mismatched content and agreement profiles")
 }
 
 type envelopeProfile struct {
@@ -72,11 +88,17 @@ func envelopeKEK(
 	switch {
 	case algorithm.Equal(OIDDSTU4145DH):
 		return dstu15946.KeyAgreement(key, peer, ukm, gost34311.New)
-	case algorithm.Equal(OIDKupynaDH):
-		if key.Curve.IsONB() {
+	case algorithm.Equal(OIDKupynaDH), algorithm.Equal(OIDKupynaStandardDH):
+		if key.Curve.IsONB() && algorithm.Equal(OIDKupynaDH) {
 			return nil, errors.New("cms: unsupported ONB Kupyna agreement profile")
 		}
-		zz, err := dstu15946.SharedSecret(key, peer)
+		var zz []byte
+		var err error
+		if algorithm.Equal(OIDKupynaStandardDH) {
+			zz, err = dstu15946.SharedSecretStandard(key, peer)
+		} else {
+			zz, err = dstu15946.SharedSecret(key, peer)
+		}
 		if err != nil {
 			return nil, err
 		}

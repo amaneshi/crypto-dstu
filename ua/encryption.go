@@ -9,7 +9,7 @@ import (
 	"github.com/amaneshi/crypto-dstu/internal/keystore"
 )
 
-// EncryptionAlgorithm identifies a complete supported CMS encryption profile.
+// EncryptionAlgorithm identifies a supported CMS content cipher.
 type EncryptionAlgorithm string
 
 const (
@@ -18,25 +18,56 @@ const (
 	EncryptionKalyna256OFB EncryptionAlgorithm = "kalyna256-ofb"
 )
 
+// KeyAgreementAlgorithm selects the CMS agreement scheme independently of its cipher.
+type KeyAgreementAlgorithm string
+
+const (
+	AgreementCofactorDH KeyAgreementAlgorithm = "cofactor-dh"
+	AgreementStandardDH KeyAgreementAlgorithm = "standard-dh"
+)
+
 // EncryptionOptions selects the content cipher and its associated KDF/wrap.
 // The zero value preserves the GOST CFB default.
 type EncryptionOptions struct {
 	Algorithm EncryptionAlgorithm
+	// Agreement defaults to cofactor DH. Standard DH is explicit and requires
+	// a Kalyna cipher and validation of the peer's prime-order subgroup.
+	Agreement KeyAgreementAlgorithm
 	// StaticOriginator references and embeds the matched agreement certificate.
 	// This supplies sender certificate discovery, not trust or content authentication.
 	StaticOriginator bool
 }
 
 func (options EncryptionOptions) algorithmOID() (asn1.ObjectIdentifier, error) {
+	agreement, err := options.agreementOID()
+	if err != nil {
+		return nil, err
+	}
+	var algorithm asn1.ObjectIdentifier
 	switch options.Algorithm {
 	case "", EncryptionGOST28147CFB:
-		return cms.OIDGost28147CFB, nil
+		algorithm = cms.OIDGost28147CFB
 	case EncryptionKalyna256CFB:
-		return cms.OIDKalyna256CFB, nil
+		algorithm = cms.OIDKalyna256CFB
 	case EncryptionKalyna256OFB:
-		return cms.OIDKalyna256OFB, nil
+		algorithm = cms.OIDKalyna256OFB
 	default:
 		return nil, fmt.Errorf("ua: unsupported encryption algorithm %q", options.Algorithm)
+	}
+	if len(agreement) != 0 && algorithm.Equal(cms.OIDGost28147CFB) {
+		return nil, fmt.Errorf("ua: standard DH requires a Kalyna encryption profile")
+	}
+	return algorithm, nil
+}
+
+func (options EncryptionOptions) agreementOID() (asn1.ObjectIdentifier, error) {
+	switch options.Agreement {
+	case "", AgreementCofactorDH:
+		return nil, nil
+	case AgreementStandardDH:
+		return cms.OIDKupynaStandardDH, nil
+	default:
+		return nil, fmt.Errorf("ua: unsupported key agreement %q", options.Agreement)
 	}
 }
 

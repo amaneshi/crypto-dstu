@@ -3,7 +3,9 @@ package cms
 import (
 	"bytes"
 	"encoding/asn1"
+	"encoding/json"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -52,6 +54,47 @@ func FuzzParseAndDecryptEnveloped(f *testing.F) {
 	}
 	f.Add([]byte{})
 	f.Add([]byte{0x30, 0})
+	data, err := os.ReadFile("testdata/iit-onb-kalyna/DSTU_ONB_173.json")
+	require.NoError(f, err)
+	var fixture struct {
+		SenderCertificate, RecipientCertificate []byte
+		Samples                                 []struct{ Envelope []byte }
+	}
+	require.NoError(f, json.Unmarshal(data, &fixture))
+	onbSender, err := cert.ParseCertificate(fixture.SenderCertificate)
+	require.NoError(f, err)
+	onbRecipient, err := cert.ParseCertificate(fixture.RecipientCertificate)
+	require.NoError(f, err)
+	onbCurve := onbRecipient.PublicKey.Curve
+	d := new(big.Int).Lsh(big.NewInt(1), uint(new(big.Int).SetBytes(onbCurve.N).BitLen()-2))
+	d.Add(d, big.NewInt(0x12345))
+	onbKey := &dstu4145.PrivateKey{Curve: onbCurve, D: d}
+	onbSenderKey := &dstu4145.PrivateKey{Curve: onbCurve, D: new(big.Int).Add(d, big.NewInt(0x13579))}
+	cofactorDER, err := asn1.Marshal(OIDKupynaDH)
+	require.NoError(f, err)
+	standardDER, err := asn1.Marshal(OIDKupynaStandardDH)
+	require.NoError(f, err)
+	for _, sample := range fixture.Samples {
+		corrected := bytes.ReplaceAll(sample.Envelope, cofactorDER, standardDER)
+		parsed, err := ParseEnveloped(corrected)
+		require.NoError(f, err)
+		_, err = DecryptEnveloped(parsed, onbKey, onbRecipient, onbSender)
+		require.NoError(f, err)
+		f.Add(sample.Envelope)
+		f.Add(corrected)
+	}
+	for _, algorithm := range []asn1.ObjectIdentifier{OIDKalyna256CFB, OIDKalyna256OFB} {
+		for _, embedded := range []bool{false, true} {
+			options := EncryptOptions{Algorithm: algorithm, AgreementAlgorithm: OIDKupynaStandardDH}
+			if embedded {
+				options.OriginatorCertificate = onbSender
+				options.EmbedOriginatorCertificate = true
+			}
+			seed, err := EncryptWithOptions([]byte("ONB standard-DH fuzz"), []*cert.Certificate{onbRecipient}, onbSenderKey, options)
+			require.NoError(f, err)
+			f.Add(seed)
+		}
+	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		if len(data) > 64<<10 {
 			return
@@ -68,11 +111,15 @@ func FuzzParseAndDecryptEnveloped(f *testing.F) {
 		require.Nil(t, withJunk)
 		var discovery []*cert.Certificate
 		if len(message.OriginatorCertificates) == 0 {
-			discovery = []*cert.Certificate{sender}
+			discovery = []*cert.Certificate{sender, onbSender}
 		}
 		plain, err := DecryptEnveloped(message, key, recipient, discovery...)
 		if err != nil {
 			require.Nil(t, plain, "failed decryption released plaintext")
+		}
+		plain, err = DecryptEnveloped(message, onbKey, onbRecipient, discovery...)
+		if err != nil {
+			require.Nil(t, plain, "failed ONB decryption released plaintext")
 		}
 		// CFB/OFB content is not authenticated. Arbitrary ciphertext mutations
 		// may decrypt successfully; do not assert otherwise in this harness.

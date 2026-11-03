@@ -24,8 +24,10 @@ basis conversions, with Cryptonite point/signature/shared-secret vectors. IIT
 named-certificate GOST CMS interoperability now has a strict positive native
 matrix on all five curves; synthetic explicit ONB certificates remain outside
 that passing profile. Explicit Kupyna-256/512 CMS with GOST ONB certificates now
-has native checks and captured independent signatures. ONB Kalyna agreement and
-modern certificate/CSR profiles remain pending. GOST
+has native checks and captured independent signatures. Explicit standard-DH
+Kalyna CFB/OFB now has native checks on all five ONB curves plus PB257, and
+independent standard-DH primitive vectors on all fifteen curves. Modern
+certificate/CSR profiles remain pending. GOST
 ONB CSR generation now has independent hashing/signature checks; see `docs/csr.md`.
 See `docs/onb.md` and `docs/compatibility.md`.
 Update the backlog when work actually completes; do not mark a profile supported
@@ -76,7 +78,7 @@ from a local round-trip alone.
   arithmetic and stored coordinates use PB; apply ONB maps at field boundaries,
   digest interpretation and signature-product truncation, never to scalars.
   Preserve independently reproduced Cryptonite vectors, verified ONB Kupyna CMS
-  and rejection of unverified ONB Kalyna/certificate/CSR profiles. Apply the
+  and rejection of unverified ONB cofactor-Kupyna/certificate/CSR profiles. Apply the
   zero-digest substitute after basis conversion; preserve the independent
   zero-digest vectors. CSR output uses
   national compressed points, raw-signature OCTET STRING wrapping and little-endian
@@ -90,6 +92,11 @@ from a local round-trip alone.
   IIT's producer emits PB signature tags for these keys; consumers must reject
   that mismatch. Explicit relabeling exists only in the independent test adapter,
   never as an implicit verification fallback.
+  Standard-DH Kalyna requires explicit selection and agreement OID .3.8, with
+  nonzero prime-order subgroup validation before agreement. IIT's ONB producer
+  uses h=1 but labels its envelopes as cofactor DH .3.7. Retain rejection of those
+  originals; only the fixture adapter relabels them. Never add an implicit
+  cofactor fallback or change the established SharedSecret cofactor behavior.
 - PB173's standard cofactor is 4. Preserve the independent cofactor-agreement
   vector and group-cardinality checks; the previous value 2 produced incompatible
   shared secrets. Do not add an implicit legacy-cofactor fallback.

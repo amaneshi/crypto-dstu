@@ -56,7 +56,11 @@ func (b *Box) encryptDocumentWithOptions(content []byte, rc *cert.Certificate, o
 		entry = agreement
 	}
 
-	cmsOptions := cms.EncryptOptions{Algorithm: algorithm}
+	agreement, err := options.agreementOID()
+	if err != nil {
+		return nil, err
+	}
+	cmsOptions := cms.EncryptOptions{Algorithm: algorithm, AgreementAlgorithm: agreement}
 	if options.StaticOriginator {
 		cmsOptions.OriginatorCertificate = entry.cryptCert
 		cmsOptions.EmbedOriginatorCertificate = true

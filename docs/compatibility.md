@@ -88,7 +88,10 @@ matrix on all five curves. Synthetic explicit-parameter ONB certificates and
 tiny-scalar certificate fixtures remain outside that passing profile.
 Explicit Kupyna-256/512 CMS with GOST ONB certificates is independently checked.
 Native CMS carrying PB signature tags on ONB keys remains rejected; test adapters
-alone normalize that known SDK quirk. Modern ONB certificates/CSRs and Kalyna
-agreement remain disabled. GOST ONB CSR generation is independently checked; see
+alone normalize that known SDK quirk. Kalyna CFB/OFB also supports explicitly
+selected standard DH (OID ending in `.8`), with full prime-order subgroup checks.
+The native ONB producer's `.7`-tagged non-cofactor envelopes remain rejected;
+there is no implicit cofactor fallback. Modern ONB certificates/CSRs remain
+disabled. GOST ONB CSR generation is independently checked; see
 [CSR encoding](csr.md). See [ONB coverage](onb.md) for
 the exact evidence, retained public fixtures, reproduction commands and limits.

@@ -88,7 +88,7 @@ LF line endings. SHA256 values for the checked-in JSON files are:
 | `FuzzPrimitiveBlocks` | All five Kalyna profiles and GOST blocks, in-place encryption/decryption, CBC comparison with the standard library and fragmented CTR/CFB/OFB streams |
 | `FuzzFieldArithmetic` | All fifteen curve domains; carryless multiplication/reduction against a separate `math/big` polynomial oracle, addition, squaring and inverse identity checked through that oracle |
 | `FuzzCurveEncodings` | All fifteen domains; malformed compressed input, valid point/basis roundtrips and unchanged input |
-| `FuzzSignaturesAndAgreement` | All fifteen domains; valid/malformed raw signatures, zero-s rejection and symmetric cofactor ECDH using candidate-derived public scalars |
+| `FuzzSignaturesAndAgreement` | All fifteen domains; valid/malformed raw signatures, zero-s rejection and symmetric cofactor/standard ECDH using candidate-derived public scalars |
 | `FuzzCMSKeyWrap` | National Kalyna CMAC/CFB wrapping, corruption rejection and no plaintext on unwrap errors |
 | `FuzzKWUnwrap` | Raw DSTU 7624 KW parsing/integrity, independently anchored by the existing Cryptonite/Bouncy Castle vectors |
 
