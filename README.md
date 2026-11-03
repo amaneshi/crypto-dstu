@@ -666,9 +666,10 @@ untested profiles.
   before enabling them.
 - [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
   password profiles beyond the tested Windows CP1251 cases.
-- [ ] **Parser fuzzing:** add CMS, Key-6/PKCS#8/JKS and revocation targets;
-  extend PFX coverage, add legacy CSR/ONB certificate seeds and run longer
-  campaigns. See [current targets and limits](docs/fuzzing.md).
+- [ ] **Parser fuzzing:** add Key-6/PKCS#8/JKS and revocation targets;
+  extend PFX coverage, multi-signer/external-originator CMS cases and legacy
+  CSR/ONB certificate seeds, then run longer campaigns. See
+  [current targets and limits](docs/fuzzing.md).
 - [ ] **Primitive validation:** broaden primitive fuzzing and independent
   known-answer coverage beyond the current tested profiles.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
