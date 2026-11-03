@@ -12,7 +12,7 @@ seed corpora during ordinary `go test`; active mutation requires `-fuzz`.
 | `internal/keystore/FuzzParseRawKey` | Public scalar 2 on all fifteen PB/ONB domains, scalar range/domain preservation after canonical serialization, nil results on errors and unchanged caller input |
 | `internal/keystore/FuzzParseKey6` | Legacy GOST and modern Kalyna encrypted PKCS#8, malformed parameters/ciphertext, no key on errors and unchanged caller input |
 | `internal/keystore/FuzzParseJKSAuthenticated` | Independent public Java KeyProtector fixture; reauthenticated arbitrary store bodies reach entry/protected-key parsing, with corrupted store digests always rejected |
-| `internal/keystore/FuzzParsePKCS12` | Outer PFX integrity/structure mutations; unchanged input, no keys on errors and deliberate MAC-digest corruption rejected |
+| `internal/keystore/FuzzParsePKCS12` | Traditional and PBMAC1 outer PFX integrity/structure mutations; effective inner PBMAC1 KDF work budget, unchanged input, no keys on errors and deliberate MAC-digest corruption rejected |
 | `internal/keystore/FuzzPKCS12AuthenticatedSafe` | Reauthenticated arbitrary SafeContents, raw/shrouded keys, GOST/Kalyna key privacy, certificate association, duplicate keys and encrypted SafeContents; no keys on errors |
 | `internal/ocsp/FuzzParseAndCheckResponse` | Issuer-signed good/revoked/unknown responses, responder-name/key-hash IDs and unsuccessful responses; parsing/CertID/signature/freshness checks, unchanged input and no good status on authentication errors |
 | `internal/ocsp/FuzzCheckResponderCRL` | Issuer-signed full CRLs with/without revoked responder, signature/freshness/extension parsing and unchanged input; accepted CRLs reject trailing data and corrupted signatures |
@@ -119,6 +119,12 @@ passed on the same toolchain with two workers: 982,081 CSR executions and
 gopls diagnostics, isolated native suite and independent UAPKIC replay also passed.
 See [modern ONB fixtures](../internal/testvectors/testdata/modern-onb-pki/README.md)
 for the separate interoperability evidence and its scope.
+
+The PBMAC1 expansion passed a further three-minute PFX parsing campaign with
+two workers and Go 1.27.3: 7,888,417 executions. Its valid PBMAC1 seed must reach
+private-key import; the harness bounds the effective inner KDF iterations,
+independently of ignored legacy outer MacData fields. Separate OpenSSL and UAPKI
+checks cover the UTF-8 password profile and national-key privacy.
 
 Fuzzing remains ongoing maintenance. These bounded campaigns cannot establish
 the absence of bugs, exhaust every ASN.1 variant, measure maximum-size resource

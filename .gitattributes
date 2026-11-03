@@ -5,3 +5,4 @@ internal/cms/testdata/iit-onb-kupyna/*.json text eol=lf
 pkg/dstu15946/testdata/standard-dh-cryptonite.json text eol=lf
 internal/cms/testdata/iit-onb-kalyna/*.json text eol=lf
 internal/testvectors/testdata/modern-onb-pki/*.json text eol=lf
+internal/keystore/testdata/pkcs12-pbmac1-openssl.json text eol=lf

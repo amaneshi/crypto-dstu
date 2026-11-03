@@ -9,11 +9,23 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 )
 
 const pfxExportIterations = 10000
+
+// PKCS12Integrity selects the PFX password MAC independently of key encryption.
+type PKCS12Integrity string
+
+const (
+	PKCS12IntegritySHA256       PKCS12Integrity = "pkcs12-sha256"
+	PKCS12IntegrityPBMAC1SHA256 PKCS12Integrity = "pbmac1-sha256"
+)
+
+// PKCS12ExportOptions controls integrity; its zero value preserves the BMP profile.
+type PKCS12ExportOptions struct{ Integrity PKCS12Integrity }
 
 // MarshalPKCS12 exports DER PKCS#8 keys with matching certificates. Each key is
 // independently protected by PBES2/Kupyna MAC-256 PBKDF2/Kalyna-256 CBC. A fresh
@@ -23,13 +35,32 @@ func MarshalPKCS12(rawKeys, certificates [][]byte, password string) ([]byte, err
 	return marshalPKCS12(rawKeys, certificates, password, rand.Reader)
 }
 
+// MarshalPKCS12WithOptions exports with an explicitly selected integrity profile.
+func MarshalPKCS12WithOptions(rawKeys, certificates [][]byte, password string, options PKCS12ExportOptions) ([]byte, error) {
+	return marshalPKCS12WithOptions(rawKeys, certificates, password, rand.Reader, options)
+}
+
 func marshalPKCS12(rawKeys, certificates [][]byte, password string, random io.Reader) ([]byte, error) {
+	return marshalPKCS12WithOptions(rawKeys, certificates, password, random, PKCS12ExportOptions{})
+}
+
+func marshalPKCS12WithOptions(rawKeys, certificates [][]byte, password string, random io.Reader, options PKCS12ExportOptions) ([]byte, error) {
+	if options.Integrity != "" && options.Integrity != PKCS12IntegritySHA256 && options.Integrity != PKCS12IntegrityPBMAC1SHA256 {
+		return nil, errors.New("keystore: PKCS12 export: unsupported integrity profile")
+	}
 	if len(password) == 0 || len(password) > 32 || strings.ContainsRune(password, 0) {
 		return nil, errors.New("keystore: PKCS12 export: password must contain 1..32 UTF-8 bytes without NUL")
 	}
-	encodedPassword, err := pkcs12Password(password)
-	if err != nil {
-		return nil, err
+	if !utf8.ValidString(password) {
+		return nil, errors.New("keystore: PKCS12 export: invalid UTF-8 password")
+	}
+	var encodedPassword []byte
+	var err error
+	if options.Integrity != PKCS12IntegrityPBMAC1SHA256 {
+		encodedPassword, err = pkcs12Password(password)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer clear(encodedPassword)
 	if len(rawKeys) == 0 || len(rawKeys) > 64 || len(certificates) == 0 || len(certificates) > 512 {
@@ -154,12 +185,19 @@ func marshalPKCS12(rawKeys, certificates [][]byte, password string, random io.Re
 	if _, err = io.ReadFull(random, mac.Salt); err != nil {
 		return nil, err
 	}
-	mac.MAC.Algorithm = algorithmIdentifier{Algorithm: asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}, Parameters: asn1.RawValue{Tag: asn1.TagNull}}
-	macKey := pkcs12MACKey(sha256.New, encodedPassword, mac.Salt, mac.Iterations)
-	defer clear(macKey)
-	authenticator := hmac.New(sha256.New, macKey)
-	authenticator.Write(safe)
-	mac.MAC.Digest = authenticator.Sum(nil)
+	if options.Integrity == PKCS12IntegrityPBMAC1SHA256 {
+		mac, err = makePBMAC1(safe, password, mac.Salt, pfxExportIterations)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		mac.MAC.Algorithm = algorithmIdentifier{Algorithm: asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}, Parameters: asn1.RawValue{Tag: asn1.TagNull}}
+		macKey := pkcs12MACKey(sha256.New, encodedPassword, mac.Salt, mac.Iterations)
+		defer clear(macKey)
+		authenticator := hmac.New(sha256.New, macKey)
+		authenticator.Write(safe)
+		mac.MAC.Digest = authenticator.Sum(nil)
+	}
 	macDER, err := asn1.Marshal(mac)
 	if err != nil {
 		return nil, err

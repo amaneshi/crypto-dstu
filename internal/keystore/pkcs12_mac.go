@@ -117,6 +117,9 @@ func verifyPKCS12MAC(raw asn1.RawValue, authenticatedSafe []byte, password strin
 	if err != nil || !bytes.Equal(canonical, raw.FullBytes) {
 		return errors.New("keystore: PKCS12: noncanonical MAC data")
 	}
+	if data.MAC.Algorithm.Algorithm.Equal(oidPBMAC1) {
+		return verifyPBMAC1(data, authenticatedSafe, password)
+	}
 	newHash, err := pkcs12Hash(data.MAC.Algorithm)
 	if err != nil {
 		return err

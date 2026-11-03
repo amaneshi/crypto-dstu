@@ -131,6 +131,15 @@ func FuzzParsePKCS12(f *testing.F) {
 	pairs, err := ParsePKCS12(p12DER(f, p12Sign(f, safe, fuzzPassword)), fuzzPassword)
 	require.NoError(f, err)
 	require.NotEmpty(f, pairs)
+	modern := p12Sign(f, safe, fuzzPassword)
+	mac, err := makePBMAC1(safe, fuzzPassword, []byte("public PBMAC1 fuzz salt"), 2)
+	require.NoError(f, err)
+	modern.MacData = p12Raw(f, mac)
+	modernDER := p12DER(f, modern)
+	pairs, err = ParsePKCS12(modernDER, fuzzPassword)
+	require.NoError(f, err)
+	require.NotEmpty(f, pairs, "PBMAC1 seed must reach key import")
+	f.Add(modernDER)
 	f.Add([]byte{0x30, 0})
 	f.Fuzz(func(t *testing.T, data []byte) {
 		if len(data) > 64<<10 {
@@ -140,8 +149,20 @@ func FuzzParsePKCS12(f *testing.F) {
 		if _, err := asn1.Unmarshal(data, &outer); err == nil {
 			var mac pkcs12MacData
 			_, macErr := asn1.Unmarshal(outer.MacData.FullBytes, &mac)
-			if macErr == nil && mac.Iterations > 256 && mac.Iterations <= 1_000_000 {
-				return
+			if macErr == nil {
+				iterations := mac.Iterations
+				if mac.MAC.Algorithm.Algorithm.Equal(oidPBMAC1) {
+					var parameters pbmac1Params
+					var kdf pbkdf2Params
+					if _, err := asn1.Unmarshal(mac.MAC.Algorithm.Parameters.FullBytes, &parameters); err == nil {
+						if _, err := asn1.Unmarshal(parameters.KDF.Parameters.FullBytes, &kdf); err == nil {
+							iterations = kdf.Iterations
+						}
+					}
+				}
+				if iterations > 256 && iterations <= 1_000_000 {
+					return
+				}
 			}
 			if safe, err := pkcs12AuthenticatedSafe(outer.AuthSafe); err == nil && !fuzzSafeBudget(safe) {
 				return

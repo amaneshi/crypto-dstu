@@ -35,6 +35,8 @@ random 32-byte salt, 10,000 PKCS#12 KDF iterations, and a BMP-formatted password
 No private key is emitted in an unencrypted bag.
 
 Export passwords must contain 1–32 UTF-8 bytes, valid BMP characters and no NUL.
+The explicit PBMAC1 profile below also accepts supplementary Unicode characters
+within the same byte limit. The default export profile remains unchanged.
 Export limits are 64 keys, 512 input certificates, 512 total bags, 8 MiB combined
 input data and 16 MiB output. These limits are deliberately stricter than import.
 Neither export nor import promotes certificates to trust anchors or validates
@@ -56,13 +58,14 @@ structure; that check does not claim OpenSSL supports Kalyna key decryption.
 | SHA-224/256/384/512 | HMAC | OpenSSL 3.5.9 KDF/MAC vectors |
 | GOST 34.311-95 (`1.2.804.2.1.1.1.1.2.1`) | HMAC | Disposable IIT-generated PB257 PFX |
 | Kupyna-256 (`1.2.804.2.1.1.1.1.2.2.1`) | National Kupyna KMAC-256 | Disposable IIT-generated modern PB257 PFX |
+| PBMAC1 (`1.2.840.113549.1.5.14`) | PBKDF2 with SHA-2 HMAC PRF and SHA-2 HMAC | OpenSSL 3.5.9 PFX, including mixed SHA-256 MAC/SHA-512 PRF |
 
-Key derivation uses [RFC 7292 Appendix B](https://www.rfc-editor.org/rfc/rfc7292.html#appendix-B),
+Traditional MAC key derivation uses [RFC 7292 Appendix B](https://www.rfc-editor.org/rfc/rfc7292.html#appendix-B),
 diversifier ID 3, producing one digest-sized MAC key. The native Kupyna profile
 uses KMAC, not HMAC; its hash OID does not authorize other untested constructions.
-Kupyna-512 PFX MACs, PBMAC1 and other integrity profiles remain unsupported.
+Kupyna-512 PFX MACs and other unlisted integrity profiles remain unsupported.
 
-MAC passwords use terminated UTF-16BE/BMP encoding. Invalid UTF-8, supplementary
+Traditional MAC passwords use terminated UTF-16BE/BMP encoding. Invalid UTF-8, supplementary
 Unicode characters, and passwords over 4096 UTF-8 bytes are explicitly rejected.
 An empty caller password supports both the standard terminator and the historical
 zero-byte password representation, but only if the corresponding MAC verifies.
@@ -71,6 +74,41 @@ native GOST/Kupyna PFX checks now cover Cyrillic/Ukrainian passwords with the
 corrected Windows CP1251 adapter boundary; this is limited to the tested profiles.
 The existing Key-6 password limits/policies still apply to privacy protection.
 See [password compatibility](compatibility.md).
+
+### Explicit UTF-8 PBMAC1 profile
+
+[RFC 9879](https://www.rfc-editor.org/rfc/rfc9879.html#section-6) specifies raw
+UTF-8 passwords for PBMAC1, without a terminator or added BOM. The implementation
+preserves exact bytes and performs no Unicode normalization. CJK, Arabic,
+Devanagari, Greek, emoji, supplementary letters, and distinct composed/decomposed
+spellings are covered. Import accepts valid UTF-8 up to 4096 bytes; existing
+privacy-profile limits still apply to encrypted bags. Export accepts 1–32 UTF-8
+bytes without NUL, including supplementary characters.
+
+```go
+options := ua.PKCS12ExportOptions{Integrity: ua.PKCS12IntegrityPBMAC1SHA256}
+pfx, err := ua.ProtectPKCS12WithOptions(rawKey, certificates, "密碼🔑", options)
+// Or export loaded keys and certificates:
+pfx, err = box.ExportPKCS12WithOptions("密碼🔑", options)
+```
+
+Export uses PBKDF2/HMAC-SHA256 and HMAC-SHA256, an explicit 32-byte key length,
+a fresh 32-byte salt and 10,000 iterations. The national encrypted key bags are
+unchanged. Import supports SHA-224/256/384/512 HMAC independently for PRF and MAC,
+with absent/NULL algorithm parameters. PBKDF2 salt must contain 1–1024 bytes,
+iterations 1–1,000,000 and explicit keyLength 20–64 bytes. Missing keyLength,
+SHA-1/default PRF, unsupported algorithms, malformed/trailing parameters and
+wrong-length digests fail before releasing keys. The outer legacy MacData salt
+and iteration fields are ignored for PBMAC1; the effective KDF parameters are
+inside PBMAC1-params. There is no BMP/UTF-8 retry on a failed MAC.
+
+Sixteen retained PFX fixtures cover eight password/hash cases. OpenSSL verifies
+complete Go-produced national-key PFX integrity and independently generates
+certificate-only PBMAC1 PFX. A bounded test adapter invokes the original,
+unmodified UAPKI Kupyna password KDF and Kalyna-CBC implementation to decrypt
+the Go fixtures' key bags, with wrong-password rejection. OpenSSL itself does
+not decrypt Kalyna. IIT acceptance of PBMAC1 or non-CP1251 passwords is not
+claimed. See [fixture provenance and reproduction](../internal/keystore/testdata/README.md).
 
 The parser accepts absent or NULL digest parameters, iteration counts from 1 to
 1,000,000 (omitted means 1), and salt lengths from 1 to 1024 bytes. PFX input is

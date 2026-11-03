@@ -15,8 +15,7 @@ optional native development/test adapter; the consumer library remains CGo-free.
 Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
-Remaining pending areas are additional provider profiles, arbitrary Unicode
-password interoperability, security review, and provisioning/running
+Remaining pending areas are external security review and provisioning/running
 the dedicated native CI runner. Workflow setup is documented in `docs/ci.md`.
 All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
@@ -31,6 +30,12 @@ certificate/CSR profiles support Kupyna-256/512 signatures with GOST ONB SPKI
 and legacy named parameters, checked by IIT/UAPKIC/OpenSSL. Alternate modern
 SPKI OIDs remain rejected. See `docs/csr.md` for CSR evidence and limits.
 See `docs/onb.md` and `docs/compatibility.md`.
+Explicit PBMAC1 PFX now supports UTF-8 passwords beyond CP1251, including
+supplementary characters, with OpenSSL integrity and unmodified UAPKI privacy
+checks. Preserve the default BMP integrity profile, exact password bytes,
+mandatory PBKDF2 keyLength, SHA-2 allowlist and independent KDF work bounds.
+PBMAC1 ignores outer legacy MacData salt/iterations as RFC 9879 requires;
+its effective salt/iterations come only from PBMAC1 KDF parameters.
 Update the backlog when work actually completes; do not mark a profile supported
 from a local round-trip alone.
 
@@ -143,7 +148,9 @@ from a local round-trip alone.
   remain discovery data, never trust roots. See `docs/pkcs12.md` for size/KDF,
   password and profile limits. PFX export encrypts every PKCS#8 key bag with the
   modern Kalyna profile and authenticates the container with HMAC-SHA256, fresh
-  salts/IVs and 10,000 iterations. Require an unambiguous matching certificate
+  salts/IVs and 10,000 iterations. Explicit PBMAC1 export uses PBKDF2/HMAC-SHA256
+  with raw UTF-8 instead of the default BMP integrity KDF; no normalization or
+  lossy code-page fallback is allowed. Require an unambiguous matching certificate
   for every contained key; preserve secondary IIT agreement-key attributes.
   Native signing checks supply matching certificates to the SDK discovery store;
   do not claim automatic native discovery from the embedded certificate bags.

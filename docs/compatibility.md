@@ -71,7 +71,27 @@ Independent native checks now include:
 Tests compare cryptographic signatures/public-key correspondence rather than
 requiring equality of profile-dependent opaque `EUGetKeyInfoBinary` identifiers.
 The evidence covers the tested CP1251-representable strings on this Windows SDK;
-it does not establish arbitrary Unicode passwords or other providers/platforms.
+it does not establish arbitrary Unicode passwords for that Windows API.
+
+## Unicode PFX password profile
+
+Explicit `ua.PKCS12IntegrityPBMAC1SHA256` uses RFC 9879 UTF-8 password integrity
+instead of the default PKCS#12 BMP encoding. It supports valid Unicode, including
+supplementary characters, within the documented password length limits. Passwords
+are not normalized: composed and decomposed spellings remain different secrets.
+
+OpenSSL 3.5.9 independently verifies complete Go PFX integrity and produces
+certificate-only PBMAC1 fixtures. The pinned UAPKI reference independently decrypts
+their national key bags using its original password KDF and Kalyna code. Tests
+cover CJK, Arabic, Devanagari, Greek, emoji and the 32-byte export boundary, plus
+wrong passwords, malformed KDF parameters and modified contents. Public API
+checks preserve key/certificate association and discovery-only trust.
+
+Use `ProtectPKCS12WithOptions` or `Box.ExportPKCS12WithOptions` to select it.
+The existing export defaults and IIT CP1251 adapter policy remain in effect;
+PBMAC1 support is not a claim of IIT compatibility for those passwords.
+Traditional PFX integrity still rejects non-BMP characters. Other providers and
+unlisted profiles need separate evidence. See [PFX policy](pkcs12.md#explicit-utf-8-pbmac1-profile).
 
 ## ONB coverage
 

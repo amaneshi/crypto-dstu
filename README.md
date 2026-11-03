@@ -661,8 +661,6 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
-  password profiles beyond the tested Windows CP1251 cases.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
 
 CI provisioning and native runner execution are deferred while CI is paused;
@@ -676,6 +674,9 @@ The five ONB curves now have independent named-certificate GOST/Kupyna CMS and
 explicit standard-DH Kalyna CFB/OFB checks with the pinned IIT SDK. Named ONB
 certificates and CSRs signed with Kupyna-256/512 also have independent checks;
 see [ONB encoding changes, evidence and limits](docs/onb.md).
+Explicit PBMAC1 PFX supports Unicode passwords, including supplementary
+characters, with independent OpenSSL integrity and UAPKI key-privacy checks;
+see [password profiles](docs/compatibility.md#unicode-pfx-password-profile).
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current
