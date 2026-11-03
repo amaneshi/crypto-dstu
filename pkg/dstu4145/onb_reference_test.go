@@ -16,7 +16,7 @@ import (
 )
 
 func TestONBCryptoniteOperations(t *testing.T) {
-	for _, name := range []string{"onb-operations-cryptonite.json", "onb-zero-digest-cryptonite.json"} {
+	for _, name := range []string{"onb-operations-cryptonite.json", "onb-zero-digest-cryptonite.json", "pb-operations-cryptonite.json"} {
 		t.Run(name, func(t *testing.T) { checkONBCryptoniteOperations(t, "testdata/"+name) })
 	}
 }
@@ -25,8 +25,9 @@ func checkONBCryptoniteOperations(t *testing.T, path string) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	var fixture struct {
-		Producer, SourceCommit string
-		Vectors                []struct {
+		Producer, SourceCommit, Basis string
+		PrngUnixTime                  int64
+		Vectors                       []struct {
 			Degree                                                    int
 			Digest, Qx, Qy, Compressed, PeerCompressed, SharedX, R, S string
 		}
@@ -34,11 +35,17 @@ func checkONBCryptoniteOperations(t *testing.T, path string) {
 	require.NoError(t, json.Unmarshal(data, &fixture))
 	require.NotEmpty(t, fixture.Producer)
 	require.Equal(t, "3618d340d22e27a6becf97d89c453f8e64068a39", fixture.SourceCommit)
-	require.Len(t, fixture.Vectors, 5)
+	if fixture.Basis == "PB" {
+		require.Equal(t, int64(1793707200), fixture.PrngUnixTime)
+		require.Len(t, fixture.Vectors, 10)
+	} else {
+		require.Len(t, fixture.Vectors, 5)
+		fixture.Basis = "ONB"
+	}
 	decode := func(value string) []byte { b, err := hex.DecodeString(value); require.NoError(t, err); return b }
 	for _, v := range fixture.Vectors {
 		t.Run(fmt.Sprint(v.Degree), func(t *testing.T) {
-			curve := dstu4145.ParamsByName(fmt.Sprintf("DSTU_ONB_%d", v.Degree)).Curve
+			curve := dstu4145.ParamsByName(fmt.Sprintf("DSTU_%s_%d", fixture.Basis, v.Degree)).Curve
 			key := &dstu4145.PrivateKey{Curve: curve, D: big.NewInt(2)}
 			pub := key.Public()
 			x, err := curve.EncodeField(pub.Q.X)

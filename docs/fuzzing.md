@@ -21,6 +21,8 @@ seed corpora during ordinary `go test`; active mutation requires `-fuzz`.
 
 The local runner selects the twelve parser targets; KW is listed for reference
 as a separate primitive target, outside this parser completion matrix.
+`-Suite primitives` selects the separate [primitive validation](primitive-validation.md)
+matrix; omitting `-Suite` retains the parser default.
 
 No operational keys are loaded. Known private scalars 1, 2 and 7 are intentional
 public test inputs. Other seeds use disposable generated keys and retain only

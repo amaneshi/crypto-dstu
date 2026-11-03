@@ -2,6 +2,7 @@ param(
     [ValidatePattern('^[1-9][0-9]*(s|m|h)$')][string]$Duration = '3m',
     [ValidateRange(1, 16)][int]$Workers = 2,
     [string]$GoExecutable = 'go',
+    [ValidateSet('parsers', 'primitives')][string]$Suite = 'parsers',
     [string[]]$Targets,
     [string]$OutputDirectory = (Join-Path ([IO.Path]::GetTempPath()) ('crypto-dstu-fuzz-' + [Guid]::NewGuid().ToString('N')))
 )
@@ -21,9 +22,20 @@ $packages = [ordered]@{
     FuzzParseAndDecryptEnveloped = './internal/cms'
     FuzzDecode = './internal/transport'
 }
+if ($Suite -eq 'primitives') {
+    $packages = [ordered]@{
+        FuzzPrimitiveHashes = './internal/testvectors'
+        FuzzPrimitiveBlocks = './internal/testvectors'
+        FuzzFieldArithmetic = './internal/testvectors'
+        FuzzCurveEncodings = './internal/testvectors'
+        FuzzSignaturesAndAgreement = './internal/testvectors'
+        FuzzCMSKeyWrap = './internal/testvectors'
+        FuzzKWUnwrap = './pkg/kalyna'
+    }
+}
 if (!$Targets) { $Targets = @($packages.Keys) }
 foreach ($target in $Targets) {
-    if (!$packages.Contains($target)) { throw "Unknown parser fuzz target: $target" }
+    if (!$packages.Contains($target)) { throw "Unknown $Suite fuzz target: $target" }
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $outputRoot = (Resolve-Path -LiteralPath $OutputDirectory).Path
@@ -42,7 +54,7 @@ try {
         $matches = @(Select-String -LiteralPath $log -Pattern 'execs: ([0-9]+)')
         $executions = if ($matches.Count) { [long]$matches[-1].Matches[0].Groups[1].Value } else { 0 }
         $record = [ordered]@{
-            target = $target; package = $packages[$target]; toolchain = "$version"
+            target = $target; package = $packages[$target]; toolchain = "$version"; suite = $Suite
             duration = $Duration; workers = $Workers; exitCode = $code
             executions = $executions; elapsedSeconds = [math]::Round($timer.Elapsed.TotalSeconds, 2)
             log = $log

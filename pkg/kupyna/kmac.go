@@ -37,6 +37,7 @@ type kmacDigest struct {
 	key       []byte
 	invertKey []byte
 	keyLen    int
+	keyPadLen uint64
 }
 
 // NewKMAC256 returns a Kupyna-256 KMAC keyed with key (mac_len = 32).
@@ -73,7 +74,7 @@ func newKMAC(key []byte, macLen int) *kmacDigest {
 }
 
 // initState resets the hash state and feeds PAD(K) as the first block(s).
-// Mirrors dstu7564_init_kmac: after init, msg_tot_len = blockSize*8 (one key block fed).
+// Standard provider keys occupy one block; longer keys may need more blocks.
 func (k *kmacDigest) initState() {
 	// Reset state to IV (state[0] = blockSize, rest zero)
 	k.state = make([][rows]byte, k.cols)
@@ -84,12 +85,12 @@ func (k *kmacDigest) initState() {
 
 	// Build PAD(K): key_buf || 0x80 || zeros || LE96(keyLen*8)
 	// padded to a multiple of blockSize.
-	keyBuf := make([]byte, k.blockSize*2) // large enough
-	copy(keyBuf, k.key)
-	paddedLen := kmacPaddingInPlace(keyBuf, k.keyLen, uint64(k.keyLen)*8, k.blockSize)
+	keyBuf := kmacPadded(k.key, uint64(k.keyLen)*8, k.blockSize)
+	defer clear(keyBuf)
+	k.keyPadLen = uint64(len(keyBuf))
 
 	// Feed each padded key block through digest(), advancing msg_tot_len.
-	for i := 0; i < paddedLen; i += k.blockSize {
+	for i := 0; i < len(keyBuf); i += k.blockSize {
 		compress(k.state, keyBuf[i:i+k.blockSize], k.rounds)
 		k.msgTotLen += uint64(k.blockSize) * 8
 	}
@@ -149,6 +150,7 @@ func (k *kmacDigest) cloneKMAC() *kmacDigest {
 		rounds:      k.rounds,
 		hashSize:    k.hashSize,
 		keyLen:      k.keyLen,
+		keyPadLen:   k.keyPadLen,
 		lastBlockEl: k.lastBlockEl,
 		msgTotLen:   k.msgTotLen,
 		key:         make([]byte, len(k.key)),
@@ -163,10 +165,10 @@ func (k *kmacDigest) cloneKMAC() *kmacDigest {
 	return k2
 }
 
-// finalise mirrors dstu7564_final_kmac exactly.
+// finalise applies Kupyna KMAC padding, including keys spanning multiple blocks.
 func (k *kmacDigest) finalise() []byte {
-	// msg_len = total message bytes (excl. the key block)
-	msgLen := (k.msgTotLen >> 3) - uint64(k.blockSize)
+	// msg_len = total message bytes (excluding every padded key block).
+	msgLen := (k.msgTotLen >> 3) - k.keyPadLen
 	// Undo the last partial block's bits from msg_tot_len
 	k.msgTotLen -= uint64(k.lastBlockEl) * 8
 
@@ -183,31 +185,28 @@ func (k *kmacDigest) finalise() []byte {
 		compress(k.state, paddingBlocks[i:i+k.blockSize], k.rounds)
 	}
 
-	// Clear lastBlock — it has been consumed
-	k.lastBlock = make([]byte, k.blockSize)
-	k.lastBlockEl = 0
-
 	// --- Append ~K, then PAD the whole (PAD(K)||PAD(M)||~K) ---
-	// msg_tot_len is now bits of PAD(K)+PAD(M).  Adding ~K bytes:
-	k.msgTotLen += uint64(k.keyLen) * 8
-	copy(k.lastBlock, k.invertKey)
-	// padding() call: buf=lastBlock, buf_len_out=msg_tot_len>>3,
-	//                 buf_len_out_bit=msg_tot_len
-	totalBytes := k.msgTotLen >> 3
-	totalBits := k.msgTotLen
-	paddedLen = kmacPaddingInPlace(k.lastBlock, int(totalBytes)%k.blockSize, totalBits, k.blockSize)
-	// Subtract invertKey len (padding adds it again via totalBits already)
-	k.msgTotLen -= uint64(k.keyLen) * 8
-	k.lastBlockEl = 0
-
-	for i := 0; i < paddedLen; i += k.blockSize {
-		compress(k.state, k.lastBlock[i:i+k.blockSize], k.rounds)
+	tail := kmacPadded(k.invertKey, k.msgTotLen+uint64(k.keyLen)*8, k.blockSize)
+	defer clear(tail)
+	for i := 0; i < len(tail); i += k.blockSize {
+		compress(k.state, tail[i:i+k.blockSize], k.rounds)
 	}
 
 	// Output transformation
 	outputTransform(k.state, k.rounds)
 	flat := stateToBytes(k.state)
 	return flat[len(flat)-k.hashSize:]
+}
+
+// kmacPadded retains every input block and appends the 96-bit length trailer.
+// Prefix data already compressed by the caller is reflected in totalBits.
+func kmacPadded(data []byte, totalBits uint64, blockSize int) []byte {
+	size := (len(data) + 13 + blockSize - 1) / blockSize * blockSize
+	output := make([]byte, size)
+	copy(output, data)
+	output[len(data)] = 0x80
+	binary.LittleEndian.PutUint64(output[size-12:], totalBits)
+	return output
 }
 
 // kmacPaddingInPlace pads buf in-place starting at offset bufLenOut.

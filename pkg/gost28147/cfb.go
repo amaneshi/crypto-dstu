@@ -6,6 +6,7 @@ type cfbStream struct {
 	block cipher.Block
 	iv    [BlockSize]byte
 	gamma [BlockSize]byte
+	offset int
 }
 
 // NewCFBEncrypter returns a CFB stream encrypter with the given IV.
@@ -27,23 +28,25 @@ type cfbDecrypter struct{ *cfbStream }
 
 func (c *cfbEncrypter) XORKeyStream(dst, src []byte) {
 	for i := range src {
-		if i%BlockSize == 0 {
+		if c.offset == 0 {
 			c.block.Encrypt(c.gamma[:], c.iv[:])
 		}
-		j := i % BlockSize
+		j := c.offset
 		dst[i] = src[i] ^ c.gamma[j]
 		c.iv[j] = dst[i]
+		c.offset = (c.offset + 1) % BlockSize
 	}
 }
 
 func (c *cfbDecrypter) XORKeyStream(dst, src []byte) {
 	for i := range src {
-		if i%BlockSize == 0 {
+		if c.offset == 0 {
 			c.block.Encrypt(c.gamma[:], c.iv[:])
 		}
-		j := i % BlockSize
+		j := c.offset
 		c.iv[j] = src[i]
 		dst[i] = src[i] ^ c.gamma[j]
+		c.offset = (c.offset + 1) % BlockSize
 	}
 }
 

@@ -16,7 +16,7 @@ Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
 Remaining pending areas are additional provider profiles, arbitrary Unicode
-password interoperability, security review, primitive validation, and provisioning/running
+password interoperability, security review, and provisioning/running
 the dedicated native CI runner. Workflow setup is documented in `docs/ci.md`.
 All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
@@ -102,6 +102,11 @@ from a local round-trip alone.
   Preserve the independent Bouncy Castle vectors at 246/258/270 rounds for all
   five Kalyna block/key profiles. The raw KW counter is 32-bit little-endian;
   one-byte truncation fails for larger wrapped inputs. See `pkg/kalyna/testdata`.
+- Preserve the primitive fuzz regressions and independent fixtures described in
+  `docs/primitive-validation.md`. Compressed `01` must not panic after restoring
+  zero x; canonical zero x remains a finite point. KMAC must count every padded
+  key block and accommodate multi-block key tails. GOST CFB streams must retain
+  their byte offset across calls, matching independent one-shot ciphertext.
 - Modern Key-6 protection uses PBKDF2 with Kupyna MAC-256, not HMAC-Kupyna,
   zero-padded password bytes, Kalyna-256 CBC and strict PKCS#7 padding.
   `ua.ProtectKey` generates fresh salt/IV; it writes Key-6, not PFX. Its 1–32-byte
@@ -142,7 +147,9 @@ three-minute campaigns, including the named legacy/ONB, multi-signer/static
 originator, encrypted PFX and revocation gaps. Preserve the public fixed keys,
 identities and policy times needed for subprocess replay. The local runner is
 `scripts/test-fuzz.ps1`; its KDF/input budgets are harness limits, not changes
-to runtime security policy. Primitive validation and external review remain pending.
+to runtime security policy. The primitive matrix also passed seven three-minute
+campaigns, with independent symmetric and all-PB curve fixtures. External review
+and provider limitations remain separate pending work.
 Parsing certificates does not establish trust; unsupported discovery algorithms
 may intentionally have no DSTU public key. Preserve that distinction in tests.
 

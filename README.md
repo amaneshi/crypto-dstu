@@ -666,8 +666,6 @@ untested profiles.
   before enabling them.
 - [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
   password profiles beyond the tested Windows CP1251 cases.
-- [ ] **Primitive validation:** broaden primitive fuzzing and independent
-  known-answer coverage beyond the current tested profiles.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
 
 CI provisioning and native runner execution are deferred while CI is paused;
@@ -675,6 +673,8 @@ see [CI setup](docs/ci.md).
 
 Parser fuzz targets, campaign results and reproduction commands are documented
 in [parser fuzzing](docs/fuzzing.md).
+Independent primitive fixtures, fuzz campaigns and regression fixes are
+documented in [primitive validation](docs/primitive-validation.md).
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current

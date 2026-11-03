@@ -3,8 +3,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "dstu4145.h"
 #include "byte_array_internal.h"
+
+/* Link with --wrap=time for reproducible test-only PRNG initialization. */
+#ifdef FIXED_REFERENCE_TIME
+static unsigned int reference_time_calls;
+time_t __wrap_time(time_t *result) {
+    reference_time_calls++;
+    time_t value = (time_t)FIXED_REFERENCE_TIME;
+    if (result) *result = value;
+    return value;
+}
+#endif
 
 static void check(int code) {
     if (code != 0) { fprintf(stderr, "Cryptonite error %d\n", code); exit(1); }
@@ -18,15 +30,25 @@ static void field(const char *name, const ByteArray *value) {
 }
 int main(int argc, char **argv) {
     const int degrees[] = {173, 179, 191, 233, 431};
+    const int pb_degrees[] = {163,167,173,179,191,233,257,307,367,431};
     unsigned char seed_bytes[40], hash_bytes[32];
     int i, j;
 	int pb173 = argc==2 && !strcmp(argv[1],"pb173");
+	int pb_all = argc==2 && !strcmp(argv[1],"pb");
+#ifndef FIXED_REFERENCE_TIME
+    if (pb_all) { fprintf(stderr,"pb fixtures require FIXED_REFERENCE_TIME and --wrap=time\n"); return 1; }
+#endif
     for (i = 0; i < 40; i++) seed_bytes[i] = (unsigned char)i;
     for (i = 0; i < 32; i++) hash_bytes[i] = (unsigned char)i;
     if (argc==2 && !strcmp(argv[1],"zero")) memset(hash_bytes,0,sizeof(hash_bytes));
-    printf("{\"sourceCommit\":\"3618d340d22e27a6becf97d89c453f8e64068a39\",\"producer\":\"Cryptonite dstu4145 public API; public d=2, peer d=7; seed bytes 00..27\",\"vectors\":[");
-    for (j = 0; j < (pb173 ? 1 : 5); j++) {
-        Dstu4145Ctx *ctx = dstu4145_alloc((Dstu4145ParamsId)(pb173 ? 3 : 11+j));
+    printf("{\"sourceCommit\":\"3618d340d22e27a6becf97d89c453f8e64068a39\",");
+    if (pb_all) printf("\"basis\":\"PB\",");
+#ifdef FIXED_REFERENCE_TIME
+    if (pb_all) printf("\"prngUnixTime\":%lld,", (long long)FIXED_REFERENCE_TIME);
+#endif
+    printf("\"producer\":\"Cryptonite dstu4145 public API; public d=2, peer d=7; seed bytes 00..27\",\"vectors\":[");
+    for (j = 0; j < (pb_all ? 10 : pb173 ? 1 : 5); j++) {
+        Dstu4145Ctx *ctx = dstu4145_alloc((Dstu4145ParamsId)(pb_all ? 1+j : pb173 ? 3 : 11+j));
         ByteArray *d = ba_alloc_from_le_hex_string("02");
         ByteArray *peer = ba_alloc_from_le_hex_string("07");
         ByteArray *seed = ba_alloc_from_uint8(seed_bytes, sizeof(seed_bytes));
@@ -35,6 +57,9 @@ int main(int argc, char **argv) {
         ByteArray *px = NULL, *py = NULL, *peer_compressed = NULL;
         ByteArray *zx = NULL, *zy = NULL, *r = NULL, *s = NULL;
         PrngCtx *prng = prng_alloc(PRNG_MODE_DSTU, seed);
+#ifdef FIXED_REFERENCE_TIME
+        if (pb_all && reference_time_calls == 0) { fprintf(stderr,"link with --wrap=time\n"); return 1; }
+#endif
         if (!ctx || !prng || !d || !peer || !hash) return 1;
         check(dstu4145_get_pubkey(ctx, d, &qx, &qy));
         check(dstu4145_compress_pubkey(ctx, qx, qy, &compressed));
@@ -45,7 +70,7 @@ int main(int argc, char **argv) {
         check(dstu4145_sign(ctx, hash, &r, &s));
         check(dstu4145_init_verify(ctx, qx, qy));
         check(dstu4145_verify(ctx, hash, r, s));
-        printf("%s{\"degree\":%d,", j ? "," : "", degrees[j]);
+        printf("%s{\"degree\":%d,", j ? "," : "", pb_all ? pb_degrees[j] : degrees[j]);
         field("digest", hash); printf(",");
         field("qx", qx); printf(","); field("qy", qy); printf(",");
         field("compressed", compressed); printf(",");

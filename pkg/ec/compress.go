@@ -53,6 +53,11 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 		}
 		x = c.decodeField(encodedX)
 	}
+	// A nonzero wire encoding must not become x=0 after restoring the
+	// selector bit. Zero has its own canonical encoding handled above.
+	if x.IsZero() {
+		return nil, errors.New("noncanonical zero compressed coordinate")
+	}
 
 	// Compute y from x using the curve equation
 	// y² + xy = x³ + ax² + b

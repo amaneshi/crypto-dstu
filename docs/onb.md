@@ -47,7 +47,10 @@ The retained license is in [licenses/cryptonite.txt](licenses/cryptonite.txt).
   that unmodified Cryptonite revision with Ubuntu GCC and invoking its public
   APIs. For all five curves it contains public points, compressed points,
   cofactor shared secrets and signatures. The public scalars are deliberately
-  `d=2` and peer `d=7`; the public deterministic seed is bytes `00..27`.
+  `d=2` and peer `d=7`; the public seed is bytes `00..27`. Cryptonite's PRNG
+  also mixes the clock, so rerunning the original producer can change signature
+  bytes. The new PB producer freezes that clock explicitly; see
+  [primitive fixture reproduction](primitive-validation.md#reproduction).
 - `TestONBCryptoniteOperations` verifies those signatures and reproduces them in
   Go with their recovered public nonce, as well as checking the independent
   points and shared secrets. `onb-zero-digest-cryptonite.json` covers the zero-digest
