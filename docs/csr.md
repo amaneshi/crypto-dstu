@@ -22,6 +22,9 @@ Legacy verification is selected by the old bare-curve parameters and public-key
 encoding; a failed national
 signature never falls back to legacy rules. New output always uses national encoding.
 
+ONB point output now uses the IIT-compatible selector at bit `m-1`; PB uses bit 0.
+Earlier bit-0 ONB requests should be regenerated. See [ONB compatibility](onb.md).
+
 The parser requires complete DER, version 0, byte-aligned key/signature bit
 strings, consistent algorithms/basis, a valid signing-subgroup point, and supported
 DKE. It validates the subject and attribute structure. Bounds are 1 MiB per request
@@ -38,6 +41,10 @@ and verifies its signature using unmodified Cryptonite primitive APIs at commit
 `3618d340d22e27a6becf97d89c453f8e64068a39`. It covers GOST on all fifteen curves
 and Kupyna-256 on PB257, with modified-subject rejection. It is not the Cryptonite
 PKIX CSR parser and does not establish CA acceptance or IIT CSR interoperability.
+For ONB, the test adapter explicitly restores x using coefficient parity and
+moves the selector from `m-1` to bit 0 before invoking Cryptonite's legacy
+decompressor. Hashing and signature arithmetic remain independent and unmodified;
+this adapter is not evidence that Cryptonite accepts the new wire bytes directly.
 
 The pinned Cryptonite DSTU verification API requires exactly 32 digest bytes.
 Kupyna-512 is covered by local roundtrips, not this independent CSR signature

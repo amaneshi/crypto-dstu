@@ -11,6 +11,7 @@ import (
 
 	"github.com/amaneshi/crypto-dstu/pkg/dstu15946"
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
+	"github.com/amaneshi/crypto-dstu/pkg/ec"
 	"github.com/amaneshi/crypto-dstu/pkg/gf2m"
 	"github.com/stretchr/testify/require"
 )
@@ -54,8 +55,12 @@ func checkONBCryptoniteOperations(t *testing.T, path string) {
 			require.NoError(t, err)
 			require.Equal(t, new(big.Int).SetBytes(decode(v.Qx)), new(big.Int).SetBytes(x.Bytes()))
 			require.Equal(t, new(big.Int).SetBytes(decode(v.Qy)), new(big.Int).SetBytes(y.Bytes()))
-			require.Equal(t, decode(v.Compressed), pub.Q.Compress())
-			peer, err := curve.Expand(decode(v.PeerCompressed))
+			// The pinned Cryptonite revision uses a bit-0 ONB selector,
+			// unlike IIT's bit-(m-1) encoding. Preserve the original evidence.
+			require.Equal(t, decode(v.Compressed), cryptoniteCompressed(t, pub.Q))
+			peer := (&dstu4145.PrivateKey{Curve: curve, D: big.NewInt(7)}).Public().Q
+			require.Equal(t, decode(v.PeerCompressed), cryptoniteCompressed(t, peer))
+			peer, err = curve.Expand(peer.Compress())
 			require.NoError(t, err)
 			secret, err := dstu15946.SharedSecret(key, &dstu4145.PublicKey{Curve: curve, Q: peer})
 			require.NoError(t, err)
@@ -78,4 +83,18 @@ func checkONBCryptoniteOperations(t *testing.T, path string) {
 			require.False(t, dstu4145.Verify(pub, digest, sig))
 		})
 	}
+}
+
+func cryptoniteCompressed(t *testing.T, point *ec.Point) []byte {
+	t.Helper()
+	compressed := point.Compress()
+	if !point.Curve.IsONB() {
+		return compressed
+	}
+	x, err := point.Curve.EncodeField(point.X)
+	require.NoError(t, err)
+	legacy := new(big.Int).SetBytes(x.Bytes()).FillBytes(make([]byte, len(compressed)))
+	selector := compressed[0] >> uint((point.Curve.M-1)%8) & 1
+	legacy[len(legacy)-1] = legacy[len(legacy)-1]&0xfe | selector
+	return legacy
 }

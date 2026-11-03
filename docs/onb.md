@@ -20,6 +20,16 @@ Complete domain comparisons include the basis,
 polynomial, coefficients, subgroup order, cofactor and generator. Matching only
 field degree and order can silently serialize ONB as PB: some domains share both.
 
+Compressed points now place `Tr(y/x)` at bit `m-1` for ONB, matching the pinned
+IIT provider. PB continues to use bit 0. This changes serialized ONB public keys,
+certificate key identifiers and signed/encrypted artifacts compared with earlier
+library output. Old bit-0 ONB public-point encodings are not automatically retried:
+some bytes are valid in both profiles and can identify different points. Regenerate
+affected synthetic certificates/requests. Private scalar encodings are unchanged.
+The published Cryptonite explicit-domain constants remain recognized by their
+complete built-in domain, including the exact legacy generator encoding; this
+does not enable legacy decoding of arbitrary public keys.
+
 Supported application paths include named/complete explicit parameters,
 little-endian GOST ONB PKCS#8, Key-6/PFX protection and import, certificate key
 association, GOST CMS signing/verification, GOST CSR generation/verification and
@@ -28,8 +38,9 @@ conversion occurs before the zero check, covered by independent zero-digest vect
 PKCS#8 and certificate loaders reject an algorithm/basis mismatch. Embedded
 certificates retain the usual discovery-only trust policy.
 
-ONB Kupyna/Kalyna application profiles currently return explicit errors.
-Their wire profiles require separate validation. Passing the
+Explicit Kupyna-256/512 CMS signing now supports GOST ONB certificates. ONB
+Kalyna agreement and modern public-key certificate/CSR profiles still return
+explicit errors. Their wire profiles require separate validation. Passing the
 primitive tests does not enable arbitrary ONB degrees or nonstandard domains.
 These routines do not claim constant-time operation or a completed security review.
 
@@ -56,31 +67,84 @@ The retained license is in [licenses/cryptonite.txt](licenses/cryptonite.txt).
   points and shared secrets. `onb-zero-digest-cryptonite.json` covers the zero-digest
   fallback with the same public keys and source revision. These keys must never
   be used operationally.
+  The pinned Cryptonite compressor uses bit 0 for ONB. Tests retain its original
+  bytes and compare them through an explicit test-only conversion; they do not
+  claim those compressed values are the IIT wire profile.
 - `TestONBApplicationRoundtrip` covers GOST CMS, dynamic/static encryption, PFX,
   explicit trust and rejection of unverified modern profiles. This is local
   integration evidence, separate from provider interoperability.
 - GOST CSR checks use independent Cryptonite hashing/signature verification and
   OpenSSL request parsing; see [CSR evidence and limits](csr.md).
 
-The attempted native check used IIT x86 `1.3.1.224`, SHA256
+## Native certificate/CMS evidence
+
+Checks use IIT x86 `1.3.1.224`, SHA256
 `475539dd6b01015e73cf3d143783c3f164c3f9db1e92e724c6f6493f086d9f4f`.
-Verification with the synthetic explicit ONB certificates/CMS produced here
-returned `EUVerifyDataInternalOnTimeEx` error 50 for all five curves. This does
-not establish whether the remaining difference is the certificate encoding,
-CMS profile or SDK coverage. IIT ONB compatibility is unresolved; it is not part
-of the passing PB interoperability matrix. No real credentials were involved.
+On 3 November 2026 the bit-0 selector was identified as a public-key binding
+mismatch. `EUGetKeyInfoBinary`, given only a Key-6 scalar container, independently
+derives a key identifier matching GOST34311 over the DER OCTET STRING of the
+little-endian point with the selector at `m-1`. All five curves matched for
+public scalars 1, 2, 7 and a full-width fixture. Ordinary tests retain five native
+full-width identifiers in `pkg/dstu4145/onb_iit_test.go`; no SDK is needed to replay
+them. The public full-width scalar is `2^(bitlen(n)-2) + 0x12345`.
 
-Further isolated diagnostics compare explicit/named parameters and separate
-container inspection, certificate parsing, signing and verification. Key-info
-and `EUParseCertificateEx` succeed for the tested ONB cases, while cryptographic
-operations are not consistently successful and report native errors 50/51.
-Using named parameters alone has not established reproducible interoperability.
+`TestIITONBNamedCertificates` is a strict positive integration matrix, enabled by
+the usual native adapter configuration. It covers all five ONB curves with
+named-curve/DKE certificates and four full-width public scalars (the preceding
+value plus `i*0x13579`, i=0..3). It requires matching key identifiers, certificate
+parsing, Go CMS verified by IIT and IIT CMS verified by Go, both attached and
+detached, with modified-content rejection. Two complete runs passed: 20 identities
+and 40 signing-mode cases per run. Native errors fail this test.
 
-`TestIITONBDiagnostic` is opt-in with `IIT_ONB_DIAGNOSTIC=1`. Its PB257 positive
-control must pass, and parser/key-info failures or unrecognized native failures
-fail the test. Known ONB rejections are recorded as diagnostic results; successful
-native signatures must verify in Go. A completed diagnostic is not an ONB
-interoperability pass. It uses an intentionally public full-width fixture scalar.
+Synthetic explicit-parameter ONB certificates remain outside that passing
+profile: parsing succeeds but signing/verification return native errors 50/51.
+Certificates made with tiny public scalars 1, 2 and 7 also returned error 50 on
+both ONB173 and the PB257 control; scalar 123456789 passed on both. The reason
+for that provider restriction is not established. No real credentials, network
+services or external submissions were used. These mathematical fixture checks
+do not establish production trust, revocation status or CA acceptance.
+
+`TestIITONBDiagnostic`, opt-in with `IIT_ONB_DIAGNOSTIC=1`, retains the explicit
+versus named comparison. PB257 and named ONB checks must pass. Known explicit
+ONB rejections remain diagnostic results, not positive interoperability evidence.
+
+The full isolated native regression runner passed after this correction. A
+three-minute `FuzzCurveEncodings` campaign with two workers passed 228,073
+executions, including selector-only and finite zero-x seeds for all fifteen
+domains. The independent CSR check also passed after explicit wire transcoding
+in its reference adapter; see [CSR validation](csr.md).
+
+## Kupyna CMS profile
+
+CMS accepts explicit Kupyna-256 and Kupyna-512 digests with supported GOST ONB
+certificates. Automatic digest selection still follows the certificate's GOST
+public-key algorithm. ONB signature OIDs are `1.2.804.2.1.1.1.1.3.6.1.2` and
+`1.2.804.2.1.1.1.1.3.6.3.2`, from the
+[official OID registry](https://cip.gov.ua/ua/news/perelik-ob-yektnikh-identifikatoriv-algoritmiv-kriptografichnogo-zakhistu-informaciyi-kriptografichnikh-protokoliv-ta-politik-sertifikaciyi-z-yikh-vikoristannyam).
+
+`TestIITONBKupynaCMS` verifies Go-produced CMS with IIT on all five curves, both
+digests and attached/detached content (20 cases). It also checks independent
+native signatures. This SDK emits PB signature OIDs even when signing with an
+ONB key. The consumer rejects those original mismatched identifiers. Only the
+test adapter explicitly changes that unsigned identifier to the ONB OID; both
+Go and IIT then verify the unchanged signature value. Modified content fails.
+There is no runtime fallback or automatic rewriting of native CMS.
+The CMS fuzz target includes ONB173/ONB431 Kupyna-256/512 native seeds in both
+their original and explicitly relabeled test forms. A three-minute campaign
+with two workers passed 1,352,095 executions after this change.
+
+Twenty unmodified native samples and five disposable GOST certificates are
+retained under `internal/cms/testdata/iit-onb-kupyna`, with SDK provenance and
+ordinary verification regressions. See the fixture README for reproduction.
+This is signature/arithmetic and outgoing-wire evidence, not acceptance of
+unmodified native producer output with PB tags on ONB keys.
+
+Modern ONB certificate probes with both legacy and modern named-curve OIDs
+returned certificate parse error 50 and context-key-read error 33 in this SDK.
+An initial Kalyna static-envelope probe on ONB173/ONB431 also failed the expected
+Kupyna KEK unwrap, after selecting the intended recipient. Its cause is not
+established; no alternative KDF or basis fallback is enabled. Modern certificate,
+CSR and Kalyna agreement support remain pending independently of CMS signing.
 
 ## Reproducing operation vectors
 

@@ -660,10 +660,9 @@ have independent interoperability checks. The following work remains; passing
 the current matrix does not establish production readiness or support for
 untested profiles.
 
-- [ ] **ONB provider interoperability:** resolve certificate/CMS failures with
-  the pinned IIT SDK; see [ONB coverage](docs/onb.md).
-- [ ] **Modern ONB profiles:** independently validate Kupyna/Kalyna encodings
-  before enabling them.
+- [ ] **Remaining modern ONB profiles:** resolve Kalyna agreement and validate
+  modern ONB certificate/CSR profiles. Kupyna-256/512 CMS with GOST ONB
+  certificates is now independently checked; see [ONB coverage](docs/onb.md).
 - [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
   password profiles beyond the tested Windows CP1251 cases.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
@@ -675,6 +674,8 @@ Parser fuzz targets, campaign results and reproduction commands are documented
 in [parser fuzzing](docs/fuzzing.md).
 Independent primitive fixtures, fuzz campaigns and regression fixes are
 documented in [primitive validation](docs/primitive-validation.md).
+The five ONB curves now pass named-certificate GOST CMS checks with the pinned
+IIT SDK; see [ONB encoding changes, evidence and limits](docs/onb.md).
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current

@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// An opt-in diagnostic while native ONB profile compatibility is unresolved.
+// An opt-in comparison of native named and synthetic explicit ONB profiles.
 func TestIITONBDiagnostic(t *testing.T) {
 	if os.Getenv("IIT_ONB_DIAGNOSTIC") != "1" {
 		t.Skip("enable explicit ONB diagnostic")
@@ -55,7 +55,7 @@ func TestIITONBDiagnostic(t *testing.T) {
 				t.Logf("named=%t verify: ok=%t error=%s", named, verified.OK, verified.Error)
 				native := testiit.Invoke(t, testiit.Request{Operation: "sign", PrivateKey: container, Password: "disposable-onb", Data: message, Certificates: [][]byte{certificate.Raw}})
 				t.Logf("named=%t sign: ok=%t error=%s", named, native.OK, native.Error)
-				if !curve.IsONB() {
+				if !curve.IsONB() || named {
 					require.True(t, verified.OK, verified.Error)
 					require.True(t, native.OK, native.Error)
 				} else {

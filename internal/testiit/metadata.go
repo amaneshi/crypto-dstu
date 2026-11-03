@@ -49,6 +49,25 @@ func SignerDigest(t testing.TB, der []byte) asn1.ObjectIdentifier {
 	return algorithm.Algorithm
 }
 
+// SignerSignatureAlgorithm reads the signature OID without enabling a profile.
+func SignerSignatureAlgorithm(t testing.TB, der []byte) asn1.ObjectIdentifier {
+	t.Helper()
+	sd := signedDataFields(t, der)
+	signers := rawChildren(t, sd[len(sd)-1].FullBytes)
+	require.Len(t, signers, 1)
+	signer := rawChildren(t, signers[0].FullBytes)
+	require.GreaterOrEqual(t, len(signer), 5)
+	index := 3
+	if signer[index].Class == 2 && signer[index].Tag == 0 {
+		index++
+	}
+	var algorithm algorithmIdentifier
+	rest, err := asn1.Unmarshal(signer[index].FullBytes, &algorithm)
+	require.NoError(t, err)
+	require.Empty(t, rest)
+	return algorithm.Algorithm
+}
+
 // DigestSet independently reads all container-level CMS digest identifiers.
 func DigestSet(t testing.TB, der []byte) []asn1.ObjectIdentifier {
 	t.Helper()

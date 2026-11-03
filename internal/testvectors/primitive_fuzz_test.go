@@ -182,6 +182,12 @@ func FuzzFieldArithmetic(f *testing.F) {
 func FuzzCurveEncodings(f *testing.F) {
 	for i, params := range dstu4145.AllParams() {
 		f.Add(byte(i), params.Curve.ScalarBaseMul(big.NewInt(2)).Compress())
+		f.Add(byte(i), []byte{0})
+		bit := 0
+		if params.Curve.IsONB() {
+			bit = params.Curve.M - 1
+		}
+		f.Add(byte(i), new(big.Int).Lsh(big.NewInt(1), uint(bit)).Bytes())
 	}
 	f.Fuzz(func(t *testing.T, profile byte, encoded []byte) {
 		if len(encoded) > 128 {

@@ -59,9 +59,31 @@ func ParamsFromDER(der []byte) *DomainParams {
 		if err != nil {
 			continue
 		}
-		if new(big.Int).SetBytes(b).Cmp(new(big.Int).SetBytes(encodedB.Bytes())) == 0 && bytes.Equal(base, c.BasePoint().Compress()) {
+		if new(big.Int).SetBytes(b).Cmp(new(big.Int).SetBytes(encodedB.Bytes())) == 0 && explicitBaseMatches(p, base) {
 			return p
 		}
 	}
 	return nil
+}
+
+// Cryptonite's published explicit ONB domain constants use a bit-0 selector.
+// Recognize that exact built-in generator as well as the native bit-(m-1)
+// encoding. This does not enable legacy decoding for arbitrary public points.
+func explicitBaseMatches(p *DomainParams, base []byte) bool {
+	c := p.Curve
+	canonical := c.BasePoint().Compress()
+	if bytes.Equal(base, canonical) {
+		return true
+	}
+	if !c.IsONB() {
+		return false
+	}
+	x, err := c.EncodeField(c.BasePoint().X)
+	if err != nil {
+		return false
+	}
+	legacy := new(big.Int).SetBytes(x.Bytes()).FillBytes(make([]byte, len(canonical)))
+	selector := (canonical[0] >> uint((c.M-1)%8)) & 1
+	legacy[len(legacy)-1] = legacy[len(legacy)-1]&0xfe | selector
+	return bytes.Equal(base, legacy)
 }

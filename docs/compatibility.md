@@ -81,8 +81,14 @@ parameters, GOST ONB PKCS#8, certificates, GOST CMS and PFX paths are covered.
 PB/ONB algorithm mismatches fail, and complete domain comparisons distinguish
 domains that share field degree and subgroup order.
 
-The synthetic ONB certificate/CMS profiles were rejected by the pinned IIT SDK;
-IIT interoperability remains unresolved. Modern ONB Kupyna/Kalyna profiles remain
-explicitly disabled. GOST ONB CSR generation is independently checked; see
+ONB point compression now stores the selector at bit `m-1`, matching the pinned
+IIT SDK; PB stays at bit 0. This changes earlier ONB point bytes and key identifiers.
+Named-curve GOST certificates and attached/detached CMS now pass a strict native
+matrix on all five curves. Synthetic explicit-parameter ONB certificates and
+tiny-scalar certificate fixtures remain outside that passing profile.
+Explicit Kupyna-256/512 CMS with GOST ONB certificates is independently checked.
+Native CMS carrying PB signature tags on ONB keys remains rejected; test adapters
+alone normalize that known SDK quirk. Modern ONB certificates/CSRs and Kalyna
+agreement remain disabled. GOST ONB CSR generation is independently checked; see
 [CSR encoding](csr.md). See [ONB coverage](onb.md) for
 the exact evidence, retained public fixtures, reproduction commands and limits.

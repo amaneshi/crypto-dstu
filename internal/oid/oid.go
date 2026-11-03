@@ -12,6 +12,8 @@ var (
 	DSTU4145ONBWithGOST34311 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 1, 2}
 	DSTU4145WithKupyna256    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 1}
 	DSTU4145WithKupyna512    = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 1}
+	DSTU4145ONBWithKupyna256 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 1, 2}
+	DSTU4145ONBWithKupyna512 = asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 3, 6, 3, 2}
 )
 
 // Named curve OIDs (index 0..9 → PB_163..PB_431).
@@ -110,6 +112,8 @@ var algorithmNames = map[string]string{
 	DSTU4145ONBWithGOST34311.String(): "DSTU4145-ONB-with-GOST34311",
 	DSTU4145WithKupyna256.String():    "DSTU4145-with-Kupyna256",
 	DSTU4145WithKupyna512.String():    "DSTU4145-with-Kupyna512",
+	DSTU4145ONBWithKupyna256.String(): "DSTU4145-ONB-with-Kupyna256",
+	DSTU4145ONBWithKupyna512.String(): "DSTU4145-ONB-with-Kupyna512",
 	GOST34311.String():                "GOST34311",
 	Kupyna256.String():                "Kupyna-256",
 	Kupyna384.String():                "Kupyna-384",
@@ -142,6 +146,8 @@ func IsCurveOID(o asn1.ObjectIdentifier) bool {
 func IsDSTU4145SigAlg(o asn1.ObjectIdentifier) bool {
 	return o.Equal(DSTU4145WithGOST34311) ||
 		o.Equal(DSTU4145ONBWithGOST34311) ||
+		o.Equal(DSTU4145ONBWithKupyna256) ||
+		o.Equal(DSTU4145ONBWithKupyna512) ||
 		o.Equal(DSTU4145WithKupyna256) ||
 		o.Equal(DSTU4145WithKupyna512)
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // Compress returns the compressed representation of the point.
-// The low bit encodes Tr(y/x); the other bits encode x. Bytes are big-endian.
+// Tr(y/x) replaces bit 0 in PB and bit m-1 in ONB. Bytes are big-endian.
 func (p *Point) Compress() []byte {
 	if p.Inf {
 		// Return zero bytes for point at infinity
@@ -20,7 +20,10 @@ func (p *Point) Compress() []byte {
 	copy(out[len(out)-len(x):], x)
 	if !p.X.IsZero() {
 		z := gf2m.ModMul(p.Y, gf2m.Inv(p.X, p.Curve.ModBits), p.Curve.ModBits)
-		out[len(out)-1] = out[len(out)-1]&0xfe | byte(fieldTrace(z, p.Curve.ModBits))
+		bit := p.Curve.compressionBit()
+		index := len(out) - 1 - bit/8
+		mask := byte(1 << uint(bit%8))
+		out[index] = out[index]&^mask | byte(fieldTrace(z, p.Curve.ModBits))<<uint(bit%8)
 	}
 	return out
 }
@@ -43,13 +46,14 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 		y := computeYForZeroX(c)
 		return &Point{X: encodedX, Y: y, Curve: c, Inf: false}, nil
 	}
-	selector := encodedX.TestBit(0)
+	bit := c.compressionBit()
+	selector := encodedX.TestBit(bit)
 	x := c.decodeField(encodedX)
 	if fieldTrace(x, c.ModBits) != int(c.A.Words()[0]&1) {
-		if encodedX.TestBit(0) {
-			encodedX.ClearBit(0)
+		if encodedX.TestBit(bit) {
+			encodedX.ClearBit(bit)
 		} else {
-			encodedX.SetBit(0)
+			encodedX.SetBit(bit)
 		}
 		x = c.decodeField(encodedX)
 	}
@@ -95,6 +99,13 @@ func (c *Curve) Expand(compressed []byte) (*Point, error) {
 	}
 
 	return point, nil
+}
+
+func (c *Curve) compressionBit() int {
+	if c.IsONB() {
+		return c.M - 1
+	}
+	return 0
 }
 
 func fieldTrace(x gf2m.Element, modBits gf2m.ModBits) int {

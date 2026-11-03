@@ -1,3 +1,4 @@
 # Preserve reproducible fixture hashes across Windows and Unix checkouts.
 internal/testvectors/testdata/*.json text eol=lf
 pkg/dstu4145/testdata/pb-operations-cryptonite.json text eol=lf
+internal/cms/testdata/iit-onb-kupyna/*.json text eol=lf

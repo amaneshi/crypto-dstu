@@ -65,10 +65,12 @@ For the manual GitHub Actions workflow, runner requirements and pinned repositor
 variables, see [CI setup](ci.md). The selected CI job requires the SDK hash and
 test CA directory rather than silently skipping missing configuration.
 
-The passing matrix covers the documented PB profiles. The attempted synthetic
-ONB certificate/CMS checks returned native error 50; ONB compatibility with this
-SDK is unresolved. ONB primitive evidence comes from independent Cryptonite
-vectors instead. See [ONB coverage and limits](onb.md).
+The passing matrix covers the documented PB profiles and named-curve GOST ONB
+certificates/CMS on all five ONB curves. `TestIITONBNamedCertificates` requires
+both signature directions, attached/detached data and mutation rejection, with
+four public full-width keys per curve. The ONB selector is bit `m-1`; older bit-0
+output gave incompatible key identifiers. Synthetic explicit-parameter ONB
+certificates remain outside the passing profile. See [ONB coverage and limits](onb.md).
 
 ## What is checked
 
@@ -241,7 +243,12 @@ curves use Kupyna-256 certificates except PB431, which uses Kupyna-512 signature
 agreement derivation still uses the Kalyna profile's Kupyna-256 KDF. Together with
 PB257, both content modes now cover all ten standard PB domains. PB173 requires
 the corrected cofactor 4; see [the compatibility change](compatibility.md).
-ONB interoperability remains unresolved and is not established by this matrix.
+This modern encryption matrix covers PB. ONB Kalyna agreement remains disabled.
+Separate ONB matrices establish named-certificate GOST CMS and explicit
+Kupyna-256/512 CMS signing with GOST ONB certificates. The latter validates the
+outgoing ONB OIDs and native signature arithmetic; the native producer's PB
+signature tags are rejected by the consumer. Only the test adapter explicitly
+normalizes those tags. See [the exact modern ONB evidence](onb.md#kupyna-cms-profile).
 
 The profile follows the [national CMS technical specification](https://zakon.rada.gov.ua/laws/show/z1273-20),
 including Kupyna KDF with fixed-width shared-secret encoding and the

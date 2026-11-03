@@ -86,6 +86,9 @@ Process bits of k from MSB to LSB: double, conditionally add.
 - Window size selection based on field size `m` (jkurwa: `getWindowSize(m)`)
 
 ### 5. Implement point compression / expansion
+The bit-0 outline below describes PB. Current ONB uses bit `m-1` for the
+selector; see [ONB encoding and native evidence](../onb.md).
+
 **Compress** (from jkurwa `point.compress()`):
 - Store x-coordinate + 1 bit (trace of `y/x`)
 - If `x = 0`, y = b^(2^(m-1)) (special case)

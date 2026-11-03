@@ -56,11 +56,15 @@ func TestONBApplicationRoundtrip(t *testing.T) {
 					require.Nil(t, plaintext)
 				}
 			}
-			// Unknown modern ONB wire profiles must not inherit PB identifiers.
-			out, err := box.SignDocument(message, SignOptions{NoTax: true, DigestAlgorithm: oid.Kupyna256})
-			require.Error(t, err)
-			require.Nil(t, out)
-			out, err = box.EncryptDocumentWithOptions(message, certificate.Raw, EncryptionOptions{Algorithm: EncryptionKalyna256CFB})
+			for _, digest := range []asn1.ObjectIdentifier{oid.Kupyna256, oid.Kupyna512} {
+				out, err := box.SignDocument(message, SignOptions{NoTax: true, DigestAlgorithm: digest})
+				require.NoError(t, err)
+				result, err := box.UnsignDocument(out)
+				require.NoError(t, err)
+				require.Equal(t, message, result.Content)
+			}
+			// Kalyna agreement remains disabled pending independent agreement checks.
+			out, err := box.EncryptDocumentWithOptions(message, certificate.Raw, EncryptionOptions{Algorithm: EncryptionKalyna256CFB})
 			require.Error(t, err)
 			require.Nil(t, out)
 		})

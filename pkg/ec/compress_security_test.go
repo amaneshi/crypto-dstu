@@ -1,6 +1,7 @@
 package ec_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
@@ -10,7 +11,11 @@ import (
 func TestExpandNoncanonicalZeroDoesNotPanic(t *testing.T) {
 	for _, params := range dstu4145.AllParams() {
 		t.Run(params.Name, func(t *testing.T) {
-			point, err := params.Curve.Expand([]byte{1})
+			encoding := []byte{1}
+			if params.Curve.IsONB() {
+				encoding = new(big.Int).Lsh(big.NewInt(1), uint(params.Curve.M-1)).Bytes()
+			}
+			point, err := params.Curve.Expand(encoding)
 			if params.Curve.A.IsZero() {
 				require.Error(t, err)
 				require.Nil(t, point)

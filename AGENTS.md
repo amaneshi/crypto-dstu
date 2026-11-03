@@ -21,7 +21,11 @@ the dedicated native CI runner. Workflow setup is documented in `docs/ci.md`.
 All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
 basis conversions, with Cryptonite point/signature/shared-secret vectors. IIT
-certificate/CMS interoperability and modern ONB profiles remain pending. GOST
+named-certificate GOST CMS interoperability now has a strict positive native
+matrix on all five curves; synthetic explicit ONB certificates remain outside
+that passing profile. Explicit Kupyna-256/512 CMS with GOST ONB certificates now
+has native checks and captured independent signatures. ONB Kalyna agreement and
+modern certificate/CSR profiles remain pending. GOST
 ONB CSR generation now has independent hashing/signature checks; see `docs/csr.md`.
 See `docs/onb.md` and `docs/compatibility.md`.
 Update the backlog when work actually completes; do not mark a profile supported
@@ -71,12 +75,21 @@ from a local round-trip alone.
   domain/basis equality for key serialization, association and agreement. Curve
   arithmetic and stored coordinates use PB; apply ONB maps at field boundaries,
   digest interpretation and signature-product truncation, never to scalars.
-  Preserve independently reproduced Cryptonite vectors and explicit rejection
-  of unverified ONB Kupyna/Kalyna profiles. Apply the zero-digest substitute after
-  basis conversion; preserve the independent zero-digest vectors. CSR output uses
+  Preserve independently reproduced Cryptonite vectors, verified ONB Kupyna CMS
+  and rejection of unverified ONB Kalyna/certificate/CSR profiles. Apply the
+  zero-digest substitute after basis conversion; preserve the independent
+  zero-digest vectors. CSR output uses
   national compressed points, raw-signature OCTET STRING wrapping and little-endian
-  digest interpretation; legacy PB requests remain import-only. Do not infer IIT ONB support
-  from a local roundtrip; the recorded synthetic-profile check was rejected.
+  digest interpretation; legacy PB requests remain import-only. ONB compression
+  uses bit m-1 for the selector, PB bit 0. Preserve native key-ID fixtures and the
+  strict named-certificate CMS matrix. Cryptonite's historical ONB vectors use
+  bit 0; keep their original bytes and explicit test-only transcoding. Recognize
+  the exact legacy built-in generator in complete explicit domains without
+  retrying arbitrary public points under a second compression profile.
+  CMS Kupyna signatures use the registered ONB OIDs with GOST ONB certificates.
+  IIT's producer emits PB signature tags for these keys; consumers must reject
+  that mismatch. Explicit relabeling exists only in the independent test adapter,
+  never as an implicit verification fallback.
 - PB173's standard cofactor is 4. Preserve the independent cofactor-agreement
   vector and group-cardinality checks; the previous value 2 produced incompatible
   shared secrets. Do not add an implicit legacy-cofactor fallback.
@@ -103,8 +116,8 @@ from a local round-trip alone.
   five Kalyna block/key profiles. The raw KW counter is 32-bit little-endian;
   one-byte truncation fails for larger wrapped inputs. See `pkg/kalyna/testdata`.
 - Preserve the primitive fuzz regressions and independent fixtures described in
-  `docs/primitive-validation.md`. Compressed `01` must not panic after restoring
-  zero x; canonical zero x remains a finite point. KMAC must count every padded
+  `docs/primitive-validation.md`. A selector-only encoding must not panic after
+  restoring zero x; canonical zero x remains a finite point. KMAC must count every padded
   key block and accommodate multi-block key tails. GOST CFB streams must retain
   their byte offset across calls, matching independent one-shot ciphertext.
 - Modern Key-6 protection uses PBKDF2 with Kupyna MAC-256, not HMAC-Kupyna,

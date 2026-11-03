@@ -105,6 +105,8 @@ The initial campaigns exposed three defects. Their minimized inputs remain in
 - A nonzero compressed point `01` can restore x=0 on A=0 curves and panic in
   inversion. Expansion now rejects that noncanonical encoding while preserving
   the canonical finite zero-x point. A focused regression covers all domains.
+  After the ONB wire correction, its selector-only regression uses bit `m-1`;
+  PB continues to use `01`.
 - KMAC's key/tail padding assumed a single block. A 52-byte KMAC-256 key panicked;
   longer keys could also lose bytes or use the wrong message length. Every padded
   key block is now counted, and the complemented-key tail has enough blocks.

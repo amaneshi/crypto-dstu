@@ -3,6 +3,8 @@ package cms
 import (
 	"bytes"
 	"encoding/asn1"
+	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -60,6 +62,35 @@ func FuzzParseAndVerifySigned(f *testing.F) {
 			require.NoError(f, VerifySigned(parsed, nil, nil))
 		}
 		f.Add(seed, content)
+	}
+	// Retained native samples anchor the newly supported ONB Kupyna profiles.
+	// Preserve both the rejected PB-tagged originals and explicit ONB test forms.
+	for _, degree := range []int{173, 431} {
+		data, err := os.ReadFile(fmt.Sprintf("testdata/iit-onb-kupyna/DSTU_ONB_%d.json", degree))
+		require.NoError(f, err)
+		var fixture struct {
+			Content []byte
+			Samples []struct {
+				Bits      int
+				Signature []byte
+			}
+		}
+		require.NoError(f, json.Unmarshal(data, &fixture))
+		for _, sample := range fixture.Samples {
+			pb, onb := oid.DSTU4145WithKupyna256, oid.DSTU4145ONBWithKupyna256
+			if sample.Bits == 512 {
+				pb, onb = oid.DSTU4145WithKupyna512, oid.DSTU4145ONBWithKupyna512
+			}
+			pbDER, err := asn1.Marshal(pb)
+			require.NoError(f, err)
+			onbDER, err := asn1.Marshal(onb)
+			require.NoError(f, err)
+			corrected := bytes.Replace(sample.Signature, pbDER, onbDER, 1)
+			_, err = VerifySignedRaw(corrected, fixture.Content, nil)
+			require.NoError(f, err)
+			f.Add(sample.Signature, fixture.Content)
+			f.Add(corrected, fixture.Content)
+		}
 	}
 	f.Fuzz(func(t *testing.T, data, detached []byte) {
 		if len(data) > 64<<10 || len(detached) > 64<<10 {

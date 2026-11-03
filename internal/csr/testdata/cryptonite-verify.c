@@ -56,7 +56,22 @@ int main(int argc,char **argv) {
         need(!dstu7564_init(h,(size_t)mode)); need(!dstu7564_update(h,message)); need(!dstu7564_final(h,&hash)); dstu7564_free(h);
     }
     key=take(&spki,3); need(!spki.n && key.n && !key.p[0]); key.p++;key.n--; raw=take(&key,4);need(!key.n);
-    compressed=ba(raw); need(!dstu4145_decompress_pubkey(ctx,compressed,&qx,&qy));
+    /* IIT-compatible ONB points store the selector at m-1. The pinned
+     * Cryptonite decompressor expects it at bit 0. Restore x using
+     * Tr(x)=a (ONB trace is coefficient parity), then move the selector.
+     * Only this test adapter changes; reference arithmetic stays unmodified. */
+    unsigned char point[64]; need(raw.n<=sizeof(point)); memcpy(point,raw.p,raw.n);
+    if(curve_id>=11) {
+        const int degrees[]={173,179,191,233,431};
+        int m=degrees[curve_id-11], a=curve_id==11 ? 0:1;
+        need(raw.n==(size_t)(m+7)/8);
+        unsigned char mask=(unsigned char)(1u<<((m-1)%8));
+        int selector=(point[(m-1)/8]&mask)!=0, trace=0;
+        for(i=0;i<raw.n;i++) { unsigned char v=point[i]; while(v) {trace^=v&1;v>>=1;} }
+        if(trace!=a) point[(m-1)/8]^=mask;
+        point[0]=(unsigned char)((point[0]&0xfe)|selector);
+    }
+    compressed=ba((span){point,raw.n}); need(!dstu4145_decompress_pubkey(ctx,compressed,&qx,&qy));
     aid=take(&outer,0x30); span sigalg=take(&aid,6); need(!aid.n && sigalg.n==algorithm.n && !memcmp(sigalg.p,algorithm.p,algorithm.n));
     signature=take(&outer,3);need(!outer.n && signature.n && !signature.p[0]);signature.p++;signature.n--;
     raw=take(&signature,4);need(!signature.n && raw.n && !(raw.n&1));

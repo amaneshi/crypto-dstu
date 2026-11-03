@@ -41,7 +41,7 @@ try {
         & $GoExecutable test -tags=integration -mod=readonly -count=1 -timeout=180s -v ./internal/cms -run '^TestIIT'
         if($LASTEXITCODE -ne 0){throw 'IIT interoperability tests failed'}
         # Run after CMS initializes the shared public CZO fixture cache.
-        & $GoExecutable test -tags=integration -mod=readonly -count=1 -timeout=180s -v ./internal/interop -run '^TestIIT'
+        & $GoExecutable test -tags=integration -mod=readonly -count=1 -timeout=240s -v ./internal/interop -run '^TestIIT'
         if($LASTEXITCODE -ne 0){throw 'IIT profile/timestamp interoperability tests failed'}
     } finally {Pop-Location}
 } finally {

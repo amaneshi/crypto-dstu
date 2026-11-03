@@ -149,10 +149,16 @@ func verifySigner(si SignerInfo, c *cert.Certificate, content []byte, contentTyp
 
 func signatureAlgorithmForCurve(digest asn1.ObjectIdentifier, curve *ec.Curve) (asn1.ObjectIdentifier, error) {
 	if curve.IsONB() {
-		if !digest.Equal(oid.GOST34311) {
+		switch {
+		case digest.Equal(oid.GOST34311):
+			return oid.DSTU4145ONBWithGOST34311, nil
+		case digest.Equal(oid.Kupyna256):
+			return oid.DSTU4145ONBWithKupyna256, nil
+		case digest.Equal(oid.Kupyna512):
+			return oid.DSTU4145ONBWithKupyna512, nil
+		default:
 			return nil, errors.New("cms: unsupported ONB signature profile")
 		}
-		return oid.DSTU4145ONBWithGOST34311, nil
 	}
 	return signatureAlgorithmForDigest(digest)
 }
