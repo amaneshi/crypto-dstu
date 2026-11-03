@@ -1,0 +1,31 @@
+# Enforced correctness baseline. The broader style/complexity policy remains
+# available in .golangci.yml; expand this gate as that existing debt is resolved.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - bidichk
+    - govet
+    - ineffassign
+    - staticcheck
+  settings:
+    staticcheck:
+      checks: ["SA*"]
+  exclusions:
+    rules:
+      # These tests deliberately exercise the public nil-context rejection.
+      - path: internal/tsp/client_security_test\.go
+        linters: [staticcheck]
+        text: 'SA1012:'
+      - path: ua/timestamp_sign_test\.go
+        linters: [staticcheck]
+        text: 'SA1012:'
+      # Independent OFB comparison for the required national cipher profile.
+      - path: pkg/kalyna/message_test\.go
+        linters: [staticcheck]
+        text: 'SA1019:.*cipher.NewOFB'
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

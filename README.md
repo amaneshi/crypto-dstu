@@ -666,14 +666,18 @@ untested profiles.
   remains unverified. ONB arithmetic and
   GOST paths now have independent Cryptonite vectors; see [ONB coverage](docs/onb.md).
 - [ ] **Release validation:** obtain an independent security review, broaden
-  parser/primitive fuzzing and external known-answer coverage, and automate the
-  pinned IIT checks in CI. Include independent raw Kalyna KW vectors exercising
+  parser/primitive fuzzing and external known-answer coverage, and provision/run
+  the dedicated IIT CI runner described in [CI setup](docs/ci.md). Include
+  independent raw Kalyna KW vectors exercising
   round counters above 255.
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current
 work scope. See [IIT interoperability](docs/iit-interoperability.md) for the exact
 tested profiles and [AGENTS.md](AGENTS.md) for contributor/agent instructions.
+
+Hosted test/race, lint and vulnerability checks and a manual hash-pinned IIT
+workflow are defined in `.github/workflows`; see [CI setup](docs/ci.md).
 
 ## License
 

@@ -1,0 +1,56 @@
+name: Pinned IIT interoperability
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iit-native-runner
+  cancel-in-progress: false
+
+jobs:
+  interoperability:
+    # Never execute pull-request code on a runner with the licensed SDK.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: [self-hosted, Windows, X64, crypto-dstu-iit]
+    timeout-minutes: 20
+    env:
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+      IIT_SDK_SOURCE: ${{ vars.IIT_SDK_DIRECTORY }}
+      IIT_CA_SOURCE: ${{ vars.IIT_TEST_CA_DIRECTORY }}
+      IIT_EXPECTED_SHA256: ${{ vars.IIT_SDK_SHA256 }}
+      IIT_ONB_DIAGNOSTIC: '1'
+      IIT_LIVE_TSP: '0'
+      IIT_TSP_CAPTURE: ''
+      IIT_CAPTURE_512_DIR: ''
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: false
+      - name: Require pinned native configuration
+        run: |
+          if ($env:IIT_EXPECTED_SHA256 -notmatch '^[0-9a-fA-F]{64}$') {
+            throw 'Set IIT_SDK_SHA256 to the approved DLL SHA256'
+          }
+          foreach ($directory in @($env:IIT_SDK_SOURCE, $env:IIT_CA_SOURCE)) {
+            if (!$directory -or !(Test-Path -LiteralPath $directory -PathType Container)) {
+              throw 'Set IIT_SDK_DIRECTORY and IIT_TEST_CA_DIRECTORY to existing runner directories'
+            }
+          }
+      - name: Run isolated native matrix
+        run: |
+          ./scripts/test-iit.ps1 `
+            -SdkDirectory $env:IIT_SDK_SOURCE `
+            -TestCADirectory $env:IIT_CA_SOURCE `
+            -ExpectedSDKHash $env:IIT_EXPECTED_SHA256

@@ -16,7 +16,8 @@ Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
 Remaining pending areas are additional provider profiles, arbitrary Unicode
-password interoperability, security review, fuzzing, and CI.
+password interoperability, security review, fuzzing, and provisioning/running
+the dedicated native CI runner. Workflow setup is documented in `docs/ci.md`.
 All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
 basis conversions, with Cryptonite point/signature/shared-secret vectors. IIT
@@ -137,6 +138,12 @@ The Taskfile's `lint`/`lint-fix` paths invoke a `go.mod` task that stages files 
 runs `go mod tidy`. Avoid those paths when staging/dependency changes are outside
 the authorized task. `task lint-only` runs the configured linter without that
 staging step; it may require downloading the pinned tool.
+
+`task lint-ci` runs the enforced correctness baseline in `.golangci-ci.yml`
+without staging or tidying. Hosted CI also runs Linux race tests and govulncheck;
+use the current patch of the Go minor version declared in `go.mod`. The optional
+native workflow is manual/default-branch-only and requires a dedicated runner
+and pinned SDK variables. Do not run untrusted PR code on that runner.
 
 For changes affecting native interoperability, use the isolated Windows runner:
 

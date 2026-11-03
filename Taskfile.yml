@@ -1,7 +1,7 @@
 version: '3'
 
 env:
-  LINT_VERSION: v2.11.4
+  LINT_VERSION: v2.15.0
 
 tasks:
   default:
@@ -13,6 +13,11 @@ tasks:
     cmds:
       - echo "--> Running linter {{.LINT_VERSION}}"
       - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.LINT_VERSION}} run
+
+  lint-ci:
+    silent: true
+    cmds:
+      - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.LINT_VERSION}} run --config .golangci-ci.yml --timeout 5m ./...
 
   lint-fix-only:
     silent: true
