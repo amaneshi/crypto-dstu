@@ -15,6 +15,7 @@ func FuzzParseAndVerify(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte{0x30, 0})
 	f.Add([]byte{0x30, 0x80, 0, 0})
+	f.Add(legacyCSRSeed(f))
 	for _, profile := range []struct {
 		curve     string
 		algorithm asn1.ObjectIdentifier

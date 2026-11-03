@@ -3,10 +3,13 @@ package cert_test
 import (
 	"bytes"
 	"encoding/pem"
+	"math/big"
 	"testing"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
+	"github.com/amaneshi/crypto-dstu/internal/testiit"
 	"github.com/amaneshi/crypto-dstu/internal/testpki"
+	"github.com/amaneshi/crypto-dstu/pkg/dstu4145"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,6 +20,12 @@ func FuzzParseCertificates(f *testing.F) {
 	encoded := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: seed.Raw})
 	f.Add(encoded)
 	f.Add(append(bytes.Clone(encoded), encoded...))
+	for _, params := range dstu4145.AllParams() {
+		if params.Curve.IsONB() {
+			key := &dstu4145.PrivateKey{Curve: params.Curve, D: big.NewInt(2)}
+			f.Add(testiit.NamedCertificate(f, key).Raw)
+		}
+	}
 	f.Add([]byte{})
 	f.Add([]byte{0x30, 0})
 	f.Add([]byte("-----BEGIN CERTIFICATE-----\ninvalid\n"))

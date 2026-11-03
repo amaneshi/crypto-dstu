@@ -666,16 +666,15 @@ untested profiles.
   before enabling them.
 - [ ] **Provider passwords:** validate arbitrary Unicode and additional provider
   password profiles beyond the tested Windows CP1251 cases.
-- [ ] **Parser fuzzing:** add Key-6/PKCS#8/JKS and revocation targets;
-  extend PFX coverage, multi-signer/external-originator CMS cases and legacy
-  CSR/ONB certificate seeds, then run longer campaigns. See
-  [current targets and limits](docs/fuzzing.md).
 - [ ] **Primitive validation:** broaden primitive fuzzing and independent
   known-answer coverage beyond the current tested profiles.
 - [ ] **Independent review:** obtain an external cryptographic/security review.
 
 CI provisioning and native runner execution are deferred while CI is paused;
 see [CI setup](docs/ci.md).
+
+Parser fuzz targets, campaign results and reproduction commands are documented
+in [parser fuzzing](docs/fuzzing.md).
 
 Tax-report submission, receipt polling and report-status handling are deferred
 to the separate `tax-reporting` project. They are outside this library's current

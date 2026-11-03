@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func csrDER(t *testing.T, value any) []byte {
+func csrDER(t testing.TB, value any) []byte {
 	t.Helper()
 	data, err := asn1.Marshal(value)
 	require.NoError(t, err)
@@ -111,7 +111,8 @@ func TestNationalCSRModernPBProfiles(t *testing.T) {
 	}
 }
 
-func TestLegacyCSRImport(t *testing.T) {
+func legacyCSRSeed(t testing.TB) []byte {
+	t.Helper()
 	params := dstu4145.ParamsByName("DSTU_PB_257")
 	key := &dstu4145.PrivateKey{Curve: params.Curve, D: big.NewInt(2)}
 	public := key.Public()
@@ -128,7 +129,11 @@ func TestLegacyCSRImport(t *testing.T) {
 	signature, err := dstu4145.MarshalSignature(sig)
 	require.NoError(t, err)
 	data := csrDER(t, certificationRequest{CertificationRequestInfo: asn1.RawValue{FullBytes: raw}, SignatureAlgorithm: algorithmIdentifier{Algorithm: params.HashOID}, Signature: asn1.BitString{Bytes: signature, BitLength: 8 * len(signature)}})
-	parsed, err := Parse(data)
+	return data
+}
+
+func TestLegacyCSRImport(t *testing.T) {
+	parsed, err := Parse(legacyCSRSeed(t))
 	require.NoError(t, err)
 	require.False(t, parsed.national)
 	require.NoError(t, parsed.Verify())

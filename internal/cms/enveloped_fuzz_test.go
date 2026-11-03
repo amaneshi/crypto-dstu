@@ -5,6 +5,7 @@ import (
 	"encoding/asn1"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/amaneshi/crypto-dstu/internal/testpki"
@@ -21,20 +22,29 @@ func FuzzParseAndDecryptEnveloped(f *testing.F) {
 		Issuer:       asn1.RawValue{FullBytes: []byte{0x30, 0}},
 		PublicKey:    key.Public(),
 	}
-	sender, senderKey := testpki.Issue(f, "Disposable CMS fuzz originator", nil, nil, nil)
+	senderKey := &dstu4145.PrivateKey{Curve: key.Curve, D: big.NewInt(7)}
+	sender, _ := testpki.IssueWithOptions(f, "Public CMS fuzz originator", nil, nil, testpki.CertificateOptions{
+		Key: senderKey, Serial: big.NewInt(44),
+		NotBefore: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		NotAfter:  time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC),
+	})
 	for _, algorithm := range []asn1.ObjectIdentifier{OIDGost28147CFB, OIDKalyna256CFB, OIDKalyna256OFB} {
-		for _, static := range []bool{false, true} {
+		for _, mode := range []int{0, 1, 2} {
 			options := EncryptOptions{Algorithm: algorithm}
-			if static {
+			if mode != 0 {
 				options.OriginatorCertificate = sender
-				options.EmbedOriginatorCertificate = true
+				options.EmbedOriginatorCertificate = mode == 1
 			}
 			content := []byte("Disposable CMS envelope\x00\xff")
 			seed, err := EncryptWithOptions(content, []*cert.Certificate{recipient}, senderKey, options)
 			require.NoError(f, err)
 			message, err := ParseEnveloped(seed)
 			require.NoError(f, err)
-			plain, err := DecryptEnveloped(message, key, recipient)
+			var discovery []*cert.Certificate
+			if mode == 2 {
+				discovery = []*cert.Certificate{sender}
+			}
+			plain, err := DecryptEnveloped(message, key, recipient, discovery...)
 			require.NoError(f, err)
 			require.Equal(f, content, plain)
 			f.Add(seed)
@@ -56,7 +66,11 @@ func FuzzParseAndDecryptEnveloped(f *testing.F) {
 		withJunk, err := ParseEnveloped(append(bytes.Clone(data), 0))
 		require.Error(t, err)
 		require.Nil(t, withJunk)
-		plain, err := DecryptEnveloped(message, key, recipient)
+		var discovery []*cert.Certificate
+		if len(message.OriginatorCertificates) == 0 {
+			discovery = []*cert.Certificate{sender}
+		}
+		plain, err := DecryptEnveloped(message, key, recipient, discovery...)
 		if err != nil {
 			require.Nil(t, plain, "failed decryption released plaintext")
 		}

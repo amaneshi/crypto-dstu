@@ -16,7 +16,7 @@ Use README's **Pending changes** as the maintained backlog. PKCS#12 import now
 verifies supported MACs and matches certificates by public key; preserve its
 fail-closed handling of missing/unsupported integrity and ambiguous association.
 Remaining pending areas are additional provider profiles, arbitrary Unicode
-password interoperability, security review, fuzzing, and provisioning/running
+password interoperability, security review, primitive validation, and provisioning/running
 the dedicated native CI runner. Workflow setup is documented in `docs/ci.md`.
 All ten PB Kalyna CFB/OFB profiles and tested Cyrillic/Ukrainian Windows password
 profiles now have independent checks. Five standard ONB curves now use explicit
@@ -137,6 +137,12 @@ Use `gopls` diagnostics when available. Run targeted fuzzing or race checks when
 the change warrants them. Local HTTP mock tests require loopback networking;
 distinguish sandbox socket restrictions from actual test failures.
 See `docs/fuzzing.md` for fuzz targets, invariants and remaining coverage gaps.
+The initial parser-fuzzing backlog item is complete: twelve targets passed
+three-minute campaigns, including the named legacy/ONB, multi-signer/static
+originator, encrypted PFX and revocation gaps. Preserve the public fixed keys,
+identities and policy times needed for subprocess replay. The local runner is
+`scripts/test-fuzz.ps1`; its KDF/input budgets are harness limits, not changes
+to runtime security policy. Primitive validation and external review remain pending.
 Parsing certificates does not establish trust; unsupported discovery algorithms
 may intentionally have no DSTU public key. Preserve that distinction in tests.
 

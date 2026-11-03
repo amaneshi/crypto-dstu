@@ -32,6 +32,35 @@ func FuzzParseAndVerifySigned(f *testing.F) {
 	}
 	f.Add([]byte{}, []byte{})
 	f.Add([]byte{0x30, 0}, []byte{})
+	other, otherKey := testpki.Issue(f, "Second disposable CMS signer", nil, nil, nil)
+	first, err := Sign(content, key, certificate, SignOptions{})
+	require.NoError(f, err)
+	second, err := Sign(content, otherKey, other, SignOptions{})
+	require.NoError(f, err)
+	firstMessage, err := ParseSigned(first)
+	require.NoError(f, err)
+	secondMessage, err := ParseSigned(second)
+	require.NoError(f, err)
+	signers := append(firstMessage.rawSigners, secondMessage.rawSigners...)
+	for _, corruptSecond := range []bool{false, true} {
+		if corruptSecond {
+			signers[1].Signature[0] ^= 1
+		}
+		inner, err := marshalSignedData(1, oid.GOST34311,
+			EncapsulatedContentInfo{EContentType: OIDData, EContent: content}, signers, certificate.Raw, other.Raw)
+		require.NoError(f, err)
+		typeDER, err := asn1.Marshal(OIDSignedData)
+		require.NoError(f, err)
+		seed := marshalSEQ(append(typeDER, marshalEXPLICIT(0, inner)...))
+		parsed, err := ParseSigned(seed)
+		require.NoError(f, err)
+		if corruptSecond {
+			require.Error(f, VerifySigned(parsed, nil, nil))
+		} else {
+			require.NoError(f, VerifySigned(parsed, nil, nil))
+		}
+		f.Add(seed, content)
+	}
 	f.Fuzz(func(t *testing.T, data, detached []byte) {
 		if len(data) > 64<<10 || len(detached) > 64<<10 {
 			return

@@ -61,9 +61,35 @@ func CAExtensions(t testing.TB) []pkix.Extension {
 // creates a self-signed certificate; otherwise issuerKey signs the new key.
 func Issue(t testing.TB, name string, issuer *cert.Certificate, issuerKey *dstu4145.PrivateKey, extensions []pkix.Extension) (*cert.Certificate, *dstu4145.PrivateKey) {
 	t.Helper()
-	key, err := dstu4145.GenerateKey(dstu4145.ParamsByName("DSTU_PB_257").Curve)
-	if err != nil {
-		t.Fatal(err)
+	return IssueWithOptions(
+		t, name, issuer, issuerKey, CertificateOptions{Extensions: extensions},
+	)
+}
+
+// CertificateOptions permits fixed public test keys/identities across fuzz workers.
+type CertificateOptions struct {
+	Key                 *dstu4145.PrivateKey
+	Serial              *big.Int
+	NotBefore, NotAfter time.Time
+	Extensions          []pkix.Extension
+}
+
+// IssueWithOptions issues a test certificate; zero options retain Issue defaults.
+func IssueWithOptions(
+	t testing.TB,
+	name string,
+	issuer *cert.Certificate,
+	issuerKey *dstu4145.PrivateKey,
+	options CertificateOptions,
+) (*cert.Certificate, *dstu4145.PrivateKey) {
+	t.Helper()
+	key := options.Key
+	if key == nil {
+		var err error
+		key, err = dstu4145.GenerateKey(dstu4145.ParamsByName("DSTU_PB_257").Curve)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	subject := mustDER(t, pkix.Name{CommonName: name}.ToRDNSequence())
 	issuerName := subject
@@ -72,11 +98,21 @@ func Issue(t testing.TB, name string, issuer *cert.Certificate, issuerKey *dstu4
 	} else {
 		issuerName = issuer.Subject.FullBytes
 	}
-	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 120))
-	if err != nil {
-		t.Fatal(err)
+	serial := options.Serial
+	if serial == nil {
+		var err error
+		serial, err = rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 120))
+		if err != nil {
+			t.Fatal(err)
+		}
+		serial.Add(serial, big.NewInt(1))
 	}
-	serial.Add(serial, big.NewInt(1))
+	if options.NotBefore.IsZero() {
+		options.NotBefore = time.Now().Add(-time.Hour)
+	}
+	if options.NotAfter.IsZero() {
+		options.NotAfter = time.Now().Add(24 * time.Hour)
+	}
 	compressed := key.Public().Q.Compress()
 	slices.Reverse(compressed)
 	pub := mustDER(t, compressed)
@@ -94,10 +130,10 @@ func Issue(t testing.TB, name string, issuer *cert.Certificate, issuerKey *dstu4
 			Key       asn1.BitString
 		}
 		Extensions []pkix.Extension `asn1:"optional,explicit,tag:3"`
-	}{2, serial, alg, asn1.RawValue{FullBytes: issuerName}, struct{ From, To time.Time }{time.Now().Add(-time.Hour), time.Now().Add(24 * time.Hour)}, asn1.RawValue{FullBytes: subject}, struct {
+	}{2, serial, alg, asn1.RawValue{FullBytes: issuerName}, struct{ From, To time.Time }{options.NotBefore, options.NotAfter}, asn1.RawValue{FullBytes: subject}, struct {
 		Algorithm algorithm
 		Key       asn1.BitString
-	}{algorithm{OID: oid.DSTU4145WithGOST34311, Parameters: asn1.RawValue{FullBytes: params}}, asn1.BitString{Bytes: pub, BitLength: len(pub) * 8}}, extensions})
+	}{algorithm{OID: oid.DSTU4145WithGOST34311, Parameters: asn1.RawValue{FullBytes: params}}, asn1.BitString{Bytes: pub, BitLength: len(pub) * 8}}, options.Extensions})
 	der := mustDER(t, struct {
 		TBS       asn1.RawValue
 		Algorithm algorithm

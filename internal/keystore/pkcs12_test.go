@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func p12DER(t *testing.T, value any) []byte {
+func p12DER(t testing.TB, value any) []byte {
 	t.Helper()
 	der, err := asn1.Marshal(value)
 	require.NoError(t, err)
@@ -26,14 +26,14 @@ func p12DER(t *testing.T, value any) []byte {
 func p12Explicit(der []byte) asn1.RawValue {
 	return asn1.RawValue{Class: 2, Tag: 0, IsCompound: true, Bytes: der}
 }
-func p12Raw(t *testing.T, value any) asn1.RawValue {
+func p12Raw(t testing.TB, value any) asn1.RawValue {
 	t.Helper()
 	var raw asn1.RawValue
 	_, err := asn1.Unmarshal(p12DER(t, value), &raw)
 	require.NoError(t, err)
 	return raw
 }
-func p12Sign(t *testing.T, safe []byte, password string) pfxASN {
+func p12Sign(t testing.TB, safe []byte, password string) pfxASN {
 	t.Helper()
 	mac := pkcs12MacData{Salt: []byte("public test salt"), Iterations: 20}
 	mac.MAC.Algorithm.Algorithm = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
@@ -47,18 +47,18 @@ func p12Sign(t *testing.T, safe []byte, password string) pfxASN {
 	mac.MAC.Digest = h.Sum(nil)
 	return pfxASN{Version: 3, AuthSafe: contentInfo{ContentType: oidDataContentType, Content: p12Explicit(p12DER(t, safe))}, MacData: p12Raw(t, mac)}
 }
-func p12Container(t *testing.T, bags []safeBag, password string) pfxASN {
+func p12Container(t testing.TB, bags []safeBag, password string) pfxASN {
 	t.Helper()
 	contents := contentInfo{ContentType: oidDataContentType, Content: p12Explicit(p12DER(t, p12DER(t, bags)))}
 	return p12Sign(t, p12DER(t, []contentInfo{contents}), password)
 }
-func p12Key(t *testing.T) *dstu4145.PrivateKey {
+func p12Key(t testing.TB) *dstu4145.PrivateKey {
 	t.Helper()
 	key, err := dstu4145.GenerateKey(dstu4145.ParamsByName("DSTU_PB_257").Curve)
 	require.NoError(t, err)
 	return key
 }
-func p12KeyBag(t *testing.T, key *dstu4145.PrivateKey, encrypted bool, password string) safeBag {
+func p12KeyBag(t testing.TB, key *dstu4145.PrivateKey, encrypted bool, password string) safeBag {
 	t.Helper()
 	raw, err := MarshalRawKey(key)
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func p12KeyBag(t *testing.T, key *dstu4145.PrivateKey, encrypted bool, password 
 	}
 	return safeBag{BagID: oid, BagValue: p12Explicit(raw)}
 }
-func p12CertBag(t *testing.T, der []byte) safeBag {
+func p12CertBag(t testing.TB, der []byte) safeBag {
 	t.Helper()
 	inner := struct {
 		ID    asn1.ObjectIdentifier
