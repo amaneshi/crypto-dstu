@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/asn1"
 	"errors"
@@ -33,14 +34,20 @@ type EncapsulatedContentInfo struct {
 
 // SignerInfo is RFC 5652 §5.3.
 // It is encoded/decoded manually to preserve SignedAttrs SET bytes verbatim.
+// The signer is identified either by SID (version 1) or, when SubjectKeyID is
+// non-empty, by the [0] subjectKeyIdentifier choice (version 3). RFC 5652 tags
+// that choice IMPLICIT; DPS receipts encode it EXPLICIT, which
+// SubjectKeyIDExplicit records so re-encoding preserves the producer's form.
 type SignerInfo struct {
-	Version            int
-	SID                IssuerAndSerialNumber
-	DigestAlgorithm    AlgorithmIdentifier
-	SignedAttrs        asn1.RawValue // raw DER of the SET OF Attribute (tag 0x31)
-	SignatureAlgorithm AlgorithmIdentifier
-	Signature          []byte
-	UnsignedAttrs      asn1.RawValue // raw DER of unsigned attrs (may be empty)
+	Version              int
+	SID                  IssuerAndSerialNumber
+	SubjectKeyID         []byte
+	SubjectKeyIDExplicit bool
+	DigestAlgorithm      AlgorithmIdentifier
+	SignedAttrs          asn1.RawValue // raw DER of the SET OF Attribute (tag 0x31)
+	SignatureAlgorithm   AlgorithmIdentifier
+	Signature            []byte
+	UnsignedAttrs        asn1.RawValue // raw DER of unsigned attrs (may be empty)
 }
 
 // marshalSignerInfo encodes a SignerInfo to DER manually.
@@ -49,8 +56,13 @@ func marshalSignerInfo(si SignerInfo) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sidDER, err := asn1.Marshal(si.SID)
-	if err != nil {
+	var sidDER []byte
+	if len(si.SubjectKeyID) > 0 {
+		sidDER = tlv(0x80, si.SubjectKeyID)
+		if si.SubjectKeyIDExplicit {
+			sidDER = tlv(0xa0, tlv(0x04, si.SubjectKeyID))
+		}
+	} else if sidDER, err = asn1.Marshal(si.SID); err != nil {
 		return nil, err
 	}
 	digAlgDER, err := asn1.Marshal(si.DigestAlgorithm)
@@ -119,8 +131,16 @@ func parseOneSignerInfo(data []byte) (SignerInfo, error) {
 		return si, errors.New("cms: SignerInfo version: " + err.Error())
 	}
 
-	// SID IssuerAndSerialNumber — parse manually to avoid RawValue eating too much
-	{
+	// SignerIdentifier ::= CHOICE { issuerAndSerialNumber, [0] subjectKeyIdentifier }.
+	// RFC 5652 §5.3 binds the choice to the version: 1 or 3 respectively.
+	if len(rest) == 0 {
+		return si, errors.New("cms: SignerInfo SID missing")
+	}
+	switch rest[0] {
+	case 0x30:
+		if si.Version != 1 {
+			return si, errors.New("cms: SignerInfo issuerAndSerialNumber requires version 1")
+		}
 		var sidSeq asn1.RawValue
 		var r []byte
 		r, err = asn1.Unmarshal(rest, &sidSeq)
@@ -128,17 +148,47 @@ func parseOneSignerInfo(data []byte) (SignerInfo, error) {
 			return si, errors.New("cms: SignerInfo SID seq: " + err.Error())
 		}
 		rest = r
-		// Parse Issuer (RawValue = full TLV)
 		var issuerRaw asn1.RawValue
 		sidRest, err2 := asn1.Unmarshal(sidSeq.Bytes, &issuerRaw)
 		if err2 != nil {
 			return si, errors.New("cms: SignerInfo SID issuer: " + err2.Error())
 		}
 		si.SID.Issuer = asn1.RawValue{FullBytes: sidSeq.Bytes[:len(sidSeq.Bytes)-len(sidRest)]}
-		// Parse SerialNumber (big.Int)
-		if _, err2 = asn1.Unmarshal(sidRest, &si.SID.SerialNumber); err2 != nil {
+		serialRest, err2 := asn1.Unmarshal(sidRest, &si.SID.SerialNumber)
+		if err2 != nil {
 			return si, errors.New("cms: SignerInfo SID serial: " + err2.Error())
 		}
+		if len(serialRest) != 0 {
+			return si, errors.New("cms: trailing SignerInfo SID fields")
+		}
+	case 0x80, 0xa0:
+		if si.Version != 3 {
+			return si, errors.New("cms: SignerInfo subjectKeyIdentifier requires version 3")
+		}
+		var ski asn1.RawValue
+		var r []byte
+		r, err = asn1.Unmarshal(rest, &ski)
+		if err != nil {
+			return si, errors.New("cms: SignerInfo SID subjectKeyIdentifier: " + err.Error())
+		}
+		value := ski.Bytes
+		if ski.IsCompound {
+			// [0] EXPLICIT SubjectKeyIdentifier: exactly one OCTET STRING.
+			var inner []byte
+			innerRest, innerErr := asn1.Unmarshal(ski.Bytes, &inner)
+			if innerErr != nil || len(innerRest) != 0 {
+				return si, errors.New("cms: invalid SignerInfo subjectKeyIdentifier")
+			}
+			value = inner
+			si.SubjectKeyIDExplicit = true
+		}
+		if len(value) == 0 {
+			return si, errors.New("cms: invalid SignerInfo subjectKeyIdentifier")
+		}
+		si.SubjectKeyID = bytes.Clone(value)
+		rest = r
+	default:
+		return si, errors.New("cms: unsupported SignerInfo SID choice")
 	}
 
 	// DigestAlgorithm AlgorithmIdentifier
@@ -408,7 +458,17 @@ type SignerResult struct {
 	SigningTime time.Time
 	Valid       bool
 	Error       error
-	sid         IssuerAndSerialNumber // unexported; used by ResolveCertificates
+	sid         signerIdentifier // unexported; used by ResolveCertificates
+}
+
+// signerIdentifier is the SignerInfo SID CHOICE in comparable form.
+type signerIdentifier struct {
+	issuerSerial IssuerAndSerialNumber
+	subjectKeyID []byte
+}
+
+func (si SignerInfo) identifier() signerIdentifier {
+	return signerIdentifier{issuerSerial: si.SID, subjectKeyID: si.SubjectKeyID}
 }
 
 // Sign creates a CMS SignedData for content using the given private key and certificate.
@@ -559,13 +619,8 @@ func ParseSigned(der []byte) (*SignedMessage, error) {
 	}
 
 	for _, si := range sd.SignerInfos {
-		sr := SignerResult{sid: si.SID}
-		for _, c := range msg.Certificates {
-			if matchesSID(c, si.SID) {
-				sr.Certificate = c
-				break
-			}
-		}
+		sr := SignerResult{sid: si.identifier()}
+		sr.Certificate = resolveSignerCertificate(sr.sid, msg.Certificates)
 		sr.SigningTime = extractSigningTime(si.SignedAttrs.FullBytes)
 		msg.Signers = append(msg.Signers, sr)
 	}
@@ -580,19 +635,41 @@ func ResolveCertificates(msg *SignedMessage) {
 		if msg.Signers[i].Certificate != nil {
 			continue
 		}
-		sid := msg.Signers[i].sid
-		for _, c := range msg.Certificates {
-			if matchesSID(c, sid) {
-				msg.Signers[i].Certificate = c
-				break
-			}
-		}
+		msg.Signers[i].Certificate = resolveSignerCertificate(msg.Signers[i].sid, msg.Certificates)
 	}
 }
 
-// matchesSID checks if a certificate matches an IssuerAndSerialNumber.
-func matchesSID(c *cert.Certificate, sid IssuerAndSerialNumber) bool {
-	if c == nil || c.SerialNumber == nil || sid.SerialNumber == nil {
+// resolveSignerCertificate returns the unique certificate matching id. Exact
+// duplicates are tolerated; distinct certificates sharing an identifier (for
+// example a reissued certificate with the same subject key) are ambiguous and
+// resolve to nil rather than to an arbitrary candidate.
+func resolveSignerCertificate(id signerIdentifier, candidates []*cert.Certificate) *cert.Certificate {
+	var selected *cert.Certificate
+	for _, c := range candidates {
+		if !matchesSID(c, id) {
+			continue
+		}
+		if selected != nil && !bytes.Equal(selected.Raw, c.Raw) {
+			return nil
+		}
+		if selected == nil {
+			selected = c
+		}
+	}
+	return selected
+}
+
+// matchesSID checks if a certificate matches a SignerInfo identifier.
+func matchesSID(c *cert.Certificate, id signerIdentifier) bool {
+	if c == nil {
+		return false
+	}
+	if len(id.subjectKeyID) > 0 {
+		ski, ok := certificateSubjectKeyID(c)
+		return ok && bytes.Equal(ski, id.subjectKeyID)
+	}
+	sid := id.issuerSerial
+	if c.SerialNumber == nil || sid.SerialNumber == nil {
 		return false
 	}
 	// Compare serial numbers directly

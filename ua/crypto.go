@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/amaneshi/crypto-dstu/internal/cms"
@@ -12,6 +13,10 @@ import (
 )
 
 const defaultFilename = "document.xml"
+
+// certCryptLabel names the transport section carrying the sender's agreement
+// certificate ahead of its UA1_CRYPT envelope.
+const certCryptLabel = "CERTCRYPT"
 
 // EncryptDocument encrypts content for a recipient using ECDH+GOST28147.
 // recipientDER is the recipient's DER- or PEM-encoded certificate.
@@ -25,16 +30,23 @@ func (b *Box) encryptDocument(content []byte, rc *cert.Certificate) ([]byte, err
 }
 
 func (b *Box) encryptDocumentWithOptions(content []byte, rc *cert.Certificate, options EncryptionOptions) ([]byte, error) {
+	der, _, err := b.encryptWithAgreementKey(content, rc, options)
+	return der, err
+}
+
+// encryptWithAgreementKey encrypts content and also returns the sender's
+// agreement certificate used for the key agreement.
+func (b *Box) encryptWithAgreementKey(content []byte, rc *cert.Certificate, options EncryptionOptions) ([]byte, *cert.Certificate, error) {
 	algorithm, err := options.algorithmOID()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	entry, err := b.firstKey()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if rc.PublicKey == nil {
-		return nil, errors.New("ua: recipient has no public key")
+		return nil, nil, errors.New("ua: recipient has no public key")
 	}
 	if entry.cryptCert == nil || cert.CheckEncryptionUsage(entry.cryptCert) != nil || entry.privateKey.Curve != rc.PublicKey.Curve {
 		var agreement *keyEntry
@@ -46,42 +58,61 @@ func (b *Box) encryptDocumentWithOptions(content []byte, rc *cert.Certificate, o
 				continue
 			}
 			if agreement != nil {
-				return nil, errors.New("ua: ambiguous encryption key")
+				return nil, nil, errors.New("ua: ambiguous encryption key")
 			}
 			agreement = candidate
 		}
 		if agreement == nil {
-			return nil, errors.New("ua: no matching encryption key")
+			return nil, nil, errors.New("ua: no matching encryption key")
 		}
 		entry = agreement
 	}
 
 	agreement, err := options.agreementOID()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cmsOptions := cms.EncryptOptions{Algorithm: algorithm, AgreementAlgorithm: agreement}
 	if options.StaticOriginator {
 		cmsOptions.OriginatorCertificate = entry.cryptCert
 		cmsOptions.EmbedOriginatorCertificate = true
 	}
-	return cms.EncryptWithOptions(content, []*cert.Certificate{rc}, entry.privateKey, cmsOptions)
+	der, err := cms.EncryptWithOptions(content, []*cert.Certificate{rc}, entry.privateKey, cmsOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+	return der, entry.cryptCert, nil
 }
 
 // DecryptDocument decrypts an incoming document.
 // Accepts transport container bytes or raw CMS EnvelopedData DER. Static sender
-// certificates are resolved from the envelope or certificates loaded with AddCert.
-// Decryption does not authenticate the sender; verify the signed plaintext separately.
+// certificates are resolved from the envelope, from the container's CERTCRYPT
+// sections, or from certificates loaded with AddCert. Those certificates only
+// locate the originator's agreement key; they are not trusted. Decryption does
+// not authenticate the sender; verify the signed plaintext separately.
 func (b *Box) DecryptDocument(data []byte) ([]byte, error) {
 	var err error
 
 	cmsDER := data
+	candidates := b.certificates
 	// Try transport container first
 	var container *transport.Container
 	container, err = transport.Decode(data)
 	if err == nil {
 		if s := container.FindSection("UA1_CRYPT"); s != nil {
 			cmsDER = s.Contents
+			for _, section := range container.Sections {
+				if section.Label != certCryptLabel {
+					continue
+				}
+				// Helpers are untrusted discovery data: an unusable one is skipped,
+				// and a missing originator still fails decryption below.
+				helper, parseErr := cert.ParseCertificate(section.Contents)
+				if parseErr != nil {
+					continue
+				}
+				candidates = append(slices.Clone(candidates), helper)
+			}
 		}
 	}
 
@@ -94,7 +125,7 @@ func (b *Box) DecryptDocument(data []byte) ([]byte, error) {
 		if entry.cryptCert == nil {
 			continue
 		}
-		plain, decryptErr := cms.DecryptEnveloped(msg, entry.privateKey, entry.cryptCert, b.certificates...)
+		plain, decryptErr := cms.DecryptEnveloped(msg, entry.privateKey, entry.cryptCert, candidates...)
 		if decryptErr == nil {
 			return plain, nil
 		}
@@ -116,7 +147,7 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 		return nil, err
 	}
 
-	cmsCrypt, err := b.encryptDocumentWithOptions(cmsSigned, rc, opts.Encryption)
+	cmsCrypt, senderCert, err := b.encryptWithAgreementKey(cmsSigned, rc, opts.Encryption)
 	if err != nil {
 		return nil, errors.New("ua: signAndEncryptWithCert: encrypt: " + err.Error())
 	}
@@ -137,9 +168,12 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 		CRC32Sign: transport.CRC32Hex(cmsSigned),
 		CRC32File: transport.CRC32Hex(content),
 	}
+	// DPS requires the sender's agreement certificate in a CERTCRYPT section
+	// immediately before the encrypted block, as jkurwa's tax transport emits.
 	container := &transport.Container{
 		Header: header,
 		Sections: []transport.Section{
+			{Label: certCryptLabel, Contents: bytes.Clone(senderCert.Raw)},
 			{Label: "UA1_CRYPT", Contents: cmsCrypt},
 		},
 	}
@@ -148,7 +182,8 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 
 // SignAndEncrypt signs content then encrypts the signed CMS for a recipient.
 // recipientDER is the recipient's DER- or PEM-encoded certificate.
-// Returns a transport container containing only the encrypted signed payload.
+// Returns a transport container holding the sender agreement certificate
+// (CERTCRYPT) followed by the encrypted signed payload (UA1_CRYPT).
 func (b *Box) SignAndEncrypt(content []byte, recipientDER []byte, opts SignOptions) ([]byte, error) {
 	return b.SignAndEncryptWithContext(context.Background(), content, recipientDER, opts)
 }

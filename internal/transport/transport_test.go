@@ -259,6 +259,7 @@ func TestContainerSignSections(t *testing.T) {
 func TestContainerCryptSection(t *testing.T) {
 	c := &Container{Sections: []Section{
 		{Label: "UA_SIGN1", Contents: []byte("s1")},
+		{Label: "CERTCRYPT", Contents: []byte("certificate")},
 		{Label: "UA1_CRYPT", Contents: []byte("c1")},
 	}}
 	crypt := c.CryptSection()

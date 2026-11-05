@@ -128,10 +128,11 @@ func (c *Container) SignSections() []Section {
 	return out
 }
 
-// CryptSection returns the first section whose label contains "CRYPT", or nil.
+// CryptSection returns the first encrypted-data section, or nil. CERTCRYPT
+// carries the sender's certificate, not ciphertext, and is never returned.
 func (c *Container) CryptSection() *Section {
 	for i := range c.Sections {
-		if strings.Contains(c.Sections[i].Label, "CRYPT") {
+		if c.Sections[i].Label != "CERTCRYPT" && strings.Contains(c.Sections[i].Label, "CRYPT") {
 			return &c.Sections[i]
 		}
 	}

@@ -69,6 +69,13 @@ func (id *originatorIdentifier) matches(c *cert.Certificate) bool {
 	if id.Serial != nil {
 		return c.SerialNumber != nil && id.Serial.Cmp(c.SerialNumber) == 0 && bytes.Equal(id.Issuer.FullBytes, c.Issuer.FullBytes)
 	}
+	ski, found := certificateSubjectKeyID(c)
+	return found && len(id.SubjectKeyID) != 0 && bytes.Equal(id.SubjectKeyID, ski)
+}
+
+// certificateSubjectKeyID returns the certificate's single, well-formed
+// subjectKeyIdentifier extension value. Duplicate or malformed extensions fail.
+func certificateSubjectKeyID(c *cert.Certificate) ([]byte, bool) {
 	var ski []byte
 	found := false
 	for _, ext := range c.Extensions {
@@ -76,14 +83,14 @@ func (id *originatorIdentifier) matches(c *cert.Certificate) bool {
 			continue
 		}
 		if found {
-			return false
+			return nil, false
 		}
 		found = true
 		if rest, err := asn1.Unmarshal(ext.Value, &ski); err != nil || len(rest) != 0 {
-			return false
+			return nil, false
 		}
 	}
-	return found && len(id.SubjectKeyID) != 0 && bytes.Equal(id.SubjectKeyID, ski)
+	return ski, found && len(ski) != 0
 }
 
 // Resolving an agreement key does not trust the certificate or authenticate the

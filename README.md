@@ -424,7 +424,8 @@ plain, err := box.DecryptDocument(encrypted)
 ```
 
 For a static-originator envelope, load the sender's certificate with `box.AddCert`
-when it is not embedded in the envelope. The decrypt CLI accepts `-cert sender.cer`.
+when it is not embedded in the envelope or carried in a transport `CERTCRYPT`
+section. The decrypt CLI accepts `-cert sender.cer`.
 These certificates supply agreement keys without becoming trusted roots;
 verify the decrypted signed content separately before using it.
 
@@ -437,6 +438,10 @@ container, err := box.SignAndEncrypt(content, recipientDER, ua.SignOptions{
     Filename: "zvit.xml",
 })
 ```
+
+The container is `TRANSPORTABLE` header, `CERTCRYPT` (the sender's agreement
+certificate) and `UA1_CRYPT`; see
+[tax transport layout](docs/compatibility.md#tax-transport-and-dps-receipts).
 
 ### Certificate information
 

@@ -116,3 +116,27 @@ Kupyna-256/512 signatures with GOST ONB SPKI and legacy named parameters.
 Alternate modern SPKI identifiers remain rejected. See
 [CSR encoding](csr.md). See [ONB coverage](onb.md) for
 the exact evidence, retained public fixtures, reproduction commands and limits.
+
+## Tax transport and DPS receipts
+
+`SignAndEncrypt` without `NoTax` writes a `TRANSPORTABLE` header, then a
+`CERTCRYPT` section holding the sender's agreement certificate, then
+`UA1_CRYPT`. Earlier output omitted `CERTCRYPT`. DPS rejected that form with
+receipt reason "відсутній сертифікат для розшифрування перед зашифрованим
+блоком" (no decryption certificate before the encrypted block). The section
+order and its contents follow jkurwa's `Message.as_transport`, which writes the
+encrypting key's own certificate, not the recipient's. `DecryptDocument` uses
+`CERTCRYPT` certificates only to locate a static originator; they are not
+trusted, and unparseable ones are ignored. DPS acceptance of the new layout has
+not yet been confirmed by a live submission.
+
+CMS `SignerInfo` accepts both signer identifier choices. Version 1 requires
+`issuerAndSerialNumber`; version 3 requires `subjectKeyIdentifier`. RFC 5652 tags
+the latter `[0] IMPLICIT`; DPS receipts (form J1499102) encode it `[0] EXPLICIT`
+around the OCTET STRING. Both forms parse and re-encode unchanged. A key
+identifier resolves only to certificates carrying one matching
+subjectKeyIdentifier extension. Distinct certificates sharing it are ambiguous
+and are not chosen. Signature, ESS signing-certificate and trust checks then
+apply to the resolved certificate as before. A real DPS receipt verified
+mathematically against its embedded certificate. It is not kept as a fixture
+because it contains taxpayer data; the regression tests use generated keys.
