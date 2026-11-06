@@ -1,6 +1,7 @@
 package ua
 
 import (
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -25,6 +26,13 @@ type CertInfo struct {
 	IsCA         bool      `json:"isCA"`
 	Algorithm    string    `json:"algorithm"`
 	CurveName    string    `json:"curveName"`
+	// KeyID is the hex GOST 34.311 hash of the subjectPublicKey contents: the
+	// same value as jkurwa's Pub.keyid, so key IDs stored by dstucrypt-based
+	// applications stay valid. It is not always the SubjectKeyIdentifier
+	// extension; newer CZO certificates carry a different SKI. It is shared by
+	// every certificate issued for the same key, and empty when the
+	// certificate has no public-key bytes.
+	KeyID string `json:"keyId"`
 }
 
 // GetCertInfo parses a DER or PEM certificate and returns a CertInfo.
@@ -56,5 +64,6 @@ func certInfoFromCert(c *cert.Certificate) *CertInfo {
 		IsCA:         ci.IsCA,
 		Algorithm:    ci.SigAlgOID,
 		CurveName:    ci.CurveOID,
+		KeyID:        hex.EncodeToString(cert.KeyID(c)),
 	}
 }

@@ -111,18 +111,31 @@ func (b *Box) SignDocumentWithContext(ctx context.Context, content []byte, opts 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	content = bytes.Clone(content)
 	entry, err := b.firstKey()
 	if err != nil {
 		return nil, err
 	}
+	return signWithEntry(ctx, entry, b.timestamper(), content, opts)
+}
+
+// signWithEntry is the signing path shared by Box and Signer. It signs content
+// with entry, optionally obtains verified timestamps through ts, and returns
+// raw CMS (NoTax) or a transport container. No partial document is returned.
+func signWithEntry(
+	ctx context.Context, entry *keyEntry, ts timestamper, content []byte, opts SignOptions,
+) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	content = bytes.Clone(content)
 	if entry.signCert == nil {
 		return nil, errors.New("ua: SignDocument: no signing certificate loaded")
 	}
 
+	var err error
 	cmsOpts := cms.SignOptions{Detached: opts.Detached, DigestAlgorithm: opts.DigestAlgorithm}
 	if opts.Timestamp != nil && opts.Timestamp.IncludeContentTimestamp {
-		cmsOpts.ContentTimestamp, err = b.requestVerifiedTimestamp(ctx, content, *opts.Timestamp)
+		cmsOpts.ContentTimestamp, err = ts.requestVerifiedTimestamp(ctx, content, *opts.Timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("ua: content timestamp: %w", err)
 		}
@@ -133,7 +146,7 @@ func (b *Box) SignDocumentWithContext(ctx context.Context, content []byte, opts 
 	}
 
 	if opts.Timestamp != nil {
-		cmsDER, err = b.addSignatureTimestamp(ctx, cmsDER, *opts.Timestamp)
+		cmsDER, err = ts.addSignatureTimestamp(ctx, cmsDER, *opts.Timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("ua: signature timestamp: %w", err)
 		}

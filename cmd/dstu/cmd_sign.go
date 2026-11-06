@@ -24,7 +24,7 @@ Options:
   -digest value           Digest: auto|gost34311|kupyna256|kupyna512 (default: auto)
   -crypt path             Recipient certificate: sign then encrypt
   -cipher value           gost28147-cfb|kalyna256-cfb|kalyna256-ofb (requires -crypt)
-  -tsp url                TSP server URL (repeatable)
+  -tsp url                TSP server URL (repeatable; default: PrivatBank TSA)
   -tsp-level value        Timestamp level: none|signature (default: none)
   -tsa-root path          Explicit trusted TSA certificate/CA DER (repeatable)
   -role value             Key role: personal|fop|director|stamp|other
@@ -46,7 +46,7 @@ Options:
 	cryptCert := fs.String("crypt", "", "recipient cert for sign+encrypt")
 	cipher := fs.String("cipher", "gost28147-cfb", "encryption cipher: gost28147-cfb|kalyna256-cfb|kalyna256-ofb")
 	var tspURLs multiFlag
-	fs.Var(&tspURLs, "tsp", "TSP server URL (repeatable)")
+	fs.Var(&tspURLs, "tsp", "TSP server URL (repeatable; default: "+ua.DefaultTSPURL+")")
 	tspLevel := fs.String("tsp-level", "none", "TSP level: none|signature")
 	role := fs.String("role", "", "key role")
 	email := fs.String("email", "", "sender email")
@@ -76,8 +76,8 @@ Options:
 	if *tspLevel == "none" && (len(tspURLs) > 0 || len(tsaRoots) > 0) {
 		fatalf("timestamp options require -tsp-level signature")
 	}
-	if *tspLevel == "signature" && (len(tspURLs) == 0 || len(tsaRoots) == 0) {
-		fatalf("signature timestamp requires -tsp and -tsa-root")
+	if *tspLevel == "signature" && len(tsaRoots) == 0 {
+		fatalf("signature timestamp requires -tsa-root")
 	}
 	if *includeChain != "none" {
 		fatalf("certificate-chain embedding is not implemented; omit -include-chain")

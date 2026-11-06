@@ -101,8 +101,10 @@ dstu sign \
   -output zvit.xml.sign
 ```
 
-Timestamp and extended-chain embedding are not implemented. The CLI rejects
-`-tsp`, non-`none` `-tsp-level`, and non-`none` `-include-chain`.
+Signature timestamps need `-tsp-level signature` and an explicit `-tsa-root`.
+`-tsp` is optional: without it the PrivatBank TSA (`ua.DefaultTSPURL`) is used.
+Content timestamps and extended-chain embedding are not implemented; the CLI
+rejects `content`/`all` for `-tsp-level` and non-`none` `-include-chain`.
 
 #### `dstu sign` flags
 
@@ -116,8 +118,9 @@ Timestamp and extended-chain embedding are not implemented. The CLI rejects
 | `-no-tax` | false | Raw CMS output; omit transport header and UA_SIGN1 prefix |
 | `-detached` | false | Produce detached signature (content not embedded) |
 | `-crypt path` | | Recipient certificate: sign then encrypt |
-| `-tsp url` | | Unsupported; returns an error |
-| `-tsp-level value` | none | Only `none` is currently supported |
+| `-tsp url` | PrivatBank TSA | TSP server URL (repeatable); requires `-tsp-level signature` |
+| `-tsp-level value` | none | `none` or `signature` |
+| `-tsa-root path` | | Trusted TSA certificate/CA DER (repeatable); required for `signature` |
 | `-role value` | | Key role for multi-key stores: `personal` \| `fop` \| `director` \| `stamp` \| `other` |
 | `-email addr` | | Sender email for transport header |
 | `-filename name` | | Attachment filename for transport header |
@@ -197,6 +200,7 @@ NotAfter:     2025-01-01T00:00:00Z
 Role:         director
 Algorithm:    DSTU4145WithGOST34311
 Curve:        DSTU_PB_257
+KeyID:        e1bcc73d9a160a4df8e66a4e90333f695f3dd333674d1bc67d09ef70ab5d788e
 IsCA:         false
 ```
 
@@ -379,6 +383,47 @@ if err != nil {
 }
 ```
 
+### Long-running services: open keys once, sign many times
+
+`Box` combines a key and signing configuration. A service that keeps keys
+open and signs with each of them repeatedly can keep the two apart. It opens
+each key once with `OpenKey` (this decrypts the container, the expensive step)
+and creates one configured `Signer`:
+
+```go
+// Once, at startup. Timestamp nil: documents carry no timestamp.
+signer, err := ua.NewSigner(ua.SignerOptions{
+    Timestamp: &ua.TimestampSignOptions{
+        URLs:           []string{"http://tsa-1/", "http://tsa-2/"}, // empty: ua.DefaultTSPURL
+        AttemptTimeout: 4 * time.Second, // per URL, so a hung TSA leaves time for the next
+        TSARoots:       tsaRoots,        // empty: token checked, TSA not chained to a root
+    },
+})
+
+// Once per key (when it is added or activated).
+key, err := ua.OpenKey(containerBytes, password) // optional extra cert DERs as trailing args
+info := key.Info()                               // KeyID, CommonName, NotAfter, ...
+
+// Per document: key + data → signed CMS.
+signed, err := signer.Sign(ctx, key, content, ua.SignOptions{NoTax: true})
+```
+
+`Key` and `Signer` are immutable and safe for concurrent use, so one `Signer`
+can sign with any number of keys from many goroutines. `NewSigner` checks the
+TSA roots and URLs straight away. `SignOptions.Timestamp` must stay nil with a
+`Signer`, because the `Signer` owns timestamping. Use `OpenKeyByRole` for
+containers that hold several signing identities.
+
+Timestamp verification on a `Signer`:
+
+| `TSARoots` | What a returned token has passed |
+|---|---|
+| set | Everything below, plus a valid path from the TSA to one of the roots (and optional OCSP via `RevocationOptions`) |
+| empty | Imprint of this signature, request nonce, well-formed `TSTInfo` with no future time, exactly one ESS-bound TSA signer with a valid signature, an exclusive timestamping EKU, and a TSA certificate covering `genTime`. **Not checked:** whether the TSA is trusted. Use this only when the party that verifies the document makes that decision, as DPS does for PRRO. Revocation checking requires roots. |
+
+`Box` and the CLI always require roots. The URLs and `AttemptTimeout` fields
+work for `Box` too, and take priority over `AddTSP`.
+
 ### Verify / unsign a document
 
 ```go
@@ -456,6 +501,21 @@ fmt.Printf("EDRPOU: %s\n", info.EDRPOU)
 fmt.Printf("Role:   %s\n", info.Role)
 fmt.Printf("Valid:  %s — %s\n", info.NotBefore.Format("2006-01-02"), info.NotAfter.Format("2006-01-02"))
 ```
+
+### Key identifier
+
+```go
+info, err := box.SigningCertInfo() // or ua.GetCertInfo(certDER)
+fmt.Println(info.KeyID)            // 64 hex characters
+```
+
+`CertInfo.KeyID` is the GOST 34.311 hash of the certificate's
+`subjectPublicKey` contents. It is the same value jkurwa calls `Pub.keyid`,
+so key IDs stored by applications built on dstucrypt stay valid. It is **not**
+always the certificate's SubjectKeyIdentifier: newer CZO certificates carry a
+different SKI. The tests in `internal/cert/keyid_test.go` check it against
+values computed independently with jkurwa 1.21.0. `Box.SigningCertInfo`
+returns the CertInfo of the selected signing key's certificate.
 
 ### Remove password protection from a key
 

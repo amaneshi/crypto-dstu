@@ -178,8 +178,18 @@ dstu sign -key Key-6.dat:password -cert signer.cer \
   -tsa-root tsa-root.cer -input report.xml -output report.cms -no-tax
 ```
 
-Add `-crypt recipient.cer` for sign/timestamp/encrypt. Both URL and TSA trust
-are required for CLI timestamp creation. CLI signing currently authenticates the
+Add `-crypt recipient.cer` for sign/timestamp/encrypt. TSA trust (`-tsa-root`)
+is required for CLI timestamp creation. `-tsp` is optional: library callers and
+the CLI fall back to `ua.DefaultTSPURL` (PrivatBank's qualified TSA, which
+currently chains to the NBU 2026 root) when no endpoint or Fetch callback is set.
+
+`ua.Signer` (see the README) is the one exception to explicit TSA trust. With
+empty `TimestampSignOptions.TSARoots`, it verifies every property of the token
+except the TSA's path to a trusted root (`tsp.VerifyImprintUnanchored`), so
+trust in the TSA is left to the document's verifier. `Box`, the CLI and all
+document verification keep requiring explicit roots. Endpoints come from
+`TimestampSignOptions.URLs`, tried in order, with an optional per-attempt
+`AttemptTimeout`. CLI signing currently authenticates the
 TSA path without online revocation; applications needing required TSA revocation
 should use `TimestampSignOptions.RevocationOptions`. Content/all timestamp levels
 and chain-embedding flags remain rejected.

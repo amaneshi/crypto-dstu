@@ -76,6 +76,21 @@ func TestBoxAddTSP(t *testing.T) {
 	require.Equal(t, "http://tsp.example.com/", b.tspClients[0].URL)
 }
 
+func TestTimestampClientsDefaultAndOverride(t *testing.T) {
+	b := NewBox()
+	clients := b.timestampClients()
+	require.Len(t, clients, 1)
+	require.Equal(t, DefaultTSPURL, clients[0].URL)
+	require.Empty(t, b.tspClients, "the default must not be stored as a configured endpoint")
+
+	b.AddTSP("http://tsp-1.example/")
+	b.AddTSP("http://tsp-2.example/")
+	clients = b.timestampClients()
+	require.Len(t, clients, 2)
+	require.Equal(t, "http://tsp-1.example/", clients[0].URL)
+	require.Equal(t, "http://tsp-2.example/", clients[1].URL)
+}
+
 func TestBoxFirstKeyEmpty(t *testing.T) {
 	b := NewBox()
 	_, err := b.firstKey()

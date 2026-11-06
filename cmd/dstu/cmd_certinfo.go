@@ -71,5 +71,6 @@ Options:
 	printField("Role", info.Role)
 	printField("Algorithm", info.Algorithm)
 	printField("Curve", info.CurveName)
+	printField("KeyID", info.KeyID)
 	fmt.Printf("%-14s %v\n", "IsCA:", info.IsCA) //nolint:forbidigo // CLI output
 }

@@ -19,6 +19,12 @@ type keyEntry struct {
 }
 
 // Box is a stateful context that manages keys, certificates, CA list and TSP config.
+//
+// Concurrency: the setup methods (LoadKey, LoadKeyFile, AddCert, AddCertFile,
+// LoadCABundle, LoadCABundleFile, AddTSP, SelectKeyByRole) modify the Box and
+// must not run concurrently with any other method. Once setup is finished, the
+// remaining methods only read the Box, so one Box may sign, encrypt, decrypt
+// and verify from many goroutines at once (see TestConcurrentSigningOnOneBox).
 type Box struct {
 	keys         []*keyEntry
 	caCerts      []*cert.Certificate
@@ -117,7 +123,8 @@ func (b *Box) LoadCABundleFile(path string) error {
 	return b.LoadCABundle(data)
 }
 
-// AddTSP registers a TSP server URL.
+// AddTSP registers a TSP server URL. Registered URLs replace DefaultTSPURL and
+// are tried in order.
 func (b *Box) AddTSP(url string) {
 	b.tspClients = append(b.tspClients, tsp.NewClient(url))
 }
