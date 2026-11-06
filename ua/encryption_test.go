@@ -122,14 +122,37 @@ func TestTaxTransportCarriesSenderAgreementCertificate(t *testing.T) {
 		require.Equal(t, "CERTCRYPT", container.Sections[0].Label)
 		require.Equal(t, sender.Raw, container.Sections[0].Contents)
 		require.Equal(t, "UA1_CRYPT", container.Sections[1].Label)
+		// DPS-produced envelopes have no OriginatorInfo certificates; the
+		// static originator is found through CERTCRYPT, not the envelope.
+		envelope, err := cms.ParseEnveloped(container.Sections[1].Contents)
+		require.NoError(t, err)
+		require.Empty(t, envelope.OriginatorCertificates)
+		require.Empty(t, receiver.certificates)
+		// DPS's own encrypted receipts decrypt to UA1_SIGN\0<len><CMS>; the
+		// signed report must be wrapped the same way inside UA1_CRYPT.
 		signed, err := receiver.DecryptDocument(encoded)
 		require.NoError(t, err)
-		require.NotEmpty(t, signed)
+		inner, err := transport.DecodeSections(signed)
+		require.NoError(t, err)
+		require.Len(t, inner, 1)
+		require.Equal(t, "UA1_SIGN", inner[0].Label)
+		message, err := cms.ParseSigned(inner[0].Contents)
+		require.NoError(t, err)
+		require.Equal(t, content, message.Content)
+		receiver.caCerts = []*cert.Certificate{sender}
+		verified, err := receiver.UnsignDocument(signed)
+		receiver.caCerts = nil
+		require.NoError(t, err)
+		require.Equal(t, content, verified.Content)
 	}
 	raw, err := box.SignAndEncrypt(content, recipient.Raw, SignOptions{NoTax: true})
 	require.NoError(t, err)
 	_, err = cms.ParseEnveloped(raw)
 	require.NoError(t, err, "NoTax output remains a bare EnvelopedData")
+	plain, err := receiver.DecryptDocument(raw)
+	require.NoError(t, err)
+	_, err = cms.ParseSigned(plain)
+	require.NoError(t, err, "NoTax plaintext remains bare CMS")
 }
 
 // CERTCRYPT is untrusted discovery data for the static originator certificate:
@@ -170,4 +193,44 @@ func TestDecryptResolvesOriginatorFromCertCrypt(t *testing.T) {
 	require.Equal(t, content, plain)
 	require.Empty(t, receiver.certificates, "helpers are not retained")
 	require.Empty(t, receiver.caCerts, "helpers are not trusted")
+}
+
+// DPS routes gateway replies by the transport header EDRPOU; Sonata writes it
+// and a reply to a request without it was addressed RCV_EDRPOU=00000000.
+func TestTaxTransportHeaderEDRPOU(t *testing.T) {
+	sender, senderKey := testpki.Issue(t, "sender", nil, nil, nil)
+	recipient, _ := testpki.Issue(t, "recipient", nil, nil, nil)
+	box := NewBox()
+	box.keys = []*keyEntry{{privateKey: senderKey, signCert: sender, cryptCert: sender}}
+	options := SignOptions{Filename: "report.xml", Email: "sender@example.test", EDRPOU: "1234567890"}
+	encoded, err := box.SignAndEncrypt([]byte("header"), recipient.Raw, options)
+	require.NoError(t, err)
+	container, err := transport.Decode(encoded)
+	require.NoError(t, err)
+	require.Equal(t, "1234567890", container.Header.EDRPOU)
+	require.Equal(t, "sender@example.test", container.Header.SndEmail)
+
+	signed, err := box.SignDocument([]byte("header"), options)
+	require.NoError(t, err)
+	box.caCerts = []*cert.Certificate{sender}
+	result, err := box.UnsignDocument(signed)
+	box.caCerts = nil
+	require.NoError(t, err)
+	require.Equal(t, "1234567890", result.Header.EDRPOU)
+
+	for _, bad := range []SignOptions{
+		{EDRPOU: "1234567"},
+		{EDRPOU: "12345678901"},
+		{EDRPOU: "12345678A"},
+		{EDRPOU: "12345678\r\nRESULT=0"},
+		{Filename: "a.xml\r\nEDRPOU=1"},
+		{Email: "x@example.test\x00"},
+	} {
+		output, err := box.SignAndEncrypt([]byte("header"), recipient.Raw, bad)
+		require.Error(t, err)
+		require.Nil(t, output)
+		output, err = box.SignDocument([]byte("header"), bad)
+		require.Error(t, err)
+		require.Nil(t, output)
+	}
 }

@@ -30,13 +30,15 @@ func (b *Box) encryptDocument(content []byte, rc *cert.Certificate) ([]byte, err
 }
 
 func (b *Box) encryptDocumentWithOptions(content []byte, rc *cert.Certificate, options EncryptionOptions) ([]byte, error) {
-	der, _, err := b.encryptWithAgreementKey(content, rc, options)
+	der, _, err := b.encryptWithAgreementKey(content, rc, options, true)
 	return der, err
 }
 
 // encryptWithAgreementKey encrypts content and also returns the sender's
-// agreement certificate used for the key agreement.
-func (b *Box) encryptWithAgreementKey(content []byte, rc *cert.Certificate, options EncryptionOptions) ([]byte, *cert.Certificate, error) {
+// agreement certificate used for the key agreement. embedOriginator controls
+// whether a static originator certificate is also placed in OriginatorInfo;
+// tax transport carries it in CERTCRYPT instead, as DPS's own envelopes do.
+func (b *Box) encryptWithAgreementKey(content []byte, rc *cert.Certificate, options EncryptionOptions, embedOriginator bool) ([]byte, *cert.Certificate, error) {
 	algorithm, err := options.algorithmOID()
 	if err != nil {
 		return nil, nil, err
@@ -75,7 +77,7 @@ func (b *Box) encryptWithAgreementKey(content []byte, rc *cert.Certificate, opti
 	cmsOptions := cms.EncryptOptions{Algorithm: algorithm, AgreementAlgorithm: agreement}
 	if options.StaticOriginator {
 		cmsOptions.OriginatorCertificate = entry.cryptCert
-		cmsOptions.EmbedOriginatorCertificate = true
+		cmsOptions.EmbedOriginatorCertificate = embedOriginator
 	}
 	der, err := cms.EncryptWithOptions(content, []*cert.Certificate{rc}, entry.privateKey, cmsOptions)
 	if err != nil {
@@ -147,7 +149,17 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 		return nil, err
 	}
 
-	cmsCrypt, senderCert, err := b.encryptWithAgreementKey(cmsSigned, rc, opts.Encryption)
+	// Tax transport encrypts a UA1_SIGN section, not the bare CMS: DPS's own
+	// encrypted messages decrypt to UA1_SIGN\0<len><CMS>, and Sonata stores the
+	// accepted signed report the same way. NoTax keeps raw CMS inside.
+	plaintext := cmsSigned
+	if !opts.NoTax {
+		plaintext = transport.EncodeSection(transport.Section{Label: "UA1_SIGN", Contents: cmsSigned})
+	}
+	// Tax transport references the static originator by issuer and serial and
+	// carries its certificate only in CERTCRYPT; DPS-produced envelopes have no
+	// OriginatorInfo certificates. Raw NoTax envelopes still embed it.
+	cmsCrypt, senderCert, err := b.encryptWithAgreementKey(plaintext, rc, opts.Encryption, opts.NoTax)
 	if err != nil {
 		return nil, errors.New("ua: signAndEncryptWithCert: encrypt: " + err.Error())
 	}
@@ -157,16 +169,9 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 	if opts.NoTax {
 		return cmsCrypt, nil
 	}
-	filename := opts.Filename
-	if filename == "" {
-		filename = defaultFilename
-	}
-	header := &transport.Header{
-		Filename:  filename,
-		SndEmail:  opts.Email,
-		CerType:   "UA1",
-		CRC32Sign: transport.CRC32Hex(cmsSigned),
-		CRC32File: transport.CRC32Hex(content),
+	header, err := opts.transportHeader(cmsSigned, content, false)
+	if err != nil {
+		return nil, err
 	}
 	// DPS requires the sender's agreement certificate in a CERTCRYPT section
 	// immediately before the encrypted block, as jkurwa's tax transport emits.
@@ -183,7 +188,8 @@ func (b *Box) signAndEncryptWithCertContext(ctx context.Context, content []byte,
 // SignAndEncrypt signs content then encrypts the signed CMS for a recipient.
 // recipientDER is the recipient's DER- or PEM-encoded certificate.
 // Returns a transport container holding the sender agreement certificate
-// (CERTCRYPT) followed by the encrypted signed payload (UA1_CRYPT).
+// (CERTCRYPT) followed by UA1_CRYPT, whose plaintext is a UA1_SIGN section
+// carrying the signed CMS. With NoTax, it returns the EnvelopedData of the raw CMS.
 func (b *Box) SignAndEncrypt(content []byte, recipientDER []byte, opts SignOptions) ([]byte, error) {
 	return b.SignAndEncryptWithContext(context.Background(), content, recipientDER, opts)
 }

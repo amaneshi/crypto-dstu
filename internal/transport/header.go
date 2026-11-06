@@ -14,6 +14,7 @@ type Header struct {
 	Filename  string // FILENAME
 	SndName   string // SND_NAME
 	SndEmail  string // SND_EMAIL
+	EDRPOU    string // EDRPOU — sender's taxpayer code; DPS routes replies by it
 	RcvName   string // RCV_NAME
 	RcvEmail  string // RCV_EMAIL
 	PrgType   string // PRG_TYPE
@@ -36,6 +37,7 @@ var headerFields = []struct {
 	{"FILENAME", func(h *Header) string { return h.Filename }, func(h *Header, v string) { h.Filename = v }},
 	{"SND_NAME", func(h *Header) string { return h.SndName }, func(h *Header, v string) { h.SndName = v }},
 	{"SND_EMAIL", func(h *Header) string { return h.SndEmail }, func(h *Header, v string) { h.SndEmail = v }},
+	{"EDRPOU", func(h *Header) string { return h.EDRPOU }, func(h *Header, v string) { h.EDRPOU = v }},
 	{"RCV_NAME", func(h *Header) string { return h.RcvName }, func(h *Header, v string) { h.RcvName = v }},
 	{"RCV_EMAIL", func(h *Header) string { return h.RcvEmail }, func(h *Header, v string) { h.RcvEmail = v }},
 	{"PRG_TYPE", func(h *Header) string { return h.PrgType }, func(h *Header, v string) { h.PrgType = v }},

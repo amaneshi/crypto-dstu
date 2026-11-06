@@ -440,7 +440,7 @@ container, err := box.SignAndEncrypt(content, recipientDER, ua.SignOptions{
 ```
 
 The container is `TRANSPORTABLE` header, `CERTCRYPT` (the sender's agreement
-certificate) and `UA1_CRYPT`; see
+certificate) and `UA1_CRYPT`, whose plaintext is a `UA1_SIGN` section; see
 [tax transport layout](docs/compatibility.md#tax-transport-and-dps-receipts).
 
 ### Certificate information

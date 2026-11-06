@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/amaneshi/crypto-dstu/internal/cms"
@@ -21,6 +22,39 @@ type SignOptions struct {
 	NoTax           bool                  // return raw CMS DER; skip transport container wrapping
 	Filename        string                // FILENAME field in transport header
 	Email           string                // SND_EMAIL field in transport header
+	// EDRPOU is the sender's taxpayer code (ЄДРПОУ or РНОКПП) for the EDRPOU
+	// transport header field. DPS routes gateway replies to the taxpayer's
+	// mailbox by it; without it, a reply addressed RCV_EDRPOU=00000000 was emailed.
+	EDRPOU string
+}
+
+// transportHeader builds and validates the TRANSPORTABLE header for tax output.
+func (opts SignOptions) transportHeader(cmsSigned, content []byte, detached bool) (*transport.Header, error) {
+	filename := opts.Filename
+	if filename == "" {
+		filename = defaultFilename
+	}
+	for _, value := range []string{filename, opts.Email, opts.EDRPOU} {
+		if strings.ContainsAny(value, "\r\n\x00") {
+			return nil, errors.New("ua: transport header values must not contain line breaks or NUL")
+		}
+	}
+	if opts.EDRPOU != "" {
+		if len(opts.EDRPOU) < 8 || len(opts.EDRPOU) > 10 || strings.Trim(opts.EDRPOU, "0123456789") != "" {
+			return nil, errors.New("ua: EDRPOU must be 8 to 10 digits")
+		}
+	}
+	header := &transport.Header{
+		Filename:  filename,
+		SndEmail:  opts.Email,
+		EDRPOU:    opts.EDRPOU,
+		CerType:   "UA1",
+		CRC32Sign: transport.CRC32Hex(cmsSigned),
+	}
+	if !detached {
+		header.CRC32File = transport.CRC32Hex(content)
+	}
+	return header, nil
 }
 
 // SignerResult holds per-signer verification output.
@@ -47,6 +81,7 @@ type TimestampResult struct {
 type TransportHeader struct {
 	Filename  string
 	SndEmail  string
+	EDRPOU    string
 	RcvEmail  string
 	CerType   string
 	CRC32Sign string
@@ -111,19 +146,9 @@ func (b *Box) SignDocumentWithContext(ctx context.Context, content []byte, opts 
 	}
 
 	// Wrap in transport container
-	filename := opts.Filename
-	if filename == "" {
-		filename = defaultFilename
-	}
-
-	header := &transport.Header{
-		Filename:  filename,
-		SndEmail:  opts.Email,
-		CerType:   "UA1",
-		CRC32Sign: transport.CRC32Hex(cmsDER),
-	}
-	if !opts.Detached {
-		header.CRC32File = transport.CRC32Hex(content)
+	header, err := opts.transportHeader(cmsDER, content, opts.Detached)
+	if err != nil {
+		return nil, err
 	}
 
 	container := &transport.Container{
@@ -172,6 +197,7 @@ func (b *Box) UnsignDocumentWithOptions(ctx context.Context, data, originalConte
 			result.Header = &TransportHeader{
 				Filename:  h.Filename,
 				SndEmail:  h.SndEmail,
+				EDRPOU:    h.EDRPOU,
 				RcvEmail:  h.RcvEmail,
 				CerType:   h.CerType,
 				CRC32Sign: h.CRC32Sign,

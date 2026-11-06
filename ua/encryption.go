@@ -33,8 +33,10 @@ type EncryptionOptions struct {
 	// Agreement defaults to cofactor DH. Standard DH is explicit and requires
 	// a Kalyna cipher and validation of the peer's prime-order subgroup.
 	Agreement KeyAgreementAlgorithm
-	// StaticOriginator references and embeds the matched agreement certificate.
-	// This supplies sender certificate discovery, not trust or content authentication.
+	// StaticOriginator references the matched agreement certificate by issuer and
+	// serial. Raw envelopes also embed it in OriginatorInfo; tax transport instead
+	// carries it in CERTCRYPT, as DPS-produced envelopes do. This supplies sender
+	// certificate discovery, not trust or content authentication.
 	StaticOriginator bool
 }
 

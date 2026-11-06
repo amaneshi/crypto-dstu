@@ -127,8 +127,21 @@ receipt reason "відсутній сертифікат для розшифру�
 order and its contents follow jkurwa's `Message.as_transport`, which writes the
 encrypting key's own certificate, not the recipient's. `DecryptDocument` uses
 `CERTCRYPT` certificates only to locate a static originator; they are not
-trusted, and unparseable ones are ignored. DPS acceptance of the new layout has
-not yet been confirmed by a live submission.
+trusted, and unparseable ones are ignored.
+
+The `UA1_CRYPT` plaintext is a `UA1_SIGN` transport section carrying the signed
+CMS, not the bare CMS. A DPS-encrypted receipt decrypted with the recipient key
+yields exactly `UA1_SIGN\0<length><CMS>`, and Sonata stores its DPS-accepted
+signed report in the same form. Earlier output encrypted the bare CMS; DPS sent
+no reply at all to such a request. `NoTax` output still encrypts the raw CMS.
+Tax-transport envelopes reference the static originator by issuer and serial
+but carry no `OriginatorInfo` certificates; the certificate travels only in
+`CERTCRYPT`, matching DPS-produced envelopes. Raw `NoTax` envelopes still embed
+it. `SignOptions.EDRPOU` writes the sender's taxpayer code (8-10 digits) to the
+`EDRPOU` header field, which Sonata also writes and by which DPS appears to
+route gateway replies; header values containing CR, LF or NUL are rejected.
+DPS acceptance of the corrected layout has not yet been confirmed by a live
+submission from this library.
 
 CMS `SignerInfo` accepts both signer identifier choices. Version 1 requires
 `issuerAndSerialNumber`; version 3 requires `subjectKeyIdentifier`. RFC 5652 tags
