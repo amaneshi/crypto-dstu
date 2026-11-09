@@ -34,13 +34,13 @@ func TestKeyIDMatchesJkurwa(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(filepath.Base(filepath.Dir(tt.path))+"/"+filepath.Base(tt.path), func(t *testing.T) {
 			c := loadTestCert(t, tt.path)
-			assert.Equal(t, tt.keyID, hex.EncodeToString(KeyID(c)))
+			assert.Equal(t, tt.keyID, hex.EncodeToString(c.KeyID()))
 		})
 	}
 }
 
 func TestKeyIDEmptyPublicKey(t *testing.T) {
-	assert.Nil(t, KeyID(&Certificate{}))
+	assert.Nil(t, (&Certificate{}).KeyID())
 }
 
 func loadTestCert(t *testing.T, path string) *Certificate {

@@ -24,7 +24,7 @@ func mustRawKey(t *testing.T, key *dstu4145.PrivateKey) []byte {
 
 func TestOpenKey(t *testing.T) {
 	tsa := newTestTSA(t)
-	wantKeyID := hex.EncodeToString(cert.KeyID(tsa.signer))
+	wantKeyID := hex.EncodeToString(tsa.signer.KeyID())
 
 	t.Run("PFX with embedded certificate", func(t *testing.T) {
 		pfx, err := ProtectPKCS12(tsa.signerKey, [][]byte{tsa.signer.Raw}, "secret")

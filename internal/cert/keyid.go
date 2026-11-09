@@ -8,7 +8,7 @@ import "github.com/amaneshi/crypto-dstu/pkg/gost34311"
 // applications use to refer to a key. It is not necessarily equal to the
 // certificate's SubjectKeyIdentifier extension: newer CZO certificates carry a
 // different SKI value.
-func KeyID(c *Certificate) []byte {
+func (c *Certificate) KeyID() []byte {
 	if len(c.SubjectPublicKeyBytes) == 0 {
 		return nil
 	}

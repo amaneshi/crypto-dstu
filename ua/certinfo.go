@@ -64,6 +64,6 @@ func certInfoFromCert(c *cert.Certificate) *CertInfo {
 		IsCA:         ci.IsCA,
 		Algorithm:    ci.SigAlgOID,
 		CurveName:    ci.CurveOID,
-		KeyID:        hex.EncodeToString(cert.KeyID(c)),
+		KeyID:        hex.EncodeToString(c.KeyID()),
 	}
 }
