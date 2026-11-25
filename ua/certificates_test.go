@@ -33,8 +33,7 @@ func TestCertificateAccessAndSeparateAgreementKey(t *testing.T) {
 }
 
 func TestSigningCertInfo(t *testing.T) {
-	// A parsed CZO certificate whose key ID jkurwa computes as e1bcc73d… while
-	// its SubjectKeyIdentifier is b756205e… (see internal/cert/keyid_test.go).
+	// A parsed CZO certificate whose SubjectKeyIdentifier is b756205e…
 	der, err := os.ReadFile(filepath.FromSlash("../internal/ocsp/testdata/czo-2025/subject.cer"))
 	require.NoError(t, err)
 	signCert, err := cert.ParseCertificate(der)
@@ -43,7 +42,7 @@ func TestSigningCertInfo(t *testing.T) {
 	box.keys = []*keyEntry{{privateKey: mustGenerateKey(t), signCert: signCert}}
 	info, err := box.SigningCertInfo()
 	require.NoError(t, err)
-	const keyID = "e1bcc73d9a160a4df8e66a4e90333f695f3dd333674d1bc67d09ef70ab5d788e"
+	const keyID = "b756205e4fc5515736de04f80deb17dca97c414b7af82a9b46655ec04c4b78c1"
 	require.Equal(t, keyID, info.KeyID)
 	require.Equal(t, signCert.NotAfter, info.NotAfter)
 

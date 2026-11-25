@@ -665,8 +665,8 @@ func matchesSID(c *cert.Certificate, id signerIdentifier) bool {
 		return false
 	}
 	if len(id.subjectKeyID) > 0 {
-		ski, ok := certificateSubjectKeyID(c)
-		return ok && bytes.Equal(ski, id.subjectKeyID)
+		ski := c.KeyID()
+		return len(ski) != 0 && bytes.Equal(ski, id.subjectKeyID)
 	}
 	sid := id.issuerSerial
 	if c.SerialNumber == nil || sid.SerialNumber == nil {

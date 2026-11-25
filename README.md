@@ -506,16 +506,15 @@ fmt.Printf("Valid:  %s — %s\n", info.NotBefore.Format("2006-01-02"), info.NotA
 
 ```go
 info, err := box.SigningCertInfo() // or ua.GetCertInfo(certDER)
-fmt.Println(info.KeyID)            // 64 hex characters
+fmt.Println(info.KeyID)            // hex SubjectKeyIdentifier
 ```
 
-`CertInfo.KeyID` is the GOST 34.311 hash of the certificate's
-`subjectPublicKey` contents. It is the same value jkurwa calls `Pub.keyid`,
-so key IDs stored by applications built on dstucrypt stay valid. It is **not**
-always the certificate's SubjectKeyIdentifier: newer CZO certificates carry a
-different SKI. The tests in `internal/cert/keyid_test.go` check it against
-values computed independently with jkurwa 1.21.0. `Box.SigningCertInfo`
-returns the CertInfo of the selected signing key's certificate.
+`CertInfo.KeyID` is the hex value of the certificate's SubjectKeyIdentifier
+extension. It is empty when the certificate has no such extension, or has a
+duplicated or malformed one. Earlier versions returned the GOST 34.311 hash of
+the `subjectPublicKey` contents (jkurwa's `Pub.keyid`); that value differs from
+the SKI on newer CZO certificates. `Box.SigningCertInfo` returns the CertInfo of
+the selected signing key's certificate.
 
 ### Remove password protection from a key
 
