@@ -315,6 +315,8 @@ func TestCZO_Real_DSTU_BES_Detached(t *testing.T) {
 	require.NoError(t, err)
 	content, err := os.ReadFile(contentPath)
 	require.NoError(t, err)
+	// The signature covers CRLF content; see the czo rule in .gitattributes.
+	require.Equal(t, []byte("Test\r\n"), content)
 
 	msg, err := ParseSigned(sigData)
 	require.NoError(t, err)
