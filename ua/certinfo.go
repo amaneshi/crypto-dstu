@@ -26,8 +26,11 @@ type CertInfo struct {
 	IsCA         bool      `json:"isCA"`
 	Algorithm    string    `json:"algorithm"`
 	CurveName    string    `json:"curveName"`
-	// KeyID is the hex SubjectKeyIdentifier extension value, or empty when
-	// the certificate has none (or a duplicated or malformed one).
+	// KeyID is the hex SubjectKeyIdentifier extension value. When the
+	// extension is absent it is the Kupyna-256 hash of the subjectPublicKey
+	// contents, the derivation current CZO certificates use for their SKI. It
+	// is empty for a duplicated or malformed extension, or when there is
+	// neither an extension nor public-key bytes.
 	KeyID string `json:"keyId"`
 }
 

@@ -506,15 +506,17 @@ fmt.Printf("Valid:  %s — %s\n", info.NotBefore.Format("2006-01-02"), info.NotA
 
 ```go
 info, err := box.SigningCertInfo() // or ua.GetCertInfo(certDER)
-fmt.Println(info.KeyID)            // hex SubjectKeyIdentifier
+fmt.Println(info.KeyID)            // hex SKI, or Kupyna-256 of the key if absent
 ```
 
 `CertInfo.KeyID` is the hex value of the certificate's SubjectKeyIdentifier
-extension. It is empty when the certificate has no such extension, or has a
-duplicated or malformed one. Earlier versions returned the GOST 34.311 hash of
-the `subjectPublicKey` contents (jkurwa's `Pub.keyid`); that value differs from
-the SKI on newer CZO certificates. `Box.SigningCertInfo` returns the CertInfo of
-the selected signing key's certificate.
+extension. If the extension is absent, it is the Kupyna-256 hash of the
+`subjectPublicKey` contents, which is how current CZO certificates derive their
+SKI. A duplicated or malformed extension gives an empty value, not a
+substitute. Earlier versions returned the GOST 34.311 hash of those bytes
+(jkurwa's `Pub.keyid`), which still matches SKIs on older CZO certificates but
+not newer ones. `Box.SigningCertInfo` returns the CertInfo of the selected
+signing key's certificate.
 
 ### Remove password protection from a key
 

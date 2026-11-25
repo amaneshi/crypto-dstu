@@ -69,7 +69,7 @@ func (id *originatorIdentifier) matches(c *cert.Certificate) bool {
 	if id.Serial != nil {
 		return c.SerialNumber != nil && id.Serial.Cmp(c.SerialNumber) == 0 && bytes.Equal(id.Issuer.FullBytes, c.Issuer.FullBytes)
 	}
-	ski := c.KeyID()
+	ski := c.SubjectKeyID()
 	return len(ski) != 0 && len(id.SubjectKeyID) != 0 && bytes.Equal(id.SubjectKeyID, ski)
 }
 

@@ -4,29 +4,55 @@ import (
 	"encoding/asn1"
 
 	"github.com/amaneshi/crypto-dstu/internal/oid"
+	"github.com/amaneshi/crypto-dstu/pkg/kupyna"
 )
 
-// KeyID returns the certificate's SubjectKeyIdentifier extension value (the
-// contents of its OCTET STRING). It returns nil when the extension is absent,
-// duplicated, malformed or empty. It is shared by every certificate issued for
-// the same key only if the issuer derived it from that key.
+// KeyID returns the certificate's key identifier: its SubjectKeyIdentifier
+// value when the extension is present and well-formed, otherwise, only when
+// the extension is absent, the Kupyna-256 hash of the subjectPublicKey
+// contents. Current CZO certificates derive their SKI the same way. A
+// duplicated, malformed or empty extension yields nil, never a substitute.
+// CMS identifier matching must use SubjectKeyID, which never falls back.
 func (c *Certificate) KeyID() []byte {
-	var ski []byte
+	if ski, present := c.subjectKeyID(); present {
+		return ski
+	}
+	if len(c.SubjectPublicKeyBytes) == 0 {
+		return nil
+	}
+	h := kupyna.New256()
+	_, _ = h.Write(c.SubjectPublicKeyBytes)
+	return h.Sum(nil)
+}
+
+// SubjectKeyID returns only the SubjectKeyIdentifier extension value, or nil
+// when the extension is absent, duplicated, malformed or empty.
+func (c *Certificate) SubjectKeyID() []byte {
+	ski, _ := c.subjectKeyID()
+	return ski
+}
+
+// subjectKeyID reports the extension value and whether the extension exists at
+// all (even if unusable), so callers can tell absence from corruption.
+func (c *Certificate) subjectKeyID() (ski []byte, present bool) {
 	found := false
 	for _, ext := range c.Extensions {
 		if !ext.Id.Equal(oid.OIDExtSubjectKeyID) {
 			continue
 		}
 		if found {
-			return nil
+			return nil, true
 		}
 		found = true
 		if rest, err := asn1.Unmarshal(ext.Value, &ski); err != nil || len(rest) != 0 {
-			return nil
+			return nil, true
 		}
 	}
-	if !found || len(ski) == 0 {
-		return nil
+	if !found {
+		return nil, false
 	}
-	return ski
+	if len(ski) == 0 {
+		return nil, true
+	}
+	return ski, true
 }
