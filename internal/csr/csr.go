@@ -53,8 +53,8 @@ type Request struct {
 	// Subject DN attributes in order.
 	// Use oid.OIDCommonName, oid.EDRPOU, oid.DRFO etc. as Type.
 	Subject []AttributeTypeAndValue
-	// SignatureAlgorithmOID overrides the default derived from the key's curve.
-	// Leave nil to use the curve's GOST PB/ONB signature algorithm.
+	// SignatureAlgorithmOID overrides the default signature algorithm.
+	// Leave nil to use Kupyna-256 with the matching PB or ONB OID.
 	SignatureAlgorithmOID asn1.ObjectIdentifier
 }
 
@@ -75,7 +75,12 @@ func Create(req *Request, priv *dstu4145.PrivateKey) ([]byte, error) {
 		if params == nil {
 			return nil, errors.New("csr: cannot determine curve OID for key")
 		}
-		sigAlgOID = params.HashOID
+		// Kupyna-256 is the default digest; the registered OID depends on
+		// the curve basis. Pass SignatureAlgorithmOID for GOST 34.311.
+		sigAlgOID = oid.DSTU4145WithKupyna256
+		if priv.Curve.IsONB() {
+			sigAlgOID = oid.DSTU4145ONBWithKupyna256
+		}
 	}
 	if err := checkSignatureProfile(sigAlgOID, priv.Curve); err != nil {
 		return nil, err

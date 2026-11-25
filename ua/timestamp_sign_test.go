@@ -10,6 +10,7 @@ import (
 
 	"github.com/amaneshi/crypto-dstu/internal/cert"
 	"github.com/amaneshi/crypto-dstu/internal/cms"
+	"github.com/amaneshi/crypto-dstu/internal/oid"
 	"github.com/amaneshi/crypto-dstu/internal/testpki"
 	"github.com/amaneshi/crypto-dstu/internal/testtimestamp"
 	"github.com/amaneshi/crypto-dstu/internal/tsp"
@@ -63,7 +64,7 @@ func TestCreateVerifiedSignatureTimestamp(t *testing.T) {
 				tokens, err := message.ContentTimestampTokens(0)
 				require.NoError(t, err)
 				require.Len(t, tokens, 1)
-				hash, err := tsp.HashData(content, asn1.ObjectIdentifier{1, 2, 804, 2, 1, 1, 1, 1, 2, 1})
+				hash, err := tsp.HashData(content, oid.Kupyna256)
 				require.NoError(t, err)
 				_, err = tsp.VerifyToken(tokens[0], hash, nil, []*cert.Certificate{root})
 				require.NoError(t, err)

@@ -36,8 +36,8 @@ func TestSigningDigestCLI(t *testing.T) {
 		name   string
 		digest asn1.ObjectIdentifier
 	}{
-		{"default", oid.GOST34311},
-		{"auto", oid.GOST34311},
+		{"default", oid.Kupyna256},
+		{"auto", oid.Kupyna256},
 		{"gost34311", oid.GOST34311},
 		{"kupyna256", oid.Kupyna256},
 		{"kupyna512", oid.Kupyna512},

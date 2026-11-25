@@ -114,10 +114,10 @@ func TestSignTimestampCLIControlsOutput(t *testing.T) {
 			}
 			message, err := cms.VerifySignedRaw(document, nil, []*cert.Certificate{root})
 			require.NoError(t, err)
-			wantDigest := oid.GOST34311
+			wantDigest := oid.Kupyna256
 			switch tc.digest {
-			case "kupyna256":
-				wantDigest = oid.Kupyna256
+			case "gost34311":
+				wantDigest = oid.GOST34311
 			case "kupyna512":
 				wantDigest = oid.Kupyna512
 			}

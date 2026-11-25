@@ -27,11 +27,27 @@ func TestNationalCSRProfiles(t *testing.T) {
 	for _, params := range dstu4145.AllParams() {
 		t.Run(params.Name, func(t *testing.T) {
 			key := &dstu4145.PrivateKey{Curve: params.Curve, D: big.NewInt(2)} // public fixture scalar
-			data, err := Create(&Request{Subject: []AttributeTypeAndValue{{oid.OIDCommonName, "CSR interoperability"}}}, key)
+			// The GOST 34.311 profile is explicit: it carries the DKE parameter
+			// that the mutations below exercise.
+			gost := oid.DSTU4145WithGOST34311
+			defaultAlgorithm := oid.DSTU4145WithKupyna256
+			if params.Curve.IsONB() {
+				gost = oid.DSTU4145ONBWithGOST34311
+				defaultAlgorithm = oid.DSTU4145ONBWithKupyna256
+			}
+			subject := []AttributeTypeAndValue{{oid.OIDCommonName, "CSR interoperability"}}
+			fallback, err := Create(&Request{Subject: subject}, key)
+			require.NoError(t, err)
+			defaultParsed, err := Parse(fallback)
+			require.NoError(t, err)
+			require.NoError(t, defaultParsed.Verify())
+			require.Equal(t, defaultAlgorithm, defaultParsed.SignatureAlgOID, "default is Kupyna-256")
+			data, err := Create(&Request{Subject: subject, SignatureAlgorithmOID: gost}, key)
 			require.NoError(t, err)
 			parsed, err := Parse(data)
 			require.NoError(t, err)
 			require.NoError(t, parsed.Verify())
+			require.Equal(t, gost, parsed.SignatureAlgOID)
 			require.True(t, parsed.national)
 			require.True(t, key.Public().Q.Equal(parsed.PublicKey.Q))
 			var outer certificationRequest

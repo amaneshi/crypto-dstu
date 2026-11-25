@@ -37,7 +37,7 @@ type TimestampSignOptions struct {
 	// accepts none: the token is then fully checked except for the path to a
 	// trusted root (see NewSigner).
 	TSARoots         [][]byte
-	ImprintAlgorithm asn1.ObjectIdentifier // zero selects GOST 34.311
+	ImprintAlgorithm asn1.ObjectIdentifier // zero selects Kupyna-256
 	Fetch            func(context.Context, TimestampRequest) ([]byte, error)
 	// URLs are TSA endpoints (http or https), tried in order until one answers.
 	URLs []string
@@ -134,7 +134,7 @@ func (ts timestamper) requestVerifiedTimestamp(ctx context.Context, data []byte,
 	}
 	algorithm := options.ImprintAlgorithm
 	if len(algorithm) == 0 {
-		algorithm = oid.GOST34311
+		algorithm = oid.Kupyna256
 	}
 	imprint, err := tsp.HashData(data, algorithm)
 	if err != nil {

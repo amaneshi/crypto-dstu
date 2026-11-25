@@ -243,7 +243,7 @@ dstu csr \
 |------|---------|-------------|
 | `-key path[:password]` | | Existing key container (optional; fresh key generated if omitted) |
 | `-curve name` | `DSTU_PB_257` | Curve for generated key |
-| `-digest name` | `auto` | `auto`/`gost34311`, `kupyna256` or `kupyna512`; signature OID follows the key basis |
+| `-digest name` | `auto` | `auto` (Kupyna-256), `gost34311`, `kupyna256` or `kupyna512`; signature OID follows the key basis |
 | `-cn value` | | Common name (Subject CN) |
 | `-org value` | | Organisation (Subject O) |
 | `-country value` | | Country code (Subject C) |
@@ -792,11 +792,12 @@ timestamped and signed-and-encrypted output. Unknown values fail before reading
 keys or writing output. The choice does not change the key's curve, encryption
 algorithm or timestamp-imprint algorithm.
 
-`auto` follows supported certificate **public-key** algorithm identifiers. A
-Kupyna-signed certificate can still declare a GOST public-key identifier, so
-use an explicit digest when the required document profile is Kupyna. This
-preserves the existing default; the issuer's certificate-signature algorithm
-does not select the document digest. See the independently checked
+`auto` selects Kupyna-256 for the supported certificate **public-key**
+algorithm identifiers that previously selected GOST 34.311, and keeps an
+explicit Kupyna-256/512 public-key identifier's own digest. Earlier versions
+chose GOST 34.311 here; pass `-digest gost34311` (or `SignOptions.DigestAlgorithm`)
+for counterparties that still require it. The issuer's certificate-signature
+algorithm does not select the document digest. See the independently checked
 [IIT profile matrix](docs/iit-interoperability.md#limits) for curve/profile coverage.
 
 `dstu encrypt` and `dstu sign -crypt` accept `-cipher gost28147-cfb` (default),

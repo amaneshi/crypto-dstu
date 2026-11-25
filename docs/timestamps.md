@@ -137,7 +137,7 @@ The optional Fetch callback receives `ua.TimestampRequest{DER: ...}` and returns
 complete DER TimeStampResp bytes. It receives only a signature imprint and a
 fresh nonce; private keys and document content stay local. If Fetch is nil,
 explicitly configured `Box.AddTSP` endpoints are used with the bounded TSP client.
-The default imprint is GOST 34.311; `ImprintAlgorithm` selects another supported
+The default imprint is Kupyna-256 (earlier versions used GOST 34.311); `ImprintAlgorithm` selects another supported
 hash. Request bytes and input content are copied before callbacks run.
 
 Before embedding, the library validates the original request's nonce and exact

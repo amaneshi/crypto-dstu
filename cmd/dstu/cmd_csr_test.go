@@ -38,9 +38,15 @@ func TestCSRCLI(t *testing.T) {
 				request, err := csr.Parse(data)
 				require.NoError(t, err)
 				require.NoError(t, request.Verify())
-				expected := oid.DSTU4145WithGOST34311
+				expected := oid.DSTU4145WithKupyna256
 				if request.PublicKey.Curve.IsONB() {
-					expected = oid.DSTU4145ONBWithGOST34311
+					expected = oid.DSTU4145ONBWithKupyna256
+				}
+				if digest == "gost34311" {
+					expected = oid.DSTU4145WithGOST34311
+					if request.PublicKey.Curve.IsONB() {
+						expected = oid.DSTU4145ONBWithGOST34311
+					}
 				}
 				if digest == "kupyna256" {
 					expected = oid.DSTU4145WithKupyna256

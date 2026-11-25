@@ -9,7 +9,8 @@ signatures. For example:
 dstu csr -curve DSTU_ONB_173 -cn Example -digest kupyna512 -output request.der
 ```
 
-The default remains GOST.
+The default is Kupyna-256 (earlier versions used GOST 34.311); pass
+`-digest gost34311` for the GOST profile.
 
 ## Wire-format correction
 
